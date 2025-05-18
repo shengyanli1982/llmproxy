@@ -1,0 +1,27 @@
+[package]
+name = "llmproxy"
+version = "0.1.0"
+edition = "2021"
+description = "An intelligent load balancer with smart scheduling that unifies diverse LLMs (Public/Private Cloud, vLLM, Ollama), enabling seamless multi-cloud and hybrid-cloud adoption little client-side code modifications."
+license = "MIT"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+debug = false
+incremental = false
+overflow-checks = false
+
+[[bin]]
+name = "llmproxyd"
+path = "src/main.rs"
+
+
+# 这个一定要放在最后，否则会报错
+[target.'cfg(unix)'.dependencies]
+openssl-sys = { version = "0.9", features = ["vendored"] }
+[target.'cfg(windows)'.dependencies]
+openssl-sys = "0.9"
