@@ -6,8 +6,9 @@ http_server:
   forward:
     port: 8080 # 主应用端口
     address: "0.0.0.0" # 监听地址
-    # 限流配置
+    # 限流配置(根据IP限流)
     ratelimit:
+      enabled: true # 是否启用限流, 默认是 false
       per_second: 100 # 每秒请求数
       burst: 200 # 突发请求上限
   # 管理服务配置
@@ -43,9 +44,11 @@ upstreams:
 model_groups:
   # 默认模型组
   - name: defaultgroup # 默认模型组名，必须为 defaultgroup，请求时指定这个模型组名即可
+    # 上游定义
     upstreams:
       - name: openai_primary
       - name: anthropic_primary
+    # 负载均衡策略
     balance:
       strategy: "roundrobin" # 轮询策略, 默认是 roundrobin
     # HTTP客户端配置
@@ -63,15 +66,17 @@ model_groups:
         initial: 500 # 初始重试间隔（毫秒）
       proxy:
         enabled: false # 是否启用代理, 默认不启用
-        url: "" # HTTP/HTTPS代理URL，例如：http://proxy.example.com:8080
+        url: "" # HTTP/HTTPS代理URL，例如：http://username:password@proxy.example.com:8080
 
   # OpenAI模型组
   - name: openai # 模型组名，可以自定义，请求时指定这个模型组名即可
+    # 上游定义
     upstreams:
       - name: openai_primary
         weight: 8 # 权重, 默认是 1，仅仅在 weighted_roundrobin 策略下有效
       - name: openai_backup
         weight: 2 # 权重, 默认是 1，仅仅在 weighted_roundrobin 策略下有效
+    # 负载均衡策略
     balance:
       strategy: "weighted_roundrobin" # 加权轮询策略, 默认是 roundrobin
     # HTTP客户端配置
@@ -89,12 +94,14 @@ model_groups:
         initial: 500 # 初始重试间隔（毫秒）
       proxy:
         enabled: false # 是否启用代理, 默认不启用
-        url: "" # HTTP/HTTPS代理URL，例如：http://proxy.example.com:8080
+        url: "" # HTTP/HTTPS代理URL，例如：http://username:password@proxy.example.com:8080
 
   # Anthropic模型组
   - name: anthropic # 模型组名，可以自定义，请求时指定这个模型组名即可
+    # 上游定义
     upstreams:
       - name: anthropic_primary
+    # 负载均衡策略
     balance:
       strategy: "random" # 随机策略, 默认是 roundrobin
     # HTTP客户端配置
@@ -112,5 +119,5 @@ model_groups:
         initial: 500 # 初始重试间隔（毫秒）
       proxy:
         enabled: false # 是否启用代理, 默认不启用
-        url: "" # HTTP/HTTPS代理URL，例如：http://proxy.example.com:8080
+        url: "" # HTTP/HTTPS代理URL，例如：http://username:password@proxy.example.com:8080
 
