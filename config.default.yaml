@@ -1,0 +1,113 @@
+# LLMProxy 默认配置文件
+
+# 服务器配置
+http_server:
+  # 转发服务配置
+  forward:
+    port: 8080 # 主应用端口
+    address: "0.0.0.0" # 监听地址
+    # 限流配置
+    ratelimit:
+      per_second: 100 # 每秒请求数
+      burst: 200 # 突发请求上限
+  # 管理服务配置
+  admin:
+    port: 8081 # 管理端口
+    address: "0.0.0.0" # 监听地址
+
+# 上游定义
+upstreams:
+  # OpenAI API
+  - name: openai_primary
+    url: "https://api.openai.com/v1"
+    auth:
+      type: "bearer"
+      token: "YOUR_OPENAI_API_KEY"
+
+  # Anthropic API
+  - name: anthropic_primary
+    url: "https://api.anthropic.com"
+    auth:
+      type: "bearer"
+      token: "YOUR_ANTHROPIC_API_KEY"
+
+  # 使用基本认证的示例上游
+  - name: basic_auth_example
+    url: "https://example.com/api"
+    auth:
+      type: "basic"
+      username: "user"
+      password: "password"
+
+# 模型组定义
+model_groups:
+  # 默认模型组
+  - name: defaultgroup # 模型组名，可以自定义，请求时指定这个模型组名即可
+    upstreams:
+      - name: openai_primary
+      - name: anthropic_primary
+    balance:
+      strategy: "roundrobin" # 轮询策略
+    # HTTP客户端配置
+    http_client:
+      agent: "LLMProxy/1.0" # 用户代理. 默认是 `LLMProxy/1.0`
+      keepalive: 60 # 可选：TCP Keepalive（秒）(有效范围: 5-600)
+      timeout:
+        connect: 10 # 连接超时（秒）
+        request: 10 # 请求超时（秒）
+        idle: 60 # 空闲超时（秒）
+      # 请求重试配置
+      retry:
+        attempts: 3 # 最大重试次数
+        initial: 500 # 初始重试间隔（毫秒）
+      proxy:
+        enabled: false # 是否启用代理, 默认不启用
+        url: "" # HTTP/HTTPS代理URL，例如：http://proxy.example.com:8080
+
+  # OpenAI模型组
+  - name: openai # 模型组名，可以自定义，请求时指定这个模型组名即可
+    upstreams:
+      - name: openai_primary
+        weight: 8 # 权重, 默认是 1，仅仅在 weighted_roundrobin 策略下有效
+      - name: openai_backup
+        weight: 2 # 权重, 默认是 1，仅仅在 weighted_roundrobin 策略下有效
+    balance:
+      strategy: "weighted_roundrobin" # 加权轮询策略
+    # HTTP客户端配置
+    http_client:
+      agent: "LLMProxy/1.0" # 用户代理. 默认是 `LLMProxy/1.0`
+      keepalive: 60 # 可选：TCP Keepalive（秒）(有效范围: 5-600)
+      timeout:
+        connect: 10 # 连接超时（秒）
+        request: 10 # 请求超时（秒）
+        idle: 60 # 空闲超时（秒）
+      # 请求重试配置
+      retry:
+        attempts: 3 # 最大重试次数
+        initial: 500 # 初始重试间隔（毫秒）
+      proxy:
+        enabled: false # 是否启用代理, 默认不启用
+        url: "" # HTTP/HTTPS代理URL，例如：http://proxy.example.com:8080
+
+  # Anthropic模型组
+  - name: anthropic # 模型组名，可以自定义，请求时指定这个模型组名即可
+    upstreams:
+      - name: anthropic_primary
+    balance:
+      strategy: "random" # 随机策略
+    # HTTP客户端配置
+    http_client:
+      agent: "LLMProxy/1.0" # 用户代理. 默认是 `LLMProxy/1.0`
+      keepalive: 60 # 可选：TCP Keepalive（秒）(有效范围: 5-600)
+      timeout:
+        connect: 10 # 连接超时（秒）
+        request: 10 # 请求超时（秒）
+        idle: 60 # 空闲超时（秒）
+      # 请求重试配置
+      retry:
+        attempts: 3 # 最大重试次数
+        initial: 500 # 初始重试间隔（毫秒）
+      proxy:
+        enabled: false # 是否启用代理, 默认不启用
+        url: "" # HTTP/HTTPS代理URL，例如：http://proxy.example.com:8080
+
