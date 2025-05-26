@@ -54,9 +54,6 @@ RUN adduser -D -u 1000 appuser && \
     chown -R appuser:appuser /app
 USER appuser
 
-# (可选) 暴露端口 (如果 llmproxyd 监听端口)
-EXPOSE  8080/tcp 8081/tcp
-
 # 默认运行服务端程序。
 # 假设服务端需要一个配置文件
 ENTRYPOINT ["/app/llmproxyd"]

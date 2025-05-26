@@ -397,6 +397,7 @@ pub struct ForwardConfig {
     // 转发服务名称
     pub name: String,
     // 监听端口
+    #[serde(default = "default_listen_port")]
     pub port: u16,
     // 监听地址
     #[serde(default = "default_listen_address")]
@@ -721,6 +722,10 @@ fn default_listen_address() -> String {
 
 fn default_admin_port() -> u16 {
     9000
+}
+
+fn default_listen_port() -> u16 {
+    3000
 }
 
 fn default_connect_timeout() -> u64 {
