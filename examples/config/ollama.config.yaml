@@ -1,0 +1,60 @@
+# LLMProxy Ollama 本地服务配置文件
+
+# 服务器配置
+http_server:
+  # 转发服务配置
+  forwards:
+    - name: to_ollama_local # 转发服务名
+      port: 3000 # 监听端口 (避免与默认端口冲突)
+      address: "0.0.0.0" # 监听地址
+      upstream_group: "ollama_group" # 指向 Ollama 模型组
+      # 本地服务通常不需要限流，按需开启
+      # ratelimit:
+      #   enabled: false
+      #   per_second: 100
+      #   burst: 200
+      # timeout: # 可以使用默认值或自定义
+      #   connect: 10
+  # 管理服务配置
+  admin:
+    port: 9000 # 管理端口 (避免与默认端口冲突)
+    address: "0.0.0.0"
+    # timeout: # 可以使用默认值或自定义
+    #   connect: 10
+
+# 上游定义
+upstreams:
+  # 本地 Ollama 服务
+  - name: ollama_local # 上游名
+    url: "http://localhost:11434" # Ollama 默认地址和端口
+    auth:
+      type: "none" # 本地 Ollama 通常不需要认证
+    # headers: # 通常不需要为本地 Ollama 自定义 headers
+    #   - op: insert
+    #     key: X-Custom-Header
+    #     value: "OllamaProxy"
+
+# 上游组定义
+upstream_groups:
+  # Ollama 上游组
+  - name: ollama_group # 上游组名
+    upstreams: # 至少指定一个上游
+      - name: ollama_local
+    # 负载均衡策略 (单个上游，策略影响不大，roundrobin 即可)
+    balance:
+      strategy: "roundrobin"
+    # HTTP客户端配置
+    http_client:
+      agent: "LLMProxy/1.0-Ollama" # 用户代理
+      # keepalive: 60 # TCP Keepalive（秒）
+      # timeout: # 可以使用默认值或自定义
+      #   connect: 10
+      #   request: 300 # Ollama响应可能较慢，可以适当调高请求超时
+      #   idle: 60
+      # retry: # 按需配置重试
+      #   enabled: false
+      #   attempts: 3
+      #   initial: 500
+      # proxy: # 本地服务通常不需要代理
+      #   enabled: false
+      #   url: ""

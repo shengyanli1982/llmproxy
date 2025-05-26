@@ -1,0 +1,221 @@
+# LLMProxy 配置模板
+# 请根据您的实际需求修改此文件。
+# 更多信息和高级配置，请参阅官方文档。
+
+#-------------------------------------------------------------------------------
+# 请确保在修改后保存文件。
+# 对于生产环境，强烈建议将包含敏感信息 (如 API 密钥) 的配置文件妥善保管，
+# 并考虑使用环境变量或密钥管理服务来处理这些敏感值。
+#-------------------------------------------------------------------------------
+
+#-------------------------------------------------------------------------------
+# HTTP 服务器配置 (http_server)
+#-------------------------------------------------------------------------------
+# 定义 LLMProxy 如何监听和处理传入的 HTTP 请求。
+http_server:
+  #-----------------------------------------------------------------------------
+  # 转发服务 (forwards)
+  #-----------------------------------------------------------------------------
+  # 定义一组或多组转发规则，每个规则监听特定端口并将请求路由到指定的上游组。
+  forwards:
+    # 示例 1: 转发到混合上游组 (mixgroup)
+    - name: to_mixgroup # [必填] 转发服务名称。必须在配置文件中唯一，用于日志和管理识别。
+      port: 3000 # [必填] 此转发服务监听的端口号。
+      address:
+        "0.0.0.0" # [可选] 服务监听的网络地址。默认 "0.0.0.0" (监听所有网络接口)。
+        # 考虑安全性，可设置为 "127.0.0.1" (仅本地访问)。
+      upstream_group: "mixgroup" # [必填] 此转发服务关联的上游组名称。该名称必须在 `upstream_groups` 部分定义。
+      # [可选] IP 速率限制配置。如果省略，则不启用此转发的速率限制。
+      ratelimit:
+        enabled: true # 是否启用速率限制。 (默认: false)
+        per_second: 100 # 每秒允许来自单个 IP 的最大请求数。
+        burst: 200 # 允许来自单个 IP 的突发请求数 (必须 >= per_second)。
+      # [可选] 连接超时配置。如果省略，将使用全局默认值。
+      timeout:
+        connect: 10 # 客户端连接到 LLMProxy 的超时时间 (秒)。
+
+    # 示例 2: 转发到 OpenAI 上游组 (openai_group)
+    - name: openai_group # [必填] 转发服务名称。
+      port: 3001 # [必填] 监听端口。
+      address: "0.0.0.0" # [可选] 监听地址。
+      upstream_group: "openai" # [必填] 关联的上游组名称。
+      ratelimit:
+        enabled: true
+        per_second: 100
+        burst: 200
+      timeout:
+        connect: 10
+
+  #-----------------------------------------------------------------------------
+  # 管理服务 (admin)
+  #-----------------------------------------------------------------------------
+  # [可选] 配置管理接口，用于提供监控指标 (如 /metrics) 和健康检查 (如 /health)。
+  # 注意: 管理接口通常不设置速率限制。
+  admin:
+    port: 9000 # [必填] 管理服务监听的端口号。
+    address: "0.0.0.0" # [可选] 管理服务监听的网络地址。 (默认: "0.0.0.0")
+    # [可选] 管理接口连接超时配置。
+    timeout:
+      connect: 10 # 连接到管理接口的超时时间 (秒)。
+
+#-------------------------------------------------------------------------------
+# 上游服务定义 (upstreams)
+#-------------------------------------------------------------------------------
+# 定义后端 LLM API 服务。每个上游代表一个实际的 API 端点。
+upstreams:
+  # 示例 1: OpenAI API
+  - name: openai_primary # [必填] 上游服务名称。必须在配置文件中唯一。
+    url: "https://api.openai.com/v1" # [必填] 上游服务的完整基础 URL。
+    # [可选] 认证配置。
+    auth:
+      type:
+        "bearer" # 认证类型。可选值:
+        #   "bearer": 使用 Bearer Token 认证 (例如 OpenAI, Anthropic)。
+        #   "basic": 使用 Basic Auth (用户名/密码)。
+        #   "none": 无认证。 (默认)
+      token:
+        "YOUR_OPENAI_API_KEY_HERE" # [条件必填] 当 type 为 "bearer" 时，提供 API Key。
+        # 请替换为您的真实 OpenAI API 密钥。
+      # username: "YOUR_USERNAME" # [条件必填] 当 type 为 "basic" 时，提供用户名。
+      # password: "YOUR_PASSWORD" # [条件必填] 当 type 为 "basic" 时，提供密码。
+    # [可选] HTTP 头部操作。用于在请求转发到此上游前修改请求头。
+    headers:
+      - op:
+          insert # 操作类型:
+          #   "insert": 如果头部不存在则插入；若存在则不执行任何操作。
+          #   "replace": 如果头部存在则替换其值；若不存在则插入。
+          #   "remove": 如果头部存在则删除。
+        key: X-Custom-Header-For-OpenAI # 要操作的 HTTP 头部名称。
+        value: "MyProxyValue" # 对于 "insert" 或 "replace"，这是头部的值。
+
+  # 示例 2: Anthropic API
+  - name: anthropic_primary # [必填] 上游服务名称。
+    url: "https://api.anthropic.com" # [必填] 上游服务 URL。
+    auth:
+      type: "bearer"
+      token: "YOUR_ANTHROPIC_API_KEY_HERE" # 请替换为您的真实 Anthropic API 密钥。
+    headers:
+      - op: insert
+        key:
+          "x-api-key" # 注意：某些 API (如 Anthropic Claude) 可能要求通过头部传递 API Key 而不是 Bearer Token。
+          # 请参考具体 API 文档。此处的 'token' 字段仍可用于 'Bearer' 认证类型，
+          # 而头部操作可以用于其他形式的基于头部的密钥传递。
+        value: "YOUR_ANTHROPIC_API_KEY_IN_HEADER_IF_NEEDED" # 如果 API Key 通过头部传递，请在此处配置。
+
+  # 示例 3: 使用 Basic 认证的自定义上游
+  - name: custom_service_basic_auth # [必填] 上游服务名称。
+    url: "https://api.example.com/resource" # [必填] 上游服务 URL。
+    auth:
+      type: "basic"
+      username: "service_user"
+      password: "service_password_placeholder" # 请替换为实际密码。
+  # 注意:
+  # - 如果省略 `auth` 字段，则默认不对此上游使用任何认证。
+  # - 如果省略 `headers` 字段，则默认不对发送到此上游的请求头进行任何修改。
+
+#-------------------------------------------------------------------------------
+# 上游组定义 (upstream_groups)
+#-------------------------------------------------------------------------------
+# 将多个上游服务组合在一起，并定义负载均衡、HTTP 客户端行为等。
+upstream_groups:
+  # 示例 1: 混合上游组 (用于演示多种特性)
+  - name: mixgroup # [必填] 上游组名称。必须在配置文件中唯一。
+    # [必填] 此组包含的上游服务列表 (至少需要一个)。
+    # 每个条目引用在 `upstreams` 部分定义的上游服务的 `name`。
+    upstreams:
+      - name: openai_primary
+      # - name: anthropic_primary # 可以添加多个上游到同一组
+    # [可选] 负载均衡策略。
+    balance:
+      strategy:
+        "roundrobin" # 负载均衡策略。可选值:
+        #   "roundrobin": 轮询。按顺序将请求分发给每个上游。(默认)
+        #   "weighted_roundrobin": 加权轮询。根据为每个上游定义的权重分配请求。
+        #   "random": 随机。随机选择一个上游。
+        #   "least_connections": 最少连接数 (如果支持)。选择活动连接最少的上游。
+    # [可选] HTTP 客户端配置。定义 LLMProxy 如何与此组中的上游服务通信。
+    # 如果省略，将使用全局默认的 HTTP 客户端配置。
+    http_client:
+      agent:
+        "LLMProxy/1.0 (YourIdentifier)" # [可选] 发送到上游的 User-Agent 头部值。 (默认: "LLMProxy/1.0")
+        # 建议添加标识符以便于追踪。
+      keepalive:
+        60 # [可选] TCP Keepalive 时间 (秒)。范围: 0-600。0 表示禁用。 (默认: 60)
+        # 有助于保持与上游的连接活跃，减少延迟。
+      stream_mode:
+        true # [可选] 是否启用流式传输模式。(默认: true)
+        # 对于 LLM API 的流式响应 (server-sent events) 非常重要。
+        # 当为 `true` 时，`timeout.request` 配置通常会失效或行为改变，
+        # 因为流式请求的持续时间不确定。
+      # [可选] 连接和请求超时配置。
+      timeout:
+        connect: 10 # 连接到上游服务的超时时间 (秒)。 (默认: 10)
+        request:
+          300 # 从发送请求到接收到上游完整响应 (非流式) 的超时时间 (秒)。(默认: 10, 对于长时 LLM 请求可能需要调大)
+          # 注意: 在 `stream_mode: true` 时，此超时可能不适用或行为不同。请查阅文档。
+        idle: 60 # 与上游服务的连接在无活动后被视为空闲并关闭的超时时间 (秒)。 (默认: 60)
+      # [可选] 请求重试配置。
+      retry:
+        enabled:
+          true # 是否启用向上游的请求重试。 (默认: false)
+          # 适用于幂等请求或可安全重试的场景。
+        attempts: 3 # 最大重试次数 (不包括首次尝试)。
+        initial: 500 # 首次重试前的初始等待间隔 (毫秒)。后续重试间隔可能会增加 (例如指数退避)。
+      # [可选] HTTP/HTTPS 代理配置，用于 LLMProxy 通过出站代理连接到上游服务。
+      proxy:
+        enabled: false # 是否启用出站代理。 (默认: false)
+        url:
+          "http://user:pass@your-proxy-server.com:8080" # 代理服务器 URL。
+          # 示例: "http://proxy.example.com:8080"
+          #       "socks5://user:password@host:port" (如果支持 SOCKS5)
+
+  # 示例 2: OpenAI 专用上游组 (使用加权轮询)
+  - name: openai # [必填] 上游组名称。
+    upstreams:
+      - name: openai_primary
+        weight:
+          8 # [条件可选] 权重。仅在 `balance.strategy` 为 "weighted_roundrobin" 时有效。(默认: 1)
+          # 权重越高的上游将接收到更多请求。
+      - name: custom_service_basic_auth # 可以将不同类型的上游放入一个组
+        weight: 2
+    balance:
+      strategy: "weighted_roundrobin"
+    http_client: # 可以为每个组定制 HTTP 客户端行为
+      agent: "LLMProxy/1.0 (OpenAIClient)"
+      keepalive: 90 # 例如，为 OpenAI 连接设置更长的 keepalive
+      stream_mode: true
+      timeout:
+        connect: 10
+        request: 300 # 对于 OpenAI 请求，通常响应时间较长
+        idle: 90
+      retry:
+        enabled: true
+        attempts: 2
+        initial: 1000
+      proxy:
+        enabled: false
+        # url: ""
+
+  # 示例 3: Anthropic 专用上游组 (使用随机负载均衡)
+  - name: anthropic # [必填] 上游组名称。
+    upstreams:
+      - name: anthropic_primary
+      # 可以添加更多 Anthropic 上游实例，例如不同区域的端点
+    balance:
+      strategy: "random" # 对于期望更均匀随机分布的场景
+    http_client:
+      agent: "LLMProxy/1.0 (AnthropicClient)"
+      keepalive: 60
+      # stream: true # [已废弃] 此配置项已被 `stream_mode` 替代。
+      # 为保持兼容性可能暂时有效，但建议迁移到 `stream_mode`。
+      # 后续版本可能会移除此字段。
+      stream_mode: true # 确保使用 stream_mode
+      timeout:
+        connect: 15 # Anthropic 连接可能需要稍长超时
+        request: 300 # Anthropic Claude 的响应也可能较长
+        idle: 60
+      retry:
+        enabled: false # 假设 Anthropic 请求默认不进行重试
+      proxy:
+        enabled: false
+        # url: ""
