@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use rand::{seq::SliceRandom, thread_rng};
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
+use tracing::debug;
 
 /// 负载均衡器特性
 #[async_trait]
@@ -40,8 +41,17 @@ impl LoadBalancer for RoundRobinBalancer {
             return Err(AppError::NoUpstreamAvailable);
         }
 
-        let current = self.current.fetch_add(1, Ordering::SeqCst) % self.upstreams.len();
-        Ok(&self.upstreams[current])
+        let current_index = self.current.fetch_add(1, Ordering::SeqCst) % self.upstreams.len();
+        let upstream = &self.upstreams[current_index];
+        debug!(
+            "RoundRobinBalancer selected upstream: {} ({}), index: {}",
+            upstream.name,
+            self.upstreams
+                .get(current_index)
+                .map_or("unknown_address", |u| &u.address),
+            current_index
+        );
+        Ok(upstream)
     }
 
     async fn report_failure(&self, _upstream: &UpstreamRef) {
@@ -84,8 +94,18 @@ impl LoadBalancer for WeightedRoundRobinBalancer {
             return Err(AppError::NoUpstreamAvailable);
         }
 
-        let current = self.current.fetch_add(1, Ordering::SeqCst) % self.upstreams.len();
-        Ok(&self.upstreams[current])
+        let current_index = self.current.fetch_add(1, Ordering::SeqCst) % self.upstreams.len();
+        let upstream = &self.upstreams[current_index];
+        debug!(
+            "WeightedRoundRobinBalancer selected upstream: {} ({}), weight: {}, index: {}",
+            upstream.name,
+            self.upstreams
+                .get(current_index)
+                .map_or("unknown_address", |u| &u.address),
+            upstream.weight,
+            current_index
+        );
+        Ok(upstream)
     }
 
     async fn report_failure(&self, _upstream: &UpstreamRef) {
@@ -117,6 +137,10 @@ impl LoadBalancer for RandomBalancer {
             .upstreams
             .choose(&mut thread_rng())
             .ok_or(AppError::NoUpstreamAvailable)?;
+        debug!(
+            "RandomBalancer selected upstream: {} ({})",
+            upstream.name, upstream.address
+        );
         Ok(upstream)
     }
 

@@ -18,7 +18,7 @@ use tokio_graceful_shutdown::{IntoSubsystem, SubsystemHandle};
 use tower::ServiceBuilder;
 use tower_governor::{governor::GovernorConfigBuilder, GovernorError, GovernorLayer};
 use tower_http::timeout::TimeoutLayer;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 /// 转发服务状态
 struct ForwardState {
@@ -206,6 +206,11 @@ async fn forward_handler(
         Ok(response) => {
             // 获取响应状态码
             let status = response.status();
+
+            debug!(
+                "Forwarded request: {} {} to upstream group {}, upstream response status: {}",
+                method, path_str, state.config.upstream_group, status
+            );
 
             // 记录请求耗时
             let duration = start_time.elapsed();
