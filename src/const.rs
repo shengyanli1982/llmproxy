@@ -17,19 +17,19 @@ pub mod shutdown_timeout {
 // HTTP客户端配置限制
 pub mod http_client_limits {
     // 默认连接超时（秒）
-    pub const DEFAULT_CONNECT_TIMEOUT: u64 = 3;
+    pub const DEFAULT_CONNECT_TIMEOUT: u64 = 15;
     // 最小连接超时（秒）
     pub const MIN_CONNECT_TIMEOUT: u64 = 1;
     // 最大连接超时（秒）
     pub const MAX_CONNECT_TIMEOUT: u64 = 120;
     // 默认请求超时（秒）
-    pub const DEFAULT_REQUEST_TIMEOUT: u64 = 5;
+    pub const DEFAULT_REQUEST_TIMEOUT: u64 = 120;
     // 最小请求超时（秒）
     pub const MIN_REQUEST_TIMEOUT: u64 = 1;
     // 最大请求超时（秒）
     pub const MAX_REQUEST_TIMEOUT: u64 = 1200;
     // 默认空闲超时（秒）
-    pub const DEFAULT_IDLE_TIMEOUT: u64 = 10;
+    pub const DEFAULT_IDLE_TIMEOUT: u64 = 60;
     // 最小空闲超时（秒）
     pub const MIN_IDLE_TIMEOUT: u64 = 5;
     // 最大空闲超时（秒）

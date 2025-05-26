@@ -27,7 +27,7 @@ static GLOBAL: MiMalloc = MiMalloc;
 fn init_logging(args: &Args) {
     let builder = tracing_subscriber::fmt()
         .with_ansi(false)
-        .with_line_number(true);
+        .with_line_number(false);
 
     // 如果启用调试模式，输出调试信息
     if args.debug {
