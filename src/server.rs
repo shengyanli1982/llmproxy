@@ -15,7 +15,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::net::TcpListener;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemHandle};
-use tower::ServiceBuilder;
 use tower_governor::{governor::GovernorConfigBuilder, GovernorError, GovernorLayer};
 use tower_http::timeout::TimeoutLayer;
 use tracing::{debug, error, info};
@@ -60,7 +59,7 @@ impl ForwardServer {
 impl IntoSubsystem<AppError> for ForwardServer {
     async fn run(self, subsys: SubsystemHandle) -> Result<(), AppError> {
         // 创建路由
-        let mut app = Router::new()
+        let app = Router::new()
             .route("/{*path}", axum::routing::any(forward_handler))
             .with_state(self.state.clone());
 
@@ -87,7 +86,7 @@ impl IntoSubsystem<AppError> for ForwardServer {
                 .per_second(self.state.config.ratelimit.per_second as u64)
                 .burst_size(self.state.config.ratelimit.burst)
                 // 添加自定义错误处理，记录限流指标
-                .error_handler(move |err: &GovernorError| {
+                .error_handler(move |err: GovernorError| {
                     if let GovernorError::TooManyRequests { .. } = err {
                         // 记录限流指标
                         METRICS

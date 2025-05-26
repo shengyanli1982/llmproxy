@@ -338,15 +338,15 @@ impl Config {
                 )));
             }
 
-            if config.retry.initial < retry_limits::MIN_INITIAL_INTERVAL
-                || config.retry.initial > retry_limits::MAX_INITIAL_INTERVAL
+            if config.retry.initial < retry_limits::MIN_INITIAL_MS
+                || config.retry.initial > retry_limits::MAX_INITIAL_MS
             {
                 return Err(AppError::Config(format!(
                     "Initial retry interval {}ms for {} is out of valid range [{}-{}]ms",
                     config.retry.initial,
                     context,
-                    retry_limits::MIN_INITIAL_INTERVAL,
-                    retry_limits::MAX_INITIAL_INTERVAL
+                    retry_limits::MIN_INITIAL_MS,
+                    retry_limits::MAX_INITIAL_MS
                 )));
             }
         }
@@ -744,7 +744,7 @@ fn default_retry_attempts() -> u32 {
 }
 
 fn default_retry_initial() -> u32 {
-    retry_limits::DEFAULT_INITIAL_INTERVAL
+    retry_limits::DEFAULT_INITIAL_MS
 }
 
 fn default_weight() -> u32 {

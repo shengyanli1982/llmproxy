@@ -18,8 +18,7 @@ use mimalloc::MiMalloc;
 use std::process;
 use std::sync::Arc;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemBuilder, Toplevel};
-use tracing::{debug, error, info};
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+use tracing::{error, info};
 
 // 使用 mimalloc 分配器提高内存效率
 #[global_allocator]

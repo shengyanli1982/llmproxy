@@ -48,7 +48,7 @@ impl LoadBalancer for RoundRobinBalancer {
             upstream.name,
             self.upstreams
                 .get(current_index)
-                .map_or("unknown_address", |u| &u.address),
+                .map_or("unknown_address", |u| &u.name),
             current_index
         );
         Ok(upstream)
@@ -101,7 +101,7 @@ impl LoadBalancer for WeightedRoundRobinBalancer {
             upstream.name,
             self.upstreams
                 .get(current_index)
-                .map_or("unknown_address", |u| &u.address),
+                .map_or("unknown_address", |u| &u.name),
             upstream.weight,
             current_index
         );
@@ -139,7 +139,7 @@ impl LoadBalancer for RandomBalancer {
             .ok_or(AppError::NoUpstreamAvailable)?;
         debug!(
             "RandomBalancer selected upstream: {} ({})",
-            upstream.name, upstream.address
+            upstream.name, upstream.name
         );
         Ok(upstream)
     }

@@ -277,32 +277,23 @@ impl UpstreamManager {
         let mut result = headers.clone();
 
         // 处理请求头操作
-        if let Some(ref header_ops) = upstream.headers {
-            for op in header_ops {
-                match op.op {
-                    HeaderOpType::Add | HeaderOpType::Set => {
-                        let header_name =
-                            HeaderName::from_bytes(op.name.as_bytes()).map_err(|e| {
-                                AppError::InvalidHeader(format!("Invalid header name: {}", e))
-                            })?;
-                        let header_value = HeaderValue::from_str(&op.value).map_err(|e| {
-                            AppError::InvalidHeader(format!("Invalid header value: {}", e))
-                        })?;
-                        result.insert(header_name, header_value);
-                    }
-                    HeaderOpType::Remove => {
-                        let header_name =
-                            HeaderName::from_bytes(op.name.as_bytes()).map_err(|e| {
-                                AppError::InvalidHeader(format!("Invalid header name: {}", e))
-                            })?;
-                        result.remove(header_name);
-                    }
-                    _ => {
-                        return Err(AppError::InvalidHeader(format!(
-                            "Invalid header operation: {:?}",
-                            op.op_type
-                        )));
-                    }
+        for op in &upstream.headers {
+            match op.op {
+                HeaderOpType::Insert | HeaderOpType::Replace => {
+                    let header_name = HeaderName::from_bytes(op.key.as_bytes()).map_err(|e| {
+                        AppError::InvalidHeader(format!("Invalid header name: {}", e))
+                    })?;
+                    let value_str = op.value.as_deref().unwrap_or_default();
+                    let header_value = HeaderValue::from_str(value_str).map_err(|e| {
+                        AppError::InvalidHeader(format!("Invalid header value: {}", e))
+                    })?;
+                    result.insert(header_name, header_value);
+                }
+                HeaderOpType::Remove => {
+                    let header_name = HeaderName::from_bytes(op.key.as_bytes()).map_err(|e| {
+                        AppError::InvalidHeader(format!("Invalid header name: {}", e))
+                    })?;
+                    result.remove(header_name);
                 }
             }
         }
@@ -316,44 +307,22 @@ impl UpstreamManager {
         request: reqwest_middleware::RequestBuilder,
         auth: &AuthConfig,
     ) -> Result<reqwest_middleware::RequestBuilder, AppError> {
-        match auth.auth_type {
+        match auth.r#type {
             AuthType::Basic => {
-                if let Some(ref basic_auth) = auth.basic {
-                    Ok(request.basic_auth(&basic_auth.username, Some(&basic_auth.password)))
+                if let (Some(username), Some(password)) = (&auth.username, &auth.password) {
+                    Ok(request.basic_auth(username, Some(password)))
                 } else {
                     Err(AppError::AuthError("Basic auth config missing".to_string()))
                 }
             }
             AuthType::Bearer => {
-                if let Some(ref bearer_auth) = auth.bearer {
-                    Ok(request.bearer_auth(&bearer_auth.token))
+                if let Some(token) = &auth.token {
+                    Ok(request.bearer_auth(token))
                 } else {
-                    Err(AppError::AuthError(
-                        "Bearer auth config missing".to_string(),
-                    ))
+                    Err(AppError::AuthError("Bearer auth token missing".to_string()))
                 }
             }
-            AuthType::CustomHeader => {
-                if let Some(ref custom_header) = auth.custom_header {
-                    let header_name = HeaderName::from_bytes(custom_header.name.as_bytes())
-                        .map_err(|e| {
-                            AppError::InvalidHeader(format!("Invalid header name: {}", e))
-                        })?;
-                    let header_value =
-                        HeaderValue::from_str(&custom_header.value).map_err(|e| {
-                            AppError::InvalidHeader(format!("Invalid header value: {}", e))
-                        })?;
-                    Ok(request.header(header_name, header_value))
-                } else {
-                    Err(AppError::AuthError(
-                        "Custom header auth config missing".to_string(),
-                    ))
-                }
-            }
-            _ => Err(AppError::AuthError(format!(
-                "Unsupported authentication type: {:?}",
-                auth.auth_type
-            ))),
+            AuthType::None => Ok(request),
         }
     }
 }

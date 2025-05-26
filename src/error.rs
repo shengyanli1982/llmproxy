@@ -52,4 +52,12 @@ pub enum AppError {
     /// 请求验证错误
     #[error("Request validation error: {0}")]
     ValidationError(String),
+
+    /// 无效的HTTP头
+    #[error("Invalid HTTP header: {0}")]
+    InvalidHeader(String),
+
+    /// 认证错误
+    #[error("Authentication error: {0}")]
+    AuthError(String),
 }
