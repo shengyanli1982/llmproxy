@@ -17,7 +17,7 @@ pub mod shutdown_timeout {
 // HTTP客户端配置限制
 pub mod http_client_limits {
     // 默认连接超时（秒）
-    pub const DEFAULT_CONNECT_TIMEOUT: u64 = 15;
+    pub const DEFAULT_CONNECT_TIMEOUT: u64 = 60;
     // 最小连接超时（秒）
     pub const MIN_CONNECT_TIMEOUT: u64 = 1;
     // 最大连接超时（秒）
