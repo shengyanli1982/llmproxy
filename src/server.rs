@@ -1,7 +1,7 @@
 use crate::config::ForwardConfig;
 use crate::error::AppError;
 use crate::metrics::METRICS;
-use crate::r#const::error_labels;
+use crate::r#const::{error_labels, http_headers};
 use crate::upstream::UpstreamManager;
 use axum::{
     body::Body,
@@ -53,6 +53,27 @@ impl ForwardServer {
 
         Ok(Self { addr, state })
     }
+}
+
+/// 检查响应是否为流式响应
+#[inline(always)]
+fn is_streaming_response(headers: &HeaderMap) -> bool {
+    // 检查内容类型是否为事件流
+    let is_event_stream = headers
+        .get(http_headers::CONTENT_TYPE)
+        .map(|v| v.to_str().unwrap_or(""))
+        .map(|s| s.contains(http_headers::content_types::EVENT_STREAM))
+        .unwrap_or(false);
+
+    // 检查传输编码是否为分块
+    let is_chunked = headers
+        .get(http_headers::TRANSFER_ENCODING)
+        .map(|v| v.to_str().unwrap_or(""))
+        .map(|s| s.contains(http_headers::transfer_encodings::CHUNKED))
+        .unwrap_or(false);
+
+    // 如果任一条件满足，则认为是流式响应
+    is_event_stream || is_chunked
 }
 
 #[async_trait::async_trait]
@@ -230,7 +251,10 @@ async fn forward_handler(
                     .inc();
             }
 
-            // 转换为axum响应
+            // 检查是否为流式响应
+            let is_stream = is_streaming_response(response.headers());
+
+            // 创建响应构建器
             let mut axum_response = Response::builder().status(status);
 
             // 复制响应头
@@ -240,18 +264,36 @@ async fn forward_handler(
                 }
             }
 
-            // 读取响应体
-            match response.bytes().await {
-                Ok(bytes) => match axum_response.body(Body::from(bytes)) {
+            // 根据响应类型处理
+            if is_stream {
+                // 对于流式响应，直接转发流
+                debug!("Handling streaming response");
+
+                // 将 reqwest 响应流转换为 axum 流
+                let stream = response.bytes_stream();
+                let body = Body::from_stream(stream);
+
+                match axum_response.body(body) {
                     Ok(response) => response,
                     Err(e) => {
-                        error!("Failed to create response: {}", e);
+                        error!("Failed to create streaming response: {}", e);
                         StatusCode::INTERNAL_SERVER_ERROR.into_response()
                     }
-                },
-                Err(e) => {
-                    error!("Failed to read response body: {}", e);
-                    StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                }
+            } else {
+                // 对于非流式响应，读取完整响应体
+                match response.bytes().await {
+                    Ok(bytes) => match axum_response.body(Body::from(bytes)) {
+                        Ok(response) => response,
+                        Err(e) => {
+                            error!("Failed to create response: {}", e);
+                            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                        }
+                    },
+                    Err(e) => {
+                        error!("Failed to read response body: {}", e);
+                        StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                    }
                 }
             }
         }

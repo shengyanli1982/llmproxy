@@ -9,7 +9,7 @@ use crate::{
 };
 use reqwest::{
     header::{HeaderMap, HeaderName, HeaderValue},
-    Method, Url,
+    Method, Response, Url,
 };
 use reqwest_middleware::ClientWithMiddleware;
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
@@ -77,8 +77,13 @@ impl UpstreamManager {
         // 创建客户端构建器
         let mut client_builder = reqwest::ClientBuilder::new()
             .danger_accept_invalid_certs(true) // 允许无效证书，用于内部自签名证书
-            .connect_timeout(Duration::from_secs(config.timeout.connect))
-            .timeout(Duration::from_secs(config.timeout.request));
+            .connect_timeout(Duration::from_secs(config.timeout.connect));
+
+        // 仅为非流式响应设置请求超时
+        // 流式响应会在 server.rs 中通过流式处理方式处理，不需要设置整体超时
+        if !config.stream_mode {
+            client_builder = client_builder.timeout(Duration::from_secs(config.timeout.request));
+        }
 
         // 配置TCP keepalive
         if config.keepalive > 0 {
@@ -142,7 +147,7 @@ impl UpstreamManager {
         path: &str,
         headers: HeaderMap,
         body: Option<bytes::Bytes>,
-    ) -> Result<reqwest::Response, AppError> {
+    ) -> Result<Response, AppError> {
         debug!("Forwarding request to upstream group: {}", group_name);
 
         // 获取上游组的负载均衡器
@@ -238,6 +243,14 @@ impl UpstreamManager {
                     .with_label_values(&[group_name, &upstream_config.url])
                     .observe(duration.as_secs_f64());
 
+                // 记录响应状态码
+                let status = response.status().as_u16();
+                debug!(
+                    "Upstream response status: {} from {}",
+                    status, upstream_config.url
+                );
+
+                // 直接返回完整响应（包含原始响应头）
                 Ok(response)
             }
             Err(e) => {

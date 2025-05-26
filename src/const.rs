@@ -86,6 +86,26 @@ pub mod rate_limit_limits {
     pub const DEFAULT_BURST: u32 = 200;
 }
 
+// HTTP 头部常量
+pub mod http_headers {
+    // 内容类型头部
+    pub const CONTENT_TYPE: &str = "content-type";
+    // 传输编码头部
+    pub const TRANSFER_ENCODING: &str = "transfer-encoding";
+
+    // 内容类型值
+    pub mod content_types {
+        // 事件流内容类型
+        pub const EVENT_STREAM: &str = "text/event-stream";
+    }
+
+    // 传输编码值
+    pub mod transfer_encodings {
+        // 分块传输编码
+        pub const CHUNKED: &str = "chunked";
+    }
+}
+
 //
 // 指标标签常量
 //

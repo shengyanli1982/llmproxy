@@ -628,6 +628,9 @@ pub struct HttpClientConfig {
     /// 代理配置
     #[serde(default)]
     pub proxy: ProxyConfig,
+    /// 是否支持流式响应（如果为true，则不设置请求超时）
+    #[serde(default = "default_stream_mode", rename = "stream")]
+    pub stream_mode: bool,
 }
 
 impl Default for HttpClientConfig {
@@ -638,6 +641,7 @@ impl Default for HttpClientConfig {
             timeout: HttpClientTimeoutConfig::default(),
             retry: RetryConfig::default(),
             proxy: ProxyConfig::default(),
+            stream_mode: default_stream_mode(),
         }
     }
 }
@@ -757,4 +761,8 @@ fn default_per_second() -> u32 {
 
 fn default_burst() -> u32 {
     rate_limit_limits::DEFAULT_BURST
+}
+
+fn default_stream_mode() -> bool {
+    true // 默认启用流式响应支持
 }
