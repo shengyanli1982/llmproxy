@@ -18,7 +18,7 @@ http_server:
       #   idle: 60
   # 管理服务配置
   admin:
-    port: 9001 # 管理端口 (避免与默认端口冲突)
+    port: 9000 # 管理端口 (避免与默认端口冲突)
     address: "0.0.0.0"
     # timeout: # 可以使用默认值或自定义
     #   connect: 10

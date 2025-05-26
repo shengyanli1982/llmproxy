@@ -8,22 +8,22 @@ use std::path::Path;
 use tracing::debug;
 use url::Url;
 
-/// 配置文件结构
+// 配置文件结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
-    /// HTTP服务器配置
+    // HTTP服务器配置
     #[serde(default)]
     pub http_server: HttpServerConfig,
-    /// 上游定义
+    // 上游定义
     #[serde(default)]
     pub upstreams: Vec<UpstreamConfig>,
-    /// 上游组定义
+    // 上游组定义
     #[serde(default)]
     pub upstream_groups: Vec<UpstreamGroupConfig>,
 }
 
 impl Config {
-    /// 从文件加载配置
+    // 从文件加载配置
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, AppError> {
         let path = path.as_ref();
         debug!("Attempting to load configuration from file: {:?}", path);
@@ -54,7 +54,7 @@ impl Config {
         Ok(config)
     }
 
-    /// 验证配置
+    // 验证配置
     pub fn validate(&self) -> Result<(), AppError> {
         // 验证名称唯一性
         self.validate_name_uniqueness()?;
@@ -208,7 +208,7 @@ impl Config {
         Ok(())
     }
 
-    /// 验证名称唯一性
+    // 验证名称唯一性
     fn validate_name_uniqueness(&self) -> Result<(), AppError> {
         // 验证转发服务名称唯一性
         let mut forward_names = HashSet::new();
@@ -246,7 +246,7 @@ impl Config {
         Ok(())
     }
 
-    /// 验证超时配置
+    // 验证超时配置
     fn validate_timeout_config(
         &self,
         timeout: &TimeoutConfig,
@@ -266,7 +266,7 @@ impl Config {
         Ok(())
     }
 
-    /// 验证 HTTP 客户端配置
+    // 验证 HTTP 客户端配置
     fn validate_http_client_config(
         &self,
         config: &HttpClientConfig,
@@ -371,13 +371,13 @@ impl Config {
     }
 }
 
-/// HTTP服务器配置
+// HTTP服务器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HttpServerConfig {
-    /// 转发服务配置
+    // 转发服务配置
     #[serde(default)]
     pub forwards: Vec<ForwardConfig>,
-    /// 管理服务配置
+    // 管理服务配置
     #[serde(default)]
     pub admin: AdminConfig,
 }
@@ -391,36 +391,36 @@ impl Default for HttpServerConfig {
     }
 }
 
-/// 转发服务配置
+// 转发服务配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ForwardConfig {
-    /// 转发服务名称
+    // 转发服务名称
     pub name: String,
-    /// 监听端口
+    // 监听端口
     pub port: u16,
-    /// 监听地址
+    // 监听地址
     #[serde(default = "default_listen_address")]
     pub address: String,
-    /// 指向的上游组名
+    // 指向的上游组名
     pub upstream_group: String,
-    /// 限流配置
+    // 限流配置
     #[serde(default)]
     pub ratelimit: RateLimitConfig,
-    /// 超时配置
+    // 超时配置
     #[serde(default)]
     pub timeout: TimeoutConfig,
 }
 
-/// 限流配置
+// 限流配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RateLimitConfig {
-    /// 是否启用限流
+    // 是否启用限流
     #[serde(default)]
     pub enabled: bool,
-    /// 每秒请求数
+    // 每秒请求数
     #[serde(default = "default_per_second")]
     pub per_second: u32,
-    /// 突发请求上限
+    // 突发请求上限
     #[serde(default = "default_burst")]
     pub burst: u32,
 }
@@ -435,10 +435,10 @@ impl Default for RateLimitConfig {
     }
 }
 
-/// 超时配置
+// 超时配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TimeoutConfig {
-    /// 连接超时（秒）
+    // 连接超时（秒）
     #[serde(default = "default_connect_timeout")]
     pub connect: u64,
 }
@@ -451,16 +451,16 @@ impl Default for TimeoutConfig {
     }
 }
 
-/// 管理服务配置
+// 管理服务配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AdminConfig {
-    /// 监听端口
+    // 监听端口
     #[serde(default = "default_admin_port")]
     pub port: u16,
-    /// 监听地址
+    // 监听地址
     #[serde(default = "default_listen_address")]
     pub address: String,
-    /// 超时配置
+    // 超时配置
     #[serde(default)]
     pub timeout: TimeoutConfig,
 }
@@ -475,47 +475,47 @@ impl Default for AdminConfig {
     }
 }
 
-/// 上游配置
+// 上游配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpstreamConfig {
-    /// 上游名称
+    // 上游名称
     pub name: String,
-    /// 上游URL
+    // 上游URL
     pub url: String,
-    /// 认证配置
+    // 认证配置
     #[serde(default)]
     pub auth: Option<AuthConfig>,
-    /// 请求头操作
+    // 请求头操作
     #[serde(default)]
     pub headers: Vec<HeaderOperation>,
 }
 
-/// 认证配置
+// 认证配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthConfig {
-    /// 认证类型
+    // 认证类型
     #[serde(default)]
     pub r#type: AuthType,
-    /// 认证令牌（用于Bearer认证）
+    // 认证令牌（用于Bearer认证）
     #[serde(default)]
     pub token: Option<String>,
-    /// 用户名（用于Basic认证）
+    // 用户名（用于Basic认证）
     #[serde(default)]
     pub username: Option<String>,
-    /// 密码（用于Basic认证）
+    // 密码（用于Basic认证）
     #[serde(default)]
     pub password: Option<String>,
 }
 
-/// 认证类型
+// 认证类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum AuthType {
-    /// Bearer令牌认证
+    // Bearer令牌认证
     Bearer,
-    /// 基本认证
+    // 基本认证
     Basic,
-    /// 无认证
+    // 无认证
     None,
 }
 
@@ -525,59 +525,59 @@ impl Default for AuthType {
     }
 }
 
-/// 请求头操作
+// 请求头操作
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HeaderOperation {
-    /// 操作类型
+    // 操作类型
     pub op: HeaderOpType,
-    /// 头部名称
+    // 头部名称
     pub key: String,
-    /// 头部值（对于insert和replace操作）
+    // 头部值（对于insert和replace操作）
     #[serde(default)]
     pub value: Option<String>,
 }
 
-/// 请求头操作类型
+// 请求头操作类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum HeaderOpType {
-    /// 插入（如果不存在）
+    // 插入（如果不存在）
     Insert,
-    /// 删除
+    // 删除
     Remove,
-    /// 替换（如果存在）或插入（如果不存在）
+    // 替换（如果存在）或插入（如果不存在）
     Replace,
 }
 
-/// 上游组配置
+// 上游组配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpstreamGroupConfig {
-    /// 上游组名称
+    // 上游组名称
     pub name: String,
-    /// 上游引用列表
+    // 上游引用列表
     pub upstreams: Vec<UpstreamRef>,
-    /// 负载均衡策略
+    // 负载均衡策略
     #[serde(default)]
     pub balance: BalanceConfig,
-    /// HTTP客户端配置
+    // HTTP客户端配置
     #[serde(default)]
     pub http_client: HttpClientConfig,
 }
 
-/// 上游引用
+// 上游引用
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpstreamRef {
-    /// 上游名称
+    // 上游名称
     pub name: String,
-    /// 权重（用于加权轮询策略）
+    // 权重（用于加权轮询策略）
     #[serde(default = "default_weight")]
     pub weight: u32,
 }
 
-/// 负载均衡策略配置
+// 负载均衡策略配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BalanceConfig {
-    /// 策略类型
+    // 策略类型
     #[serde(default)]
     pub strategy: BalanceStrategy,
 }
@@ -590,17 +590,17 @@ impl Default for BalanceConfig {
     }
 }
 
-/// 负载均衡策略类型
+// 负载均衡策略类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum BalanceStrategy {
-    /// 轮询
+    // 轮询
     #[serde(rename = "roundrobin")]
     RoundRobin,
-    /// 加权轮询
+    // 加权轮询
     #[serde(rename = "weighted_roundrobin")]
     WeightedRoundRobin,
-    /// 随机
+    // 随机
     Random,
 }
 
@@ -610,25 +610,25 @@ impl Default for BalanceStrategy {
     }
 }
 
-/// HTTP客户端配置
+// HTTP客户端配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HttpClientConfig {
-    /// 用户代理
+    // 用户代理
     #[serde(default = "default_user_agent")]
     pub agent: String,
-    /// TCP Keepalive（秒）
+    // TCP Keepalive（秒）
     #[serde(default = "default_keepalive")]
     pub keepalive: u32,
-    /// 超时配置
+    // 超时配置
     #[serde(default)]
     pub timeout: HttpClientTimeoutConfig,
-    /// 重试配置
+    // 重试配置
     #[serde(default)]
     pub retry: RetryConfig,
-    /// 代理配置
+    // 代理配置
     #[serde(default)]
     pub proxy: ProxyConfig,
-    /// 是否支持流式响应（如果为true，则不设置请求超时）
+    // 是否支持流式响应（如果为true，则不设置请求超时）
     #[serde(default = "default_stream_mode", rename = "stream")]
     pub stream_mode: bool,
 }
@@ -646,16 +646,16 @@ impl Default for HttpClientConfig {
     }
 }
 
-/// HTTP客户端超时配置
+// HTTP客户端超时配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HttpClientTimeoutConfig {
-    /// 连接超时（秒）
+    // 连接超时（秒）
     #[serde(default = "default_connect_timeout")]
     pub connect: u64,
-    /// 请求超时（秒）
+    // 请求超时（秒）
     #[serde(default = "default_request_timeout")]
     pub request: u64,
-    /// 空闲超时（秒）
+    // 空闲超时（秒）
     #[serde(default = "default_idle_timeout")]
     pub idle: u64,
 }
@@ -670,16 +670,16 @@ impl Default for HttpClientTimeoutConfig {
     }
 }
 
-/// 重试配置
+// 重试配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetryConfig {
-    /// 是否启用重试
+    // 是否启用重试
     #[serde(default)]
     pub enabled: bool,
-    /// 最大重试次数
+    // 最大重试次数
     #[serde(default = "default_retry_attempts")]
     pub attempts: u32,
-    /// 初始重试间隔（毫秒）
+    // 初始重试间隔（毫秒）
     #[serde(default = "default_retry_initial")]
     pub initial: u32,
 }
@@ -694,13 +694,13 @@ impl Default for RetryConfig {
     }
 }
 
-/// 代理配置
+// 代理配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProxyConfig {
-    /// 是否启用代理
+    // 是否启用代理
     #[serde(default)]
     pub enabled: bool,
-    /// 代理URL
+    // 代理URL
     #[serde(default)]
     pub url: String,
 }

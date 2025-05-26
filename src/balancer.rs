@@ -6,26 +6,26 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use tracing::debug;
 
-/// 负载均衡器特性
+// 负载均衡器特性
 #[async_trait]
 pub trait LoadBalancer: Send + Sync {
-    /// 选择一个上游服务器
+    // 选择一个上游服务器
     async fn select_upstream(&self) -> Result<&UpstreamRef, AppError>;
 
-    /// 报告服务器失败
+    // 报告服务器失败
     async fn report_failure(&self, upstream: &UpstreamRef);
 }
 
-/// 轮询负载均衡器
+// 轮询负载均衡器
 pub struct RoundRobinBalancer {
-    /// 服务器列表
+    // 服务器列表
     upstreams: Vec<UpstreamRef>,
-    /// 当前索引（原子操作）
+    // 当前索引（原子操作）
     current: AtomicUsize,
 }
 
 impl RoundRobinBalancer {
-    /// 创建新的轮询负载均衡器
+    // 创建新的轮询负载均衡器
     pub fn new(upstreams: Vec<UpstreamRef>) -> Self {
         Self {
             upstreams,
@@ -59,16 +59,16 @@ impl LoadBalancer for RoundRobinBalancer {
     }
 }
 
-/// 加权轮询负载均衡器
+// 加权轮询负载均衡器
 pub struct WeightedRoundRobinBalancer {
-    /// 服务器列表，按权重复制
+    // 服务器列表，按权重复制
     upstreams: Vec<UpstreamRef>,
-    /// 当前索引（原子操作）
+    // 当前索引（原子操作）
     current: AtomicUsize,
 }
 
 impl WeightedRoundRobinBalancer {
-    /// 创建新的加权轮询负载均衡器
+    // 创建新的加权轮询负载均衡器
     pub fn new(upstreams: Vec<UpstreamRef>) -> Self {
         // 根据权重复制服务器
         let mut weighted_upstreams = Vec::new();
@@ -113,14 +113,14 @@ impl LoadBalancer for WeightedRoundRobinBalancer {
     }
 }
 
-/// 随机负载均衡器
+// 随机负载均衡器
 pub struct RandomBalancer {
-    /// 服务器列表
+    // 服务器列表
     upstreams: Vec<UpstreamRef>,
 }
 
 impl RandomBalancer {
-    /// 创建新的随机负载均衡器
+    // 创建新的随机负载均衡器
     pub fn new(upstreams: Vec<UpstreamRef>) -> Self {
         Self { upstreams }
     }
@@ -149,7 +149,7 @@ impl LoadBalancer for RandomBalancer {
     }
 }
 
-/// 创建负载均衡器
+// 创建负载均衡器
 pub fn create_load_balancer(
     strategy: &BalanceStrategy,
     upstreams: Vec<UpstreamRef>,

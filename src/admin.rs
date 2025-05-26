@@ -13,21 +13,21 @@ use tokio::net::TcpListener;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemHandle};
 use tracing::{error, info};
 
-/// 管理服务状态
+// 管理服务状态
 #[derive(Clone)]
 struct AdminState {
-    /// 启动时间
+    // 启动时间
     start_time: std::time::Instant,
 }
 
-/// 管理服务
+// 管理服务
 pub struct AdminServer {
-    /// 监听地址
+    // 监听地址
     addr: SocketAddr,
 }
 
 impl AdminServer {
-    /// 创建新的管理服务
+    // 创建新的管理服务
     pub fn new(addr: SocketAddr) -> Self {
         Self { addr }
     }
@@ -77,12 +77,12 @@ impl IntoSubsystem<AppError> for AdminServer {
     }
 }
 
-/// 健康检查处理程序
+// 健康检查处理程序
 async fn health_handler() -> &'static str {
     "OK"
 }
 
-/// 指标处理函数
+// 指标处理函数
 async fn metrics_handler() -> Response {
     // 创建编码器
     let encoder = TextEncoder::new();

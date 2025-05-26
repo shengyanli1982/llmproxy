@@ -1,7 +1,7 @@
 use once_cell::sync::Lazy;
 use prometheus::{CounterVec, HistogramOpts, HistogramVec, Opts, Registry};
 
-/// 应用指标
+// 应用指标
 pub struct Metrics {
     registry: Registry,
     // 上游请求计数
@@ -21,7 +21,7 @@ pub struct Metrics {
 }
 
 impl Metrics {
-    /// 创建新的指标收集器
+    // 创建新的指标收集器
     fn new() -> Self {
         let registry = Registry::new();
 
@@ -130,46 +130,46 @@ impl Metrics {
         }
     }
 
-    /// 获取注册表
+    // 获取注册表
     pub fn registry(&self) -> &Registry {
         &self.registry
     }
 
-    /// 上游请求计数
+    // 上游请求计数
     pub fn upstream_requests_total(&self) -> &CounterVec {
         &self.upstream_requests_total
     }
 
-    /// 上游请求耗时
+    // 上游请求耗时
     pub fn upstream_duration_seconds(&self) -> &HistogramVec {
         &self.upstream_duration_seconds
     }
 
-    /// 上游错误计数
+    // 上游错误计数
     pub fn upstream_errors_total(&self) -> &CounterVec {
         &self.upstream_errors_total
     }
 
-    /// HTTP请求计数
+    // HTTP请求计数
     pub fn http_requests_total(&self) -> &CounterVec {
         &self.http_requests_total
     }
 
-    /// HTTP请求耗时
+    // HTTP请求耗时
     pub fn http_request_duration_seconds(&self) -> &HistogramVec {
         &self.http_request_duration_seconds
     }
 
-    /// HTTP请求错误计数
+    // HTTP请求错误计数
     pub fn http_request_errors_total(&self) -> &CounterVec {
         &self.http_request_errors_total
     }
 
-    /// 限流计数
+    // 限流计数
     pub fn ratelimit_total(&self) -> &CounterVec {
         &self.ratelimit_total
     }
 }
 
-/// 全局指标实例
+// 全局指标实例
 pub static METRICS: Lazy<Metrics> = Lazy::new(Metrics::new);

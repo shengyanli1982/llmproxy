@@ -21,18 +21,18 @@ use std::{
 };
 use tracing::{debug, error, info};
 
-/// 上游管理器
+// 上游管理器
 pub struct UpstreamManager {
-    /// 上游配置映射
+    // 上游配置映射
     upstreams: HashMap<String, UpstreamConfig>,
-    /// 上游组负载均衡器
+    // 上游组负载均衡器
     groups: HashMap<String, Arc<dyn LoadBalancer>>,
-    /// 上游组客户端
+    // 上游组客户端
     group_clients: HashMap<String, ClientWithMiddleware>,
 }
 
 impl UpstreamManager {
-    /// 创建新的上游管理器
+    // 创建新的上游管理器
     pub async fn new(
         upstreams: Vec<UpstreamConfig>,
         groups: Vec<UpstreamGroupConfig>,
@@ -70,7 +70,7 @@ impl UpstreamManager {
         })
     }
 
-    /// 创建HTTP客户端
+    // 创建HTTP客户端
     fn create_http_client(config: &HttpClientConfig) -> Result<ClientWithMiddleware, AppError> {
         debug!("Creating HTTP client, config: {:?}", config);
 
@@ -139,7 +139,7 @@ impl UpstreamManager {
         Ok(middleware_client)
     }
 
-    /// 转发请求到指定上游组
+    // 转发请求到指定上游组
     pub async fn forward_request(
         &self,
         group_name: &str,
@@ -281,7 +281,7 @@ impl UpstreamManager {
         }
     }
 
-    /// 处理请求头
+    // 处理请求头
     fn process_headers(
         &self,
         headers: HeaderMap,
@@ -314,7 +314,7 @@ impl UpstreamManager {
         Ok(result)
     }
 
-    /// 添加认证信息到请求
+    // 添加认证信息到请求
     fn add_auth(
         &self,
         request: reqwest_middleware::RequestBuilder,

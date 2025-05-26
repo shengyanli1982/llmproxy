@@ -19,24 +19,24 @@ use tower_governor::{governor::GovernorConfigBuilder, GovernorError, GovernorLay
 use tower_http::timeout::TimeoutLayer;
 use tracing::{debug, error, info};
 
-/// 转发服务状态
+// 转发服务状态
 struct ForwardState {
-    /// 上游管理器
+    // 上游管理器
     upstream_manager: Arc<UpstreamManager>,
-    /// 转发配置
+    // 转发配置
     config: ForwardConfig,
 }
 
-/// 转发服务
+// 转发服务
 pub struct ForwardServer {
-    /// 监听地址
+    // 监听地址
     addr: SocketAddr,
-    /// 服务状态
+    // 服务状态
     state: Arc<ForwardState>,
 }
 
 impl ForwardServer {
-    /// 创建新的转发服务
+    // 创建新的转发服务
     pub fn new(
         config: ForwardConfig,
         upstream_manager: Arc<UpstreamManager>,
@@ -55,7 +55,7 @@ impl ForwardServer {
     }
 }
 
-/// 检查响应是否为流式响应
+// 检查响应是否为流式响应
 #[inline(always)]
 fn is_streaming_response(headers: &HeaderMap) -> bool {
     // 检查内容类型是否为事件流
@@ -165,7 +165,7 @@ impl IntoSubsystem<AppError> for ForwardServer {
     }
 }
 
-/// 转发处理函数
+// 转发处理函数
 async fn forward_handler(
     State(state): State<Arc<ForwardState>>,
     path: Option<Path<String>>,
@@ -227,13 +227,10 @@ async fn forward_handler(
             // 获取响应状态码
             let status = response.status();
 
-            debug!(
-                "Forwarded request: {} {} to upstream group {}, upstream response status: {}",
-                method, path_str, state.config.upstream_group, status
-            );
-
             // 记录请求耗时
             let duration = start_time.elapsed();
+            let duration_ms = duration.as_millis();
+
             METRICS
                 .http_request_duration_seconds()
                 .with_label_values(&[&state.config.name, method.as_str(), &path_str])
@@ -265,7 +262,7 @@ async fn forward_handler(
             }
 
             // 根据响应类型处理
-            if is_stream {
+            let result = if is_stream {
                 // 对于流式响应，直接转发流
                 debug!("Handling streaming response");
 
@@ -295,7 +292,15 @@ async fn forward_handler(
                         StatusCode::INTERNAL_SERVER_ERROR.into_response()
                     }
                 }
-            }
+            };
+
+            // 记录请求完成的延迟时间（毫秒）
+            info!(
+                "Request completed: {} {} to upstream group {}, status code: {}, duration: {}ms",
+                method, path_str, state.config.upstream_group, status, duration_ms
+            );
+
+            result
         }
         Err(e) => {
             error!("Failed to forward request: {}", e);
@@ -308,10 +313,18 @@ async fn forward_handler(
 
             // 记录请求耗时
             let duration = start_time.elapsed();
+            let duration_ms = duration.as_millis();
+
             METRICS
                 .http_request_duration_seconds()
                 .with_label_values(&[&state.config.name, method.as_str(), &path_str])
                 .observe(duration.as_secs_f64());
+
+            // 记录请求失败的延迟时间（毫秒）
+            info!(
+                "Request failed: {} {} to upstream group {}, duration: {}ms",
+                method, path_str, state.config.upstream_group, duration_ms
+            );
 
             StatusCode::INTERNAL_SERVER_ERROR.into_response()
         }

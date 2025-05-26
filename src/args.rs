@@ -2,7 +2,7 @@ use crate::r#const::shutdown_timeout;
 use clap::{ArgAction, Parser};
 use std::path::PathBuf;
 
-/// LLMProxy - 大模型代理服务
+// LLMProxy - 大模型代理服务
 #[derive(Parser, Debug, Clone)]
 #[command(
     name = "llmproxyd",
@@ -21,7 +21,7 @@ use std::path::PathBuf;
              GitHub: https://github.com/shengyanli1982"
 )]
 pub struct Args {
-    /// 配置文件路径
+    // 配置文件路径
     #[clap(
         short,
         long,
@@ -31,7 +31,7 @@ pub struct Args {
     )]
     pub config: PathBuf,
 
-    /// 是否开启调试模式
+    // 是否开启调试模式
     #[clap(
         short, 
         long, 
@@ -40,7 +40,7 @@ pub struct Args {
     )]
     pub debug: bool,
 
-    /// 是否仅测试配置文件
+    // 是否仅测试配置文件
     #[clap(
         short = 't', 
         long = "test", 
@@ -49,7 +49,7 @@ pub struct Args {
     )]
     pub test_config: bool,
 
-    /// 优雅关闭超时时间（秒）
+    // 优雅关闭超时时间（秒）
     #[clap(
         long = "shutdown-timeout", 
         value_name = "SECONDS", 
@@ -60,12 +60,12 @@ pub struct Args {
 }
 
 impl Args {
-    /// 解析命令行参数
+    // 解析命令行参数
     pub fn parse_args() -> Self {
         Self::parse()
     }
 
-    /// 验证参数
+    // 验证参数
     pub fn validation(&self) -> Result<(), String> {
         // 验证关闭超时时间
         if self.shutdown_timeout < shutdown_timeout::MIN
