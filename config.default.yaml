@@ -4,163 +4,163 @@
 http_server:
   # 转发服务配置
   forwards:
-    - name: to_mixgroup # 转发服务名，可以自定义，请求时指定这个转发服务名即可， 名字组内必须唯一
-      port: 3000 # 监听端口
-      address: "0.0.0.0" # 监听地址
-      # 指向的模型组名
-      upstream_group: "mixgroup" # 指向的模型组名，可以自定义。 但是配置文件中必须存在这个模型组。 如果不存在，则报错。
-      # 限流配置(根据IP限流)， 如果未指定，则不启用限流
+    - name: to_mixgroup # 转发服务名称，用于请求时指定，在同一配置文件中必须唯一
+      port: 3000 # 服务监听端口
+      address: "0.0.0.0" # 服务监听地址
+      # 指向的上游组名称
+      upstream_group: "mixgroup" # 上游组名称，必须在 `upstream_groups` 中定义，否则将导致错误
+      # IP 基础的速率限制配置 (可选)
       ratelimit:
-        enabled: true # 是否启用限流, 默认是 false
-        per_second: 100 # 每秒请求数
-        burst: 200 # 突发请求上限
-      # 连接超时配置，如果未指定，则使用默认的配置
+        enabled: true # 是否启用速率限制 (默认: false)
+        per_second: 100 # 每秒最大请求数
+        burst: 200 # 允许的突发请求数
+      # 连接超时配置 (可选, 未指定则使用默认值)
       timeout:
-        connect: 10 # 连接超时（秒）
-        idle: 60 # 空闲超时（秒）
-    - name: openai_group # 转发服务名，可以自定义，请求时指定这个转发服务名即可， 名字组内必须唯一
-      port: 3001
-      address: "0.0.0.0" # 监听地址
-      # 指向的模型组名
-      upstream_group: "openai" # 指向的模型组名，可以自定义。 但是配置文件中必须存在这个模型组。 如果不存在，则报错。
-      # 限流配置(根据IP限流)，如果未指定，则不启用限流
+        connect: 10 # 连接超时时间 (秒)
+        idle: 60 # 连接空闲超时时间 (秒)
+    - name: openai_group # 转发服务名称，用于请求时指定，在同一配置文件中必须唯一
+      port: 3001 # 服务监听端口
+      address: "0.0.0.0" # 服务监听地址
+      # 指向的上游组名称
+      upstream_group: "openai" # 上游组名称，必须在 `upstream_groups` 中定义，否则将导致错误
+      # IP 基础的速率限制配置 (可选)
       ratelimit:
-        enabled: true
-        per_second: 100
-        burst: 200
-      # 连接超时配置，如果未指定，则使用默认的配置
+        enabled: true # 是否启用速率限制 (默认: false)
+        per_second: 100 # 每秒最大请求数
+        burst: 200 # 允许的突发请求数
+      # 连接超时配置 (可选, 未指定则使用默认值)
       timeout:
-        connect: 10 # 连接超时（秒）
-  # 管理服务配置，目前暂时只提供（/metrics 和 /health）
-  admin: # 这里既不限流
-    port: 9000 # 管理端口
-    address: "0.0.0.0" # 监听地址
-    # 连接超时配置，如果未指定，则使用默认的配置
+        connect: 10 # 连接超时时间 (秒)
+  # 管理服务配置 (当前提供 /metrics 和 /health 接口，不设速率限制)
+  admin:
+    port: 9000 # 管理服务监听端口
+    address: "0.0.0.0" # 管理服务监听地址
+    # 连接超时配置 (可选, 未指定则使用默认值)
     timeout:
-      connect: 10 # 连接超时（秒）
+      connect: 10 # 连接超时时间 (秒)
 
-# 上游定义
+# 上游服务定义
 upstreams:
-  # OpenAI API
-  - name: openai_primary # 上游名，可以自定义，请求时指定这个上游名即可， 名字组内必须唯一
-    url: "https://api.openai.com/v1"
+  # OpenAI API 定义
+  - name: openai_primary # 上游服务名称，在同一配置文件中必须唯一
+    url: "https://api.openai.com/v1" # 上游服务 URL
     auth:
-      type: "bearer" # 认证类型, 可选值: "bearer", "basic", "none"。如果为 none，则不添加任何认证信息。 默认是 none
-      token: "YOUR_OPENAI_API_KEY" # 认证 token
-    headers:
-      - op: insert # 如果 header 不存在，则插入，否则不插入
+      type: "bearer" # 认证类型. 可选: "bearer", "basic", "none". (默认: "none", 不添加认证信息)
+      token: "YOUR_OPENAI_API_KEY" # 认证令牌
+    headers: # HTTP 头部操作
+      - op: insert # 操作类型: insert (如果头部不存在则插入)
         key: X-Proxy-Auth
         value: "LLMProxy"
-      - op: remove # 如果 header 存在，则删除，否则不删除
+      - op: remove # 操作类型: remove (如果头部存在则删除)
         key: xxx-header-to-delete
-      - op: replace # 如果 header 存在，则替换，否则插入
+      - op: replace # 操作类型: replace (如果头部存在则替换，否则插入)
         key: xxx-header-to-replace
         value: "new-value"
 
-  # Anthropic API
-  - name: anthropic_primary # 上游名，可以自定义，请求时指定这个上游名即可， 名字组内必须唯一
-    url: "https://api.anthropic.com"
+  # Anthropic API 定义
+  - name: anthropic_primary # 上游服务名称，在同一配置文件中必须唯一
+    url: "https://api.anthropic.com" # 上游服务 URL
     auth:
-      type: "bearer" # 认证类型, 可选值: "bearer", "basic", "none"。如果为 none，则不添加任何认证信息。 默认是 none
-      token: "YOUR_ANTHROPIC_API_KEY" # 认证 token
-    headers:
-      - op: insert # 如果 header 不存在，则插入，否则不插入
+      type: "bearer" # 认证类型. 可选: "bearer", "basic", "none". (默认: "none", 不添加认证信息)
+      token: "YOUR_ANTHROPIC_API_KEY" # 认证令牌
+    headers: # HTTP 头部操作
+      - op: insert # 操作类型: insert (如果头部不存在则插入)
         key: X-Proxy-Auth
         value: "LLMProxy"
-      - op: remove # 如果 header 存在，则删除，否则不删除
+      - op: remove # 操作类型: remove (如果头部存在则删除)
         key: xxx-header-to-delete
-      - op: replace # 如果 header 存在，则替换，否则插入
+      - op: replace # 操作类型: replace (如果头部存在则替换，否则插入)
 
-  # 使用基本认证的示例上游
-  - name: basic_auth_example # 上游名，可以自定义，请求时指定这个上游名即可， 名字组内必须唯一
-    url: "https://example.com/api"
-  # 如果上游没有指定 auth，则不添加任何认证信息
-  # 如果上游没有指定 headers，则不对发送给上游的请求进行任何修改
+  # 使用 Basic 认证的示例上游
+  - name: basic_auth_example # 上游服务名称，在同一配置文件中必须唯一
+    url: "https://example.com/api" # 上游服务 URL
+  # 注意: 如果未指定 `auth` 字段, 则不添加任何认证信息。
+  # 注意: 如果未指定 `headers` 字段, 则不对发送到上游的请求头进行修改。
 
 # 上游组定义
 upstream_groups:
   # 混合上游组
-  - name: mixgroup # 上游组名，可以自定义，请求时指定这个上游组名即可， 名字组内必须唯一
-    # 上游定义
-    upstreams: # 至少指定一个上游
+  - name: mixgroup # 上游组名称，在同一配置文件中必须唯一
+    # 包含的上游服务列表 (至少一个)
+    upstreams:
       - name: openai_primary
       - name: anthropic_primary
-    # 负载均衡策略（如果没有指定，则使用默认的 roundrobin 策略）
+    # 负载均衡策略 (可选, 默认: "roundrobin")
     balance:
-      strategy: "roundrobin" # 轮询策略, 默认是 roundrobin
-    # HTTP客户端配置（如果没有指定，则使用默认的配置）
+      strategy: "roundrobin" # 轮询 (roundrobin) 策略
+    # HTTP 客户端配置 (可选, 未指定则使用默认值)
     http_client:
-      agent: "LLMProxy/1.0" # 用户代理. 默认是 `LLMProxy/1.0`
-      keepalive: 60 # TCP Keepalive（秒）(有效范围: 0-600), 0 表示不启用, 默认是 60
-      # 没有指定 stream_mode 时，默认是 true
-      # 连接超时配置，如果未指定，则使用默认的配置
+      agent: "LLMProxy/1.0" # User-Agent 头部值 (默认: "LLMProxy/1.0")
+      keepalive: 60 # TCP Keepalive 时间 (秒), 范围: 0-600. 0 表示禁用. (默认: 60)
+      # `stream_mode` 未指定时默认为 true.
+      # 连接超时配置 (可选, 未指定则使用默认值)
       timeout:
-        connect: 10 # 连接超时（秒）
-        request: 10 # 请求超时（秒）
-        idle: 60 # 空闲超时（秒）
-      # 请求重试配置（如果没有指定，则使用默认的配置）
+        connect: 10 # 连接超时时间 (秒)
+        request: 10 # 请求超时时间 (秒)
+        idle: 60 # 连接空闲超时时间 (秒)
+      # 请求重试配置 (可选, 未指定则使用默认值)
       retry:
-        enabled: true # 是否启用重试, 默认是 false
+        enabled: true # 是否启用重试 (默认: false)
         attempts: 3 # 最大重试次数
-        initial: 500 # 初始重试间隔（毫秒）
-      proxy: # （如果没有指定，则使用默认的配置）
-        enabled: false # 是否启用代理, 默认不启用
-        url: "" # HTTP/HTTPS代理URL，例如：http://username:password@proxy.example.com:8080
+        initial: 500 # 初始重试间隔 (毫秒)
+      proxy: # HTTP/HTTPS 代理配置 (可选, 默认不启用)
+        enabled: false # 是否启用代理 (默认: false)
+        url: "" # 代理 URL, 例如: http://username:password@proxy.example.com:8080
 
-  # OpenAI上游组
-  - name: openai # 上游组名，可以自定义，请求时指定这个上游组名即可， 名字组内必须唯一
-    # 上游定义
-    upstreams: # 至少指定一个上游
+  # OpenAI 上游组
+  - name: openai # 上游组名称，在同一配置文件中必须唯一
+    # 包含的上游服务列表 (至少一个)
+    upstreams:
       - name: openai_primary
-        weight: 8 # 权重, 默认是 1，仅仅在 weighted_roundrobin 策略下有效
+        weight: 8 # 权重 (默认: 1), 仅在 "weighted_roundrobin" 策略下生效
       - name: openai_backup
-        weight: 2 # 权重, 默认是 1，仅仅在 weighted_roundrobin 策略下有效
-    # 负载均衡策略（如果没有指定，则使用默认的 roundrobin 策略）
+        weight: 2 # 权重 (默认: 1), 仅在 "weighted_roundrobin" 策略下生效
+    # 负载均衡策略 (可选, 默认: "roundrobin")
     balance:
-      strategy: "weighted_roundrobin" # 加权轮询策略, 默认是 roundrobin
-    # HTTP客户端配置（如果没有指定，则使用默认的配置）
+      strategy: "weighted_roundrobin" # 加权轮询 (weighted_roundrobin) 策略
+    # HTTP 客户端配置 (可选, 未指定则使用默认值)
     http_client:
-      agent: "LLMProxy/1.0" # 用户代理. 默认是 `LLMProxy/1.0`
-      keepalive: 60 # TCP Keepalive（秒）(有效范围: 0-600), 0 表示不启用, 默认是 60
-      stream_mode: true # 是否启用流式, 默认是 true。 只影响 timeout 配置中的 request 超时(true 时， request 超时关闭)，不影响 connect 和 idle 超时
-      # 连接超时配置，如果未指定，则使用默认的配置
+      agent: "LLMProxy/1.0" # User-Agent 头部值 (默认: "LLMProxy/1.0")
+      keepalive: 60 # TCP Keepalive 时间 (秒), 范围: 0-600. 0 表示禁用. (默认: 60)
+      stream_mode: true # 是否启用流式传输 (默认: true). 为 true 时, `timeout.request` 配置将失效.
+      # 连接超时配置 (可选, 未指定则使用默认值)
       timeout:
-        connect: 10 # 连接超时（秒）
-        request: 10 # 请求超时（秒）
-        idle: 60 # 空闲超时（秒）
-      # 请求重试配置
+        connect: 10 # 连接超时时间 (秒)
+        request: 10 # 请求超时时间 (秒), 在 stream_mode:true 时无效
+        idle: 60 # 连接空闲超时时间 (秒)
+      # 请求重试配置 (可选, 未指定则使用默认值)
       retry:
-        enabled: true # 是否启用重试, 默认是 false
+        enabled: true # 是否启用重试 (默认: false)
         attempts: 3 # 最大重试次数
-        initial: 500 # 初始重试间隔（毫秒）
-      proxy: # （如果没有指定，则使用默认的配置）
-        enabled: false # 是否启用代理, 默认不启用
-        url: "" # HTTP/HTTPS代理URL，例如：http://username:password@proxy.example.com:8080
+        initial: 500 # 初始重试间隔 (毫秒)
+      proxy: # HTTP/HTTPS 代理配置 (可选, 默认不启用)
+        enabled: false # 是否启用代理 (默认: false)
+        url: "" # 代理 URL, 例如: http://username:password@proxy.example.com:8080
 
-  # Anthropic上游组
-  - name: anthropic # 上游组名，可以自定义，请求时指定这个上游组名即可， 名字组内必须唯一
-    # 上游定义
-    upstreams: # 至少指定一个上游
+  # Anthropic 上游组
+  - name: anthropic # 上游组名称，在同一配置文件中必须唯一
+    # 包含的上游服务列表 (至少一个)
+    upstreams:
       - name: anthropic_primary
-    # 负载均衡策略
+    # 负载均衡策略 (可选, 默认: "roundrobin")
     balance:
-      strategy: "random" # 随机策略, 默认是 roundrobin
-    # HTTP客户端配置（如果没有指定，则使用默认的配置）
+      strategy: "random" # 随机 (random) 策略
+    # HTTP 客户端配置 (可选, 未指定则使用默认值)
     http_client:
-      agent: "LLMProxy/1.0" # 用户代理. 默认是 `LLMProxy/1.0`
-      keepalive: 60 # TCP Keepalive（秒）(有效范围: 0-600), 0 表示不启用, 默认是 60
-      stream: true # 是否启用流式, 默认是 true。 只影响 timeout 配置中的 request 超时(true 时， request 超时关闭)，不影响 connect 和 idle 超时
-      # 连接超时配置，如果未指定，则使用默认的配置
+      agent: "LLMProxy/1.0" # User-Agent 头部值 (默认: "LLMProxy/1.0")
+      keepalive: 60 # TCP Keepalive 时间 (秒), 范围: 0-600. 0 表示禁用. (默认: 60)
+      stream: true # 是否启用流式传输 (默认: true). 注意: 此配置项已被 `stream_mode` 替代，后续版本可能会移除。为 true 时, `timeout.request` 配置将失效.
+      # 连接超时配置 (可选, 未指定则使用默认值)
       timeout:
-        connect: 10 # 连接超时（秒）
-        request: 10 # 请求超时（秒）
-        idle: 60 # 空闲超时（秒）
-      # 请求重试配置
+        connect: 10 # 连接超时时间 (秒)
+        request: 10 # 请求超时时间 (秒), 在 stream_mode:true (或旧版 stream:true) 时无效
+        idle: 60 # 连接空闲超时时间 (秒)
+      # 请求重试配置 (可选, 未指定则使用默认值)
       retry:
-        enabled: true # 是否启用重试, 默认是 false
+        enabled: true # 是否启用重试 (默认: false)
         attempts: 3 # 最大重试次数
-        initial: 500 # 初始重试间隔（毫秒）
-      proxy:
-        enabled: false # 是否启用代理, 默认不启用
-        url: "" # HTTP/HTTPS代理URL，例如：http://username:password@proxy.example.com:8080
+        initial: 500 # 初始重试间隔 (毫秒)
+      proxy: # HTTP/HTTPS 代理配置 (可选, 默认不启用)
+        enabled: false # 是否启用代理 (默认: false)
+        url: "" # 代理 URL, 例如: http://username:password@proxy.example.com:8080
 
