@@ -31,15 +31,13 @@ http_server:
       # 连接超时配置，如果未指定，则使用默认的配置
       timeout:
         connect: 10 # 连接超时（秒）
-        idle: 60 # 空闲超时（秒）
   # 管理服务配置，目前暂时只提供（/metrics 和 /health）
   admin: # 这里既不限流
-    port: 8081 # 管理端口
+    port: 9000 # 管理端口
     address: "0.0.0.0" # 监听地址
     # 连接超时配置，如果未指定，则使用默认的配置
     timeout:
       connect: 10 # 连接超时（秒）
-      idle: 60 # 空闲超时（秒）
 
 # 上游定义
 upstreams:
