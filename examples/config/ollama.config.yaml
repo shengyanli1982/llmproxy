@@ -15,7 +15,6 @@ http_server:
       #   burst: 200
       # timeout: # 可以使用默认值或自定义
       #   connect: 10
-      #   idle: 60
   # 管理服务配置
   admin:
     port: 9000 # 管理端口 (避免与默认端口冲突)
