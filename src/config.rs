@@ -1,5 +1,7 @@
 use crate::error::AppError;
-use crate::r#const::{http_client_limits, rate_limit_limits, retry_limits, weight_limits};
+use crate::r#const::{
+    breaker_limits, http_client_limits, rate_limit_limits, retry_limits, weight_limits,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs::File;
@@ -95,6 +97,24 @@ impl Config {
                 )));
             }
 
+            // 验证负载均衡策略
+            match group.balance.strategy {
+                BalanceStrategy::WeightedRoundRobin => {
+                    // 检查是否所有上游都有合理的权重设置
+                    let all_default_weight = group
+                        .upstreams
+                        .iter()
+                        .all(|u| u.weight == weight_limits::MIN_WEIGHT);
+                    if all_default_weight {
+                        return Err(AppError::Config(format!(
+                            "Upstream group '{}' uses weighted_roundrobin strategy but all upstreams have default weight",
+                            group.name
+                        )));
+                    }
+                }
+                _ => {} // 其他策略不需要特殊验证
+            }
+
             // 验证 HTTP 客户端配置
             self.validate_http_client_config(
                 &group.http_client,
@@ -162,6 +182,26 @@ impl Config {
                     "URL '{}' for upstream '{}' is invalid: {}",
                     upstream.url, upstream.name, e
                 )));
+            }
+
+            // 验证熔断器配置
+            if let Some(breaker) = &upstream.breaker {
+                if breaker.threshold < breaker_limits::MIN_THRESHOLD
+                    || breaker.threshold > breaker_limits::MAX_THRESHOLD
+                {
+                    return Err(AppError::Config(format!(
+                        "Upstream '{}' has invalid breaker.threshold ({}), must be between 0.01 and 1.0",
+                        upstream.name, breaker.threshold
+                    )));
+                }
+                if breaker.cooldown < breaker_limits::MIN_COOLDOWN
+                    || breaker.cooldown > breaker_limits::MAX_COOLDOWN
+                {
+                    return Err(AppError::Config(format!(
+                        "Upstream '{}' has invalid breaker.cooldown ({}), must be between 1 and 3600 seconds",
+                        upstream.name, breaker.cooldown
+                    )));
+                }
             }
 
             // 验证认证配置
@@ -367,6 +407,20 @@ impl Config {
             }
         }
 
+        // 验证流式模式配置
+        // 当流式模式启用时，检查请求超时设置是否合理
+        if config.stream_mode
+            && config.timeout.request < http_client_limits::DEFAULT_REQUEST_TIMEOUT
+        {
+            // 对于流式响应，建议使用更长的请求超时
+            return Err(AppError::Config(format!(
+                "Request timeout {}s for {} with stream_mode enabled is too short, recommended minimum is {}s",
+                config.timeout.request,
+                context,
+                http_client_limits::DEFAULT_REQUEST_TIMEOUT
+            )));
+        }
+
         Ok(())
     }
 }
@@ -489,6 +543,9 @@ pub struct UpstreamConfig {
     // 请求头操作
     #[serde(default)]
     pub headers: Vec<HeaderOperation>,
+    // 熔断器配置
+    #[serde(default)]
+    pub breaker: Option<BreakerConfig>,
 }
 
 // 认证配置
@@ -713,6 +770,36 @@ impl Default for ProxyConfig {
             url: String::new(),
         }
     }
+}
+
+// 熔断器配置
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BreakerConfig {
+    // 触发熔断的失败率阈值 (0.01-1.0, 例如0.5表示50%的调用失败)
+    #[serde(default = "default_circuitbreaker_threshold")]
+    pub threshold: f64,
+    // 熔断开启后进入半开 (Half-Open) 状态的冷却时间 (秒)
+    #[serde(default = "default_circuitbreaker_cooldown")]
+    pub cooldown: u64,
+}
+
+impl Default for BreakerConfig {
+    fn default() -> Self {
+        Self {
+            threshold: default_circuitbreaker_threshold(),
+            cooldown: default_circuitbreaker_cooldown(),
+        }
+    }
+}
+
+// 熔断器默认阈值
+fn default_circuitbreaker_threshold() -> f64 {
+    breaker_limits::DEFAULT_THRESHOLD
+}
+
+// 熔断器默认冷却时间（秒）
+fn default_circuitbreaker_cooldown() -> u64 {
+    breaker_limits::DEFAULT_COOLDOWN
 }
 
 // 默认值函数

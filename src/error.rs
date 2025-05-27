@@ -33,6 +33,14 @@ pub enum AppError {
     #[error("No upstream available")]
     NoUpstreamAvailable,
 
+    // 没有健康的上游可用
+    #[error("No healthy upstream available in group")]
+    NoHealthyUpstreamAvailable,
+
+    // 熔断器开启
+    #[error("Circuit breaker is open for upstream: {0}")]
+    CircuitBreakerOpen(String),
+
     // 无效代理配置
     #[error("Invalid proxy configuration: {0}")]
     InvalidProxy(String),

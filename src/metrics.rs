@@ -18,6 +18,16 @@ pub struct Metrics {
     http_request_errors_total: CounterVec,
     // 限流计数
     ratelimit_total: CounterVec,
+    // 熔断器状态变化计数
+    circuitbreaker_state_changes_total: CounterVec,
+    // 熔断器调用结果计数
+    circuitbreaker_calls_total: CounterVec,
+    // 熔断器开启计数
+    circuitbreaker_opened_total: CounterVec,
+    // 熔断器关闭计数
+    circuitbreaker_closed_total: CounterVec,
+    // 熔断器半开计数
+    circuitbreaker_half_opened_total: CounterVec,
 }
 
 impl Metrics {
@@ -95,6 +105,56 @@ impl Metrics {
         )
         .unwrap();
 
+        // 熔断器状态变化计数
+        let circuitbreaker_state_changes_total = CounterVec::new(
+            Opts::new(
+                "llmproxy_circuitbreaker_state_changes_total",
+                "Total number of state changes for the circuit breaker.",
+            ),
+            &["group", "upstream", "url", "from", "to"],
+        )
+        .unwrap();
+
+        // 熔断器调用结果计数
+        let circuitbreaker_calls_total = CounterVec::new(
+            Opts::new(
+                "llmproxy_circuitbreaker_calls_total",
+                "Total number of calls to the circuit breaker.",
+            ),
+            &["group", "upstream", "url", "result"],
+        )
+        .unwrap();
+
+        // 熔断器开启计数
+        let circuitbreaker_opened_total = CounterVec::new(
+            Opts::new(
+                "llmproxy_circuitbreaker_opened_total",
+                "Total number of times the circuit breaker was opened.",
+            ),
+            &["group", "upstream", "url"],
+        )
+        .unwrap();
+
+        // 熔断器关闭计数
+        let circuitbreaker_closed_total = CounterVec::new(
+            Opts::new(
+                "llmproxy_circuitbreaker_closed_total",
+                "Total number of times the circuit breaker was closed.",
+            ),
+            &["group", "upstream", "url"],
+        )
+        .unwrap();
+
+        // 熔断器半开计数
+        let circuitbreaker_half_opened_total = CounterVec::new(
+            Opts::new(
+                "llmproxy_circuitbreaker_half_opened_total",
+                "Total number of times the circuit breaker was half-opened.",
+            ),
+            &["group", "upstream", "url"],
+        )
+        .unwrap();
+
         // 注册指标
         registry
             .register(Box::new(upstream_requests_total.clone()))
@@ -117,6 +177,21 @@ impl Metrics {
         registry
             .register(Box::new(ratelimit_total.clone()))
             .unwrap();
+        registry
+            .register(Box::new(circuitbreaker_state_changes_total.clone()))
+            .unwrap();
+        registry
+            .register(Box::new(circuitbreaker_calls_total.clone()))
+            .unwrap();
+        registry
+            .register(Box::new(circuitbreaker_opened_total.clone()))
+            .unwrap();
+        registry
+            .register(Box::new(circuitbreaker_closed_total.clone()))
+            .unwrap();
+        registry
+            .register(Box::new(circuitbreaker_half_opened_total.clone()))
+            .unwrap();
 
         Self {
             registry,
@@ -127,6 +202,11 @@ impl Metrics {
             http_request_duration_seconds,
             http_request_errors_total,
             ratelimit_total,
+            circuitbreaker_state_changes_total,
+            circuitbreaker_calls_total,
+            circuitbreaker_opened_total,
+            circuitbreaker_closed_total,
+            circuitbreaker_half_opened_total,
         }
     }
 
@@ -168,6 +248,38 @@ impl Metrics {
     // 限流计数
     pub fn ratelimit_total(&self) -> &CounterVec {
         &self.ratelimit_total
+    }
+
+    // 熔断器状态变化计数
+    pub fn circuitbreaker_state_changes_total(&self) -> &CounterVec {
+        &self.circuitbreaker_state_changes_total
+    }
+
+    // 熔断器调用结果计数
+    pub fn circuitbreaker_calls_total(&self) -> &CounterVec {
+        &self.circuitbreaker_calls_total
+    }
+
+    // 熔断器开启计数
+    pub fn circuitbreaker_opened_total(&self) -> &CounterVec {
+        &self.circuitbreaker_opened_total
+    }
+
+    // 熔断器关闭计数
+    pub fn circuitbreaker_closed_total(&self) -> &CounterVec {
+        &self.circuitbreaker_closed_total
+    }
+
+    // 熔断器半开计数
+    pub fn circuitbreaker_half_opened_total(&self) -> &CounterVec {
+        &self.circuitbreaker_half_opened_total
+    }
+
+    // 记录上游请求错误
+    pub fn record_upstream_request_error(&self, group: &str, upstream: &str, error_type: &str) {
+        self.upstream_errors_total()
+            .with_label_values(&[error_type, group, upstream])
+            .inc();
     }
 }
 
