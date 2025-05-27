@@ -1,6 +1,7 @@
 mod admin;
 mod args;
 mod balancer;
+mod breaker;
 mod config;
 mod r#const;
 mod error;

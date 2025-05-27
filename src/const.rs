@@ -143,3 +143,40 @@ pub mod balance_strategy_labels {
     // 随机
     pub const RANDOM: &str = "random";
 }
+
+// 熔断器限制
+pub mod breaker_limits {
+    // 熔断器默认失败阈值
+    pub const DEFAULT_THRESHOLD: f64 = 0.5;
+    // 最小失败阈值
+    pub const MIN_THRESHOLD: f64 = 0.01;
+    // 最大失败阈值
+    pub const MAX_THRESHOLD: f64 = 1.0;
+
+    // 默认冷却时间（秒）
+    pub const DEFAULT_COOLDOWN: u64 = 30;
+    // 最小冷却时间（秒）
+    pub const MIN_COOLDOWN: u64 = 1;
+    // 最大冷却时间（秒）
+    pub const MAX_COOLDOWN: u64 = 3600;
+}
+
+// 熔断器状态标签
+pub mod breaker_state_labels {
+    // 关闭状态（正常）
+    pub const CLOSED: &str = "closed";
+    // 开启状态（熔断生效）
+    pub const OPEN: &str = "open";
+    // 半开状态（测试恢复中）
+    pub const HALF_OPEN: &str = "half_open";
+}
+
+// 熔断器结果标签
+pub mod breaker_result_labels {
+    // 成功
+    pub const SUCCESS: &str = "success";
+    // 失败
+    pub const FAILURE: &str = "failure";
+    // 被拒绝（熔断器开启）
+    pub const REJECTED: &str = "rejected";
+}
