@@ -6,7 +6,9 @@ use crate::{
     },
     error::AppError,
     metrics::METRICS,
-    r#const::{breaker_result_labels, error_labels, retry_limits, upstream_labels},
+    r#const::{
+        balance_strategy_labels, breaker_result_labels, error_labels, retry_limits, upstream_labels,
+    },
 };
 use reqwest::{
     header::{HeaderMap, HeaderName, HeaderValue},
@@ -339,6 +341,17 @@ impl UpstreamManager {
             .upstream_duration_seconds()
             .with_label_values(&[group_name, &upstream_config.url])
             .observe(duration.as_secs_f64());
+
+        // 检查是否为响应时间感知的负载均衡器，更新指标
+        if load_balancer.as_str() == balance_strategy_labels::RESPONSE_AWARE {
+            let duration_ms = duration.as_millis() as usize;
+            if let Some(response_aware) = load_balancer
+                .as_any()
+                .downcast_ref::<crate::balancer::ResponseAwareBalancer>()
+            {
+                response_aware.update_metrics(managed_upstream, duration_ms);
+            }
+        }
 
         // 错误处理和指标记录
         if let Err(ref err) = response {

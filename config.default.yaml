@@ -144,7 +144,7 @@ upstream_groups:
         #   "roundrobin": 轮询。按顺序将请求分发给每个上游。(默认)
         #   "weighted_roundrobin": 加权轮询。根据为每个上游定义的权重分配请求。
         #   "random": 随机。随机选择一个上游。
-        #   "least_connections": 最少连接数 (如果支持)。选择活动连接最少的上游。
+        #   "response_aware": 响应时间感知。选择平均响应时间最短的上游。
     # [可选] HTTP 客户端配置。定义 LLMProxy 如何与此组中的上游服务通信。
     # 如果省略，将使用全局默认的 HTTP 客户端配置。
     http_client:

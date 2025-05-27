@@ -142,6 +142,8 @@ pub mod balance_strategy_labels {
     pub const WEIGHTED_ROUND_ROBIN: &str = "weighted_roundrobin";
     // 随机
     pub const RANDOM: &str = "random";
+    // 响应时间感知
+    pub const RESPONSE_AWARE: &str = "response_aware";
 }
 
 // 熔断器限制
