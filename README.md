@@ -14,6 +14,7 @@ LLMProxy addresses critical challenges in enterprise LLM API deployments:
 
 -   **High Availability** - Eliminates single points of failure through intelligent request distribution across multiple LLM providers
 -   **Load Balancing** - Implements sophisticated load distribution strategies to optimize resource utilization and maintain performance under varying loads
+-   **Fault Tolerance** - Employs circuit breaker patterns to detect failing upstream services, prevent cascading failures, and automatically recover when services are restored
 -   **Horizontal Scalability** - Easily scales to handle growing request volumes by adding more upstream services without disrupting existing clients
 
 ## Key Features
@@ -64,6 +65,14 @@ LLMProxy addresses critical challenges in enterprise LLM API deployments:
         -   Intelligent retry mechanisms with configurable attempts and backoff delays
         -   Optional HTTP/HTTPS proxy support for enhanced security and compliance
 
+-   🛡️ **Advanced Fault Tolerance**
+
+    -   **Circuit Breaker Pattern:** Automatically detect and isolate failing upstream services
+    -   **Fast Failure Detection:** Quickly identify problematic services to minimize request latency
+    -   **Automatic Recovery:** Periodically test failed services and restore them when available
+    -   **Configurable Thresholds:** Fine-tune failure detection sensitivity per upstream service
+    -   **Failure Isolation:** Prevent cascading failures by containing issues to affected upstreams
+
 -   📊 **Comprehensive Monitoring & Management**
 
     -   Independent administrative interface through `http_server.admin`
@@ -77,6 +86,7 @@ LLMProxy implements a modular, microservices-oriented architecture with the foll
 -   **Forward Server**: HTTP listeners that receive and process client requests
 -   **Upstream Manager**: Orchestrates communication with LLM API servers, including load balancing and authentication
 -   **Load Balancer**: Intelligently distributes requests among available upstreams based on configured strategies
+-   **Circuit Breaker**: Monitors upstream health and prevents cascading failures by isolating problematic services
 -   **Metrics Collector**: Gathers and exposes detailed performance and operational metrics
 
 ## Prometheus Metrics
@@ -99,6 +109,14 @@ LLMProxy provides comprehensive Prometheus metrics for monitoring performance, h
 
 -   **llmproxy_ratelimit_total** (counter) - Aggregate requests rejected due to rate limiting policies, labeled by forward
 
+### Circuit Breaker Metrics
+
+-   **llmproxy_circuitbreaker_state_changes_total** (counter) - Aggregate circuit breaker state transitions, labeled by group, upstream, url, and state
+-   **llmproxy_circuitbreaker_calls_total** (counter) - Aggregate calls processed through circuit breakers, labeled by group, upstream, url, and result
+-   **llmproxy_circuitbreaker_opened_total** (counter) - Aggregate circuit breaker transitions to Open state, labeled by group, upstream, and url
+-   **llmproxy_circuitbreaker_closed_total** (counter) - Aggregate circuit breaker transitions to Closed state, labeled by group, upstream, and url
+-   **llmproxy_circuitbreaker_half_opened_total** (counter) - Aggregate circuit breaker transitions to Half-Open state, labeled by group, upstream, and url
+
 ## API Endpoints
 
 LLMProxy exposes the following HTTP API endpoints:
@@ -110,7 +128,7 @@ LLMProxy exposes the following HTTP API endpoints:
     -   _Protocol_: HTTP/HTTPS
     -   _Usage_: Client applications direct requests to these endpoints, which are then routed to the appropriate upstream LLM API
 
-### Monitoring and Health Endpoints
+### Admin Endpoints
 
 -   **GET /health**
 
@@ -173,6 +191,9 @@ upstreams:
           - op: "insert" # Operation: "insert", "replace", or "remove"
             key: "X-Custom-Header" # Header name to operate on
             value: "MyProxyValue" # Header value (for "insert" or "replace" operations)
+      breaker: # [Optional] Circuit breaker configuration
+          threshold: 0.5 # Failure rate threshold to trip breaker (0.01-1.0, default: 0.5)
+          cooldown: 30 # Cooldown period in seconds before half-open state (1-3600, default: 30)
 
     - name: "anthropic_primary"
       url: "https://api.anthropic.com"
@@ -202,7 +223,7 @@ upstream_groups:
       http_client:
           agent: "LLMProxy/1.0" # [Optional] User-Agent header (default: "LLMProxy/1.0")
           keepalive: 60 # [Optional] TCP keepalive in seconds (0-600, 0=disabled)
-          stream_mode: true # [Optional] Enable streaming mode (default: true)
+          stream: true # [Optional] Enable streaming mode (default: true)
           timeout:
               connect: 10 # Connection timeout in seconds (default: 10)
               request: 300 # Request timeout in seconds (default: 300)
@@ -227,13 +248,16 @@ upstream_groups:
 2. **Performance Optimization**:
 
     - Fine-tune timeout configurations based on specific LLM provider response characteristics
-    - Enable `stream_mode: true` for efficient streaming of LLM responses
+    - Enable `stream: true` for efficient streaming of LLM responses
     - Implement appropriate rate limits to protect both proxy infrastructure and upstream services
 
 3. **Reliability Enhancement**:
     - Enable intelligent retry mechanisms for idempotent requests
     - Implement weighted load balancing to prioritize more reliable or higher-capacity providers
     - Configure multiple upstreams in each group for redundancy and failover capabilities
+    - Deploy circuit breakers with appropriate thresholds to quickly isolate failing services
+    - Set reasonable circuit breaker cooldown periods based on upstream recovery patterns
+    - Monitor circuit breaker metrics to identify recurring upstream stability issues
 
 For a comprehensive configuration reference detailing all available options, refer to the `config.default.yaml` file included with LLMProxy.
 

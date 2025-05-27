@@ -154,7 +154,7 @@ upstream_groups:
       keepalive:
         60 # [可选] TCP Keepalive 时间 (秒)。范围: 0-600。0 表示禁用。 (默认: 60)
         # 有助于保持与上游的连接活跃，减少延迟。
-      stream_mode:
+      stream:
         true # [可选] 是否启用流式传输模式。(默认: true)
         # 对于 LLM API 的流式响应 (server-sent events) 非常重要。
         # 当为 `true` 时，`timeout.request` 配置通常会失效或行为改变，
@@ -164,7 +164,7 @@ upstream_groups:
         connect: 10 # 连接到上游服务的超时时间 (秒)。 (默认: 10)
         request:
           300 # 从发送请求到接收到上游完整响应 (非流式) 的超时时间 (秒)。(默认: 10, 对于长时 LLM 请求可能需要调大)
-          # 注意: 在 `stream_mode: true` 时，此超时可能不适用或行为不同。请查阅文档。
+          # 注意: 在 `stream: true` 时，此超时可能不适用或行为不同。请查阅文档。
         idle: 60 # 与上游服务的连接在无活动后被视为空闲并关闭的超时时间 (秒)。 (默认: 60)
       # [可选] 请求重试配置。
       retry:
@@ -195,7 +195,7 @@ upstream_groups:
     http_client: # 可以为每个组定制 HTTP 客户端行为
       agent: "LLMProxy/1.0 (OpenAIClient)"
       keepalive: 90 # 例如，为 OpenAI 连接设置更长的 keepalive
-      stream_mode: true
+      stream: true
       timeout:
         connect: 10
         request: 300 # 对于 OpenAI 请求，通常响应时间较长
@@ -218,10 +218,7 @@ upstream_groups:
     http_client:
       agent: "LLMProxy/1.0 (AnthropicClient)"
       keepalive: 60
-      # stream: true # [已废弃] 此配置项已被 `stream_mode` 替代。
-      # 为保持兼容性可能暂时有效，但建议迁移到 `stream_mode`。
-      # 后续版本可能会移除此字段。
-      stream_mode: true # 确保使用 stream_mode
+      stream: true # 确保使用 stream
       timeout:
         connect: 15 # Anthropic 连接可能需要稍长超时
         request: 300 # Anthropic Claude 的响应也可能较长

@@ -97,6 +97,24 @@ impl Config {
                 )));
             }
 
+            // 验证负载均衡策略
+            match group.balance.strategy {
+                BalanceStrategy::WeightedRoundRobin => {
+                    // 检查是否所有上游都有合理的权重设置
+                    let all_default_weight = group
+                        .upstreams
+                        .iter()
+                        .all(|u| u.weight == weight_limits::MIN_WEIGHT);
+                    if all_default_weight {
+                        return Err(AppError::Config(format!(
+                            "Upstream group '{}' uses weighted_roundrobin strategy but all upstreams have default weight",
+                            group.name
+                        )));
+                    }
+                }
+                _ => {} // 其他策略不需要特殊验证
+            }
+
             // 验证 HTTP 客户端配置
             self.validate_http_client_config(
                 &group.http_client,
@@ -387,6 +405,20 @@ impl Config {
                     config.proxy.url, e
                 )));
             }
+        }
+
+        // 验证流式模式配置
+        // 当流式模式启用时，检查请求超时设置是否合理
+        if config.stream_mode
+            && config.timeout.request < http_client_limits::DEFAULT_REQUEST_TIMEOUT
+        {
+            // 对于流式响应，建议使用更长的请求超时
+            return Err(AppError::Config(format!(
+                "Request timeout {}s for {} with stream_mode enabled is too short, recommended minimum is {}s",
+                config.timeout.request,
+                context,
+                http_client_limits::DEFAULT_REQUEST_TIMEOUT
+            )));
         }
 
         Ok(())
