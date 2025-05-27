@@ -40,7 +40,7 @@ impl UpstreamManager {
     ) -> Result<Self, AppError> {
         let mut upstream_map = HashMap::with_capacity(upstreams.len());
         let mut group_map = HashMap::with_capacity(groups.len());
-        let mut group_clients = HashMap::new();
+        let mut group_clients = HashMap::with_capacity(groups.len());
 
         // 构建上游映射
         for upstream in upstreams {
@@ -49,9 +49,9 @@ impl UpstreamManager {
 
         // 为每个组创建负载均衡器和HTTP客户端
         for group in groups {
-            let group_name = group.name.clone();
+            let group_name = &group.name;
             // 获取组内所有上游的引用
-            let upstream_refs = group.upstreams.clone();
+            let upstream_refs = &group.upstreams;
 
             // 创建托管上游列表
             let mut managed_upstreams = Vec::with_capacity(upstream_refs.len());
@@ -84,7 +84,7 @@ impl UpstreamManager {
 
                 // 创建托管上游
                 let managed_upstream = ManagedUpstream {
-                    upstream_ref,
+                    upstream_ref: upstream_ref.clone(),
                     breaker,
                 };
 
@@ -98,7 +98,7 @@ impl UpstreamManager {
             let client = Self::create_http_client(&group.http_client)?;
             group_clients.insert(group.name.clone(), client);
 
-            group_map.insert(group.name, lb);
+            group_map.insert(group.name.clone(), lb);
         }
 
         info!("Initialized {} upstream groups", group_map.len());
@@ -120,29 +120,28 @@ impl UpstreamManager {
             .connect_timeout(Duration::from_secs(config.timeout.connect));
 
         // 仅为非流式响应设置请求超时
-        // 流式响应会在 server.rs 中通过流式处理方式处理，不需要设置整体超时
         if !config.stream_mode {
             client_builder = client_builder.timeout(Duration::from_secs(config.timeout.request));
         }
 
-        // 配置TCP keepalive
+        // 配置TCP keepalive（如果启用）
         if config.keepalive > 0 {
             client_builder =
                 client_builder.tcp_keepalive(Duration::from_secs(config.keepalive as u64));
         }
 
-        // 配置空闲连接超时
+        // 配置空闲连接超时（如果设置）
         if config.timeout.idle > 0 {
             client_builder =
                 client_builder.pool_idle_timeout(Duration::from_secs(config.timeout.idle));
         }
 
-        // 配置用户代理
+        // 配置用户代理（如果有）
         if !config.agent.is_empty() {
             client_builder = client_builder.user_agent(&config.agent);
         }
 
-        // 配置代理
+        // 配置代理（如果启用）
         if config.proxy.enabled && !config.proxy.url.is_empty() {
             client_builder =
                 client_builder.proxy(reqwest::Proxy::all(&config.proxy.url).map_err(|e| {
@@ -161,11 +160,8 @@ impl UpstreamManager {
                     Duration::from_millis(config.retry.initial.into()),
                     Duration::from_secs(retry_limits::MAX_DELAY.into()),
                 )
-                // 设置延迟基值
                 .base(2)
-                // 使用有界抖动来避免多个客户端同时重试
                 .jitter(Jitter::Bounded)
-                // 配置最大重试次数
                 .build_with_max_retries(config.retry.attempts);
 
             reqwest_middleware::ClientBuilder::new(client)
@@ -260,12 +256,12 @@ impl UpstreamManager {
         };
 
         // 定义请求执行闭包
-        let request_future = || async {
+        let request_future = |headers: HeaderMap, body: Option<bytes::Bytes>| async move {
             // 创建请求构建器
             let mut request_builder = client.request(method.clone(), url_parsed.clone());
 
             // 处理请求头
-            let processed_headers = self.process_headers(headers.clone(), upstream_config)?;
+            let processed_headers = self.process_headers(headers, upstream_config)?;
             request_builder = request_builder.headers(processed_headers);
 
             // 添加认证信息
@@ -274,7 +270,7 @@ impl UpstreamManager {
             }
 
             // 添加请求体（如果有）
-            if let Some(body_data) = body.clone() {
+            if let Some(body_data) = body {
                 request_builder = request_builder.body(body_data);
             }
 
@@ -292,7 +288,10 @@ impl UpstreamManager {
         let response = match &managed_upstream.breaker {
             Some(breaker) => {
                 // 使用熔断器执行请求
-                match breaker.call_async(request_future).await {
+                match breaker
+                    .call_async(move || request_future(headers, body))
+                    .await
+                {
                     Ok(resp) => Ok(resp),
                     Err(circuitbreaker_rs::BreakerError::Open) => {
                         // 熔断器开启，拒绝请求
@@ -328,10 +327,9 @@ impl UpstreamManager {
             }
             None => {
                 // 直接执行请求（无熔断器保护）
-                match request_future().await {
-                    Ok(resp) => Ok(resp),
-                    Err(err) => Err(AppError::Upstream(err.0)),
-                }
+                request_future(headers, body)
+                    .await
+                    .map_err(|err| AppError::Upstream(err.0))
             }
         };
 

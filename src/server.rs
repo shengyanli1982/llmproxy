@@ -66,16 +66,18 @@ fn is_streaming_response(headers: &HeaderMap) -> bool {
     // 检查内容类型是否为事件流
     let is_event_stream = headers
         .get(http_headers::CONTENT_TYPE)
-        .map(|v| v.to_str().unwrap_or(""))
-        .map(|s| s.contains(http_headers::content_types::EVENT_STREAM))
-        .unwrap_or(false);
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|s| {
+            s.contains(http_headers::content_types::EVENT_STREAM)
+        });
 
     // 检查传输编码是否为分块
     let is_chunked = headers
         .get(http_headers::TRANSFER_ENCODING)
-        .map(|v| v.to_str().unwrap_or(""))
-        .map(|s| s.contains(http_headers::transfer_encodings::CHUNKED))
-        .unwrap_or(false);
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|s| {
+            s.contains(http_headers::transfer_encodings::CHUNKED)
+        });
 
     // 如果任一条件满足，则认为是流式响应
     is_event_stream || is_chunked
@@ -184,7 +186,7 @@ pub async fn forward_handler(
     // 获取请求路径
     let path_str = match path {
         Some(p) => format!("/{}", p.0),
-        None => "".to_string(),
+        None => String::new(),
     };
 
     // 记录请求指标
@@ -301,7 +303,7 @@ pub async fn forward_handler(
 
             // 记录请求完成的延迟时间（毫秒）
             info!(
-                "Request completed: {} {} to upstream group {}, status code: {}, duration: {}ms",
+                "Request completed: {} {} to upstream group {}, status: {}, time: {}ms",
                 method, path_str, state.config.upstream_group, status, duration_ms
             );
 
@@ -318,17 +320,18 @@ pub async fn forward_handler(
 
             // 记录请求耗时
             let duration = start_time.elapsed();
-            let duration_ms = duration.as_millis();
-
             METRICS
                 .http_request_duration_seconds()
                 .with_label_values(&[&state.config.name, method.as_str(), &path_str])
                 .observe(duration.as_secs_f64());
 
-            // 记录请求失败的延迟时间（毫秒）
+            // 记录请求失败的信息
             info!(
-                "Request failed: {} {} to upstream group {}, duration: {}ms",
-                method, path_str, state.config.upstream_group, duration_ms
+                "Request failed: {} {} to upstream group {}, time: {}ms",
+                method,
+                path_str,
+                state.config.upstream_group,
+                duration.as_millis()
             );
 
             StatusCode::INTERNAL_SERVER_ERROR.into_response()

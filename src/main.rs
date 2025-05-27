@@ -18,7 +18,7 @@ fn init_logging(args: &Args) {
         .with_ansi(false)
         .with_line_number(false);
 
-    // 如果启用调试模式，输出调试信息
+    // 如果启用调试模式，输出调试信息，否则只输出 info 及以上级别
     if args.debug {
         builder.with_max_level(tracing::Level::DEBUG)
     } else {
@@ -117,18 +117,14 @@ struct AppComponents {
 // 创建应用组件
 async fn create_components(config: Config) -> Result<AppComponents, AppError> {
     // 创建上游管理器
-    let upstream_manager: std::sync::Arc<UpstreamManager> = match UpstreamManager::new(
-        config.upstreams.clone(),
-        config.upstream_groups.clone(),
-    )
-    .await
-    {
-        Ok(manager) => std::sync::Arc::new(manager),
-        Err(e) => {
-            error!("Failed to initialize upstream manager: {}", e);
-            return Err(e);
-        }
-    };
+    let upstream_manager: std::sync::Arc<UpstreamManager> =
+        match UpstreamManager::new(config.upstreams, config.upstream_groups).await {
+            Ok(manager) => std::sync::Arc::new(manager),
+            Err(e) => {
+                error!("Failed to initialize upstream manager: {}", e);
+                return Err(e);
+            }
+        };
 
     // 创建管理服务
     let admin_addr = format!(
@@ -142,7 +138,7 @@ async fn create_components(config: Config) -> Result<AppComponents, AppError> {
 
     // 创建转发服务
     let mut forward_servers = Vec::with_capacity(config.http_server.forwards.len());
-    for forward_config in config.http_server.forwards {
+    for forward_config in &config.http_server.forwards {
         match ForwardServer::new(forward_config.clone(), upstream_manager.clone()) {
             Ok(server) => {
                 info!(

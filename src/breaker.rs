@@ -84,6 +84,7 @@ impl UpstreamCircuitBreaker {
     }
 
     /// 检查熔断器当前是否允许调用
+    #[inline(always)]
     pub fn is_call_permitted(&self) -> bool {
         matches!(
             self.breaker.current_state(),

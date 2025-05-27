@@ -66,7 +66,16 @@ impl Config {
 
         // 检查上游组中引用的上游是否存在
         for group in &self.upstream_groups {
+            // 确保每个组至少有一个上游
+            if group.upstreams.is_empty() {
+                return Err(AppError::Config(format!(
+                    "Upstream group '{}' has no defined upstreams",
+                    group.name
+                )));
+            }
+
             for upstream_ref in &group.upstreams {
+                // 检查引用的上游是否存在
                 if !upstream_names.contains(&upstream_ref.name) {
                     return Err(AppError::Config(format!(
                         "Upstream group '{}' references non-existent upstream '{}'",
@@ -89,30 +98,19 @@ impl Config {
                 }
             }
 
-            // 确保每个组至少有一个上游
-            if group.upstreams.is_empty() {
-                return Err(AppError::Config(format!(
-                    "Upstream group '{}' has no defined upstreams",
-                    group.name
-                )));
-            }
-
             // 验证负载均衡策略
-            match group.balance.strategy {
-                BalanceStrategy::WeightedRoundRobin => {
-                    // 检查是否所有上游都有合理的权重设置
-                    let all_default_weight = group
-                        .upstreams
-                        .iter()
-                        .all(|u| u.weight == weight_limits::MIN_WEIGHT);
-                    if all_default_weight {
-                        return Err(AppError::Config(format!(
-                            "Upstream group '{}' uses weighted_roundrobin strategy but all upstreams have default weight",
-                            group.name
-                        )));
-                    }
+            if let BalanceStrategy::WeightedRoundRobin = group.balance.strategy {
+                // 检查是否所有上游都有合理的权重设置
+                let all_default_weight = group
+                    .upstreams
+                    .iter()
+                    .all(|u| u.weight == weight_limits::MIN_WEIGHT);
+                if all_default_weight {
+                    return Err(AppError::Config(format!(
+                        "Upstream group '{}' uses weighted_roundrobin strategy but all upstreams have default weight",
+                        group.name
+                    )));
                 }
-                _ => {} // 其他策略不需要特殊验证
             }
 
             // 验证 HTTP 客户端配置
@@ -130,6 +128,7 @@ impl Config {
             .collect();
 
         for forward in &self.http_server.forwards {
+            // 检查引用的上游组是否存在
             if !group_names.contains(&forward.upstream_group) {
                 return Err(AppError::Config(format!(
                     "Forwarding service '{}' references non-existent upstream group '{}'",
@@ -139,29 +138,7 @@ impl Config {
 
             // 验证限流配置
             if forward.ratelimit.enabled {
-                if forward.ratelimit.per_second < rate_limit_limits::MIN_PER_SECOND
-                    || forward.ratelimit.per_second > rate_limit_limits::MAX_PER_SECOND
-                {
-                    return Err(AppError::Config(format!(
-                        "Requests per second {} for forwarding service '{}' is out of valid range [{}-{}]",
-                        forward.ratelimit.per_second,
-                        forward.name,
-                        rate_limit_limits::MIN_PER_SECOND,
-                        rate_limit_limits::MAX_PER_SECOND
-                    )));
-                }
-
-                if forward.ratelimit.burst < rate_limit_limits::MIN_BURST
-                    || forward.ratelimit.burst > rate_limit_limits::MAX_BURST
-                {
-                    return Err(AppError::Config(format!(
-                        "Burst limit {} for forwarding service '{}' is out of valid range [{}-{}]",
-                        forward.ratelimit.burst,
-                        forward.name,
-                        rate_limit_limits::MIN_BURST,
-                        rate_limit_limits::MAX_BURST
-                    )));
-                }
+                self.validate_rate_limit_config(&forward.ratelimit, &forward.name)?;
             }
 
             // 验证超时配置
@@ -186,22 +163,7 @@ impl Config {
 
             // 验证熔断器配置
             if let Some(breaker) = &upstream.breaker {
-                if breaker.threshold < breaker_limits::MIN_THRESHOLD
-                    || breaker.threshold > breaker_limits::MAX_THRESHOLD
-                {
-                    return Err(AppError::Config(format!(
-                        "Upstream '{}' has invalid breaker.threshold ({}), must be between 0.01 and 1.0",
-                        upstream.name, breaker.threshold
-                    )));
-                }
-                if breaker.cooldown < breaker_limits::MIN_COOLDOWN
-                    || breaker.cooldown > breaker_limits::MAX_COOLDOWN
-                {
-                    return Err(AppError::Config(format!(
-                        "Upstream '{}' has invalid breaker.cooldown ({}), must be between 1 and 3600 seconds",
-                        upstream.name, breaker.cooldown
-                    )));
-                }
+                self.validate_breaker_config(breaker, &upstream.name)?;
             }
 
             // 验证认证配置
@@ -423,11 +385,70 @@ impl Config {
 
         Ok(())
     }
+
+    // 验证限流配置
+    fn validate_rate_limit_config(
+        &self,
+        config: &RateLimitConfig,
+        service_name: &str,
+    ) -> Result<(), AppError> {
+        if config.per_second < rate_limit_limits::MIN_PER_SECOND
+            || config.per_second > rate_limit_limits::MAX_PER_SECOND
+        {
+            return Err(AppError::Config(format!(
+                "Requests per second {} for forwarding service '{}' is out of valid range [{}-{}]",
+                config.per_second,
+                service_name,
+                rate_limit_limits::MIN_PER_SECOND,
+                rate_limit_limits::MAX_PER_SECOND
+            )));
+        }
+
+        if config.burst < rate_limit_limits::MIN_BURST
+            || config.burst > rate_limit_limits::MAX_BURST
+        {
+            return Err(AppError::Config(format!(
+                "Burst limit {} for forwarding service '{}' is out of valid range [{}-{}]",
+                config.burst,
+                service_name,
+                rate_limit_limits::MIN_BURST,
+                rate_limit_limits::MAX_BURST
+            )));
+        }
+
+        Ok(())
+    }
+
+    // 验证熔断器配置
+    fn validate_breaker_config(
+        &self,
+        breaker: &BreakerConfig,
+        upstream_name: &str,
+    ) -> Result<(), AppError> {
+        if breaker.threshold < breaker_limits::MIN_THRESHOLD
+            || breaker.threshold > breaker_limits::MAX_THRESHOLD
+        {
+            return Err(AppError::Config(format!(
+                "Upstream '{}' has invalid breaker.threshold ({}), must be between 0.01 and 1.0",
+                upstream_name, breaker.threshold
+            )));
+        }
+
+        if breaker.cooldown < breaker_limits::MIN_COOLDOWN
+            || breaker.cooldown > breaker_limits::MAX_COOLDOWN
+        {
+            return Err(AppError::Config(format!(
+                "Upstream '{}' has invalid breaker.cooldown ({}s), must be between 5 and 3600 seconds",
+                upstream_name, breaker.cooldown
+            )));
+        }
+
+        Ok(())
+    }
 }
 
 // HTTP服务器配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HttpServerConfig {
     // 转发服务配置
     #[serde(default)]
@@ -436,7 +457,6 @@ pub struct HttpServerConfig {
     #[serde(default)]
     pub admin: AdminConfig,
 }
-
 
 // 转发服务配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -626,14 +646,12 @@ pub struct UpstreamRef {
 }
 
 // 负载均衡策略配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BalanceConfig {
     // 策略类型
     #[serde(default)]
     pub strategy: BalanceStrategy,
 }
-
 
 // 负载均衡策略类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -740,8 +758,7 @@ impl Default for RetryConfig {
 }
 
 // 代理配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProxyConfig {
     // 是否启用代理
     #[serde(default)]
@@ -750,7 +767,6 @@ pub struct ProxyConfig {
     #[serde(default)]
     pub url: String,
 }
-
 
 // 熔断器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]

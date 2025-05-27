@@ -26,6 +26,22 @@ pub trait LoadBalancer: Send + Sync {
     async fn report_failure(&self, upstream: &ManagedUpstream);
 }
 
+// 上游健康检查帮助函数
+#[inline(always)]
+fn is_upstream_healthy(managed_upstream: &ManagedUpstream) -> bool {
+    match &managed_upstream.breaker {
+        Some(breaker) if !breaker.is_call_permitted() => {
+            // 熔断器开启，上游不健康
+            debug!(
+                "Skipping upstream: {} (circuit breaker open)",
+                managed_upstream.upstream_ref.name
+            );
+            false
+        }
+        _ => true,
+    }
+}
+
 // 轮询负载均衡器
 pub struct RoundRobinBalancer {
     // 服务器列表
@@ -47,35 +63,33 @@ impl RoundRobinBalancer {
 #[async_trait]
 impl LoadBalancer for RoundRobinBalancer {
     async fn select_upstream(&self) -> Result<&ManagedUpstream, AppError> {
-        if self.upstreams.is_empty() {
+        let len = self.upstreams.len();
+        if len == 0 {
             return Err(AppError::NoUpstreamAvailable);
         }
 
-        // 尝试所有上游，找到一个健康的
-        let start_index = self.current.fetch_add(1, Ordering::SeqCst) % self.upstreams.len();
+        // 如果只有一个上游，直接检查它
+        if len == 1 {
+            return if is_upstream_healthy(&self.upstreams[0]) {
+                Ok(&self.upstreams[0])
+            } else {
+                Err(AppError::NoHealthyUpstreamAvailable)
+            };
+        }
 
-        for i in 0..self.upstreams.len() {
-            let index = (start_index + i) % self.upstreams.len();
+        // 尝试所有上游，找到一个健康的
+        let start_index = self.current.fetch_add(1, Ordering::SeqCst) % len;
+
+        for i in 0..len {
+            let index = (start_index + i) % len;
             let managed_upstream = &self.upstreams[index];
 
-            // 检查熔断器状态
-            match &managed_upstream.breaker {
-                Some(breaker) if !breaker.is_call_permitted() => {
-                    // 熔断器开启，跳过此上游
-                    debug!(
-                        "RoundRobinBalancer skipping upstream: {} (circuit breaker open)",
-                        managed_upstream.upstream_ref.name
-                    );
-                    continue;
-                }
-                _ => {
-                    // 熔断器关闭或不存在，可以使用此上游
-                    debug!(
-                        "RoundRobinBalancer selected upstream: {}, index: {}",
-                        managed_upstream.upstream_ref.name, index
-                    );
-                    return Ok(managed_upstream);
-                }
+            if is_upstream_healthy(managed_upstream) {
+                debug!(
+                    "RoundRobinBalancer selected upstream: {}, index: {}",
+                    managed_upstream.upstream_ref.name, index
+                );
+                return Ok(managed_upstream);
             }
         }
 
@@ -100,12 +114,22 @@ pub struct WeightedRoundRobinBalancer {
 impl WeightedRoundRobinBalancer {
     // 创建新的加权轮询负载均衡器
     pub fn new(upstreams: Vec<ManagedUpstream>) -> Self {
+        // 预先计算所需的容量以避免重新分配
+        let total_capacity = upstreams
+            .iter()
+            .map(|u| u.upstream_ref.weight as usize)
+            .sum();
+
         // 根据权重复制服务器
-        let mut weighted_upstreams = Vec::new();
+        let mut weighted_upstreams = Vec::with_capacity(total_capacity);
 
         for upstream in upstreams {
             // 对于每个服务器，按其权重添加多个副本
-            for _ in 0..upstream.upstream_ref.weight {
+            let weight = upstream.upstream_ref.weight;
+            weighted_upstreams.push(upstream.clone());
+
+            // 从第二个开始添加剩余的副本
+            for _ in 1..weight {
                 weighted_upstreams.push(upstream.clone());
             }
         }
@@ -120,37 +144,33 @@ impl WeightedRoundRobinBalancer {
 #[async_trait]
 impl LoadBalancer for WeightedRoundRobinBalancer {
     async fn select_upstream(&self) -> Result<&ManagedUpstream, AppError> {
-        if self.upstreams.is_empty() {
+        let len = self.upstreams.len();
+        if len == 0 {
             return Err(AppError::NoUpstreamAvailable);
         }
 
-        // 尝试所有上游，找到一个健康的
-        let start_index = self.current.fetch_add(1, Ordering::SeqCst) % self.upstreams.len();
+        // 如果只有一个上游，直接检查它
+        if len == 1 {
+            return if is_upstream_healthy(&self.upstreams[0]) {
+                Ok(&self.upstreams[0])
+            } else {
+                Err(AppError::NoHealthyUpstreamAvailable)
+            };
+        }
 
-        for i in 0..self.upstreams.len() {
-            let index = (start_index + i) % self.upstreams.len();
+        // 尝试所有上游，找到一个健康的
+        let start_index = self.current.fetch_add(1, Ordering::SeqCst) % len;
+
+        for i in 0..len {
+            let index = (start_index + i) % len;
             let managed_upstream = &self.upstreams[index];
 
-            // 检查熔断器状态
-            match &managed_upstream.breaker {
-                Some(breaker) if !breaker.is_call_permitted() => {
-                    // 熔断器开启，跳过此上游
-                    debug!(
-                        "WeightedRoundRobinBalancer skipping upstream: {} (circuit breaker open)",
-                        managed_upstream.upstream_ref.name
-                    );
-                    continue;
-                }
-                _ => {
-                    // 熔断器关闭或不存在，可以使用此上游
-                    debug!(
-                        "WeightedRoundRobinBalancer selected upstream: {}, weight: {}, index: {}",
-                        managed_upstream.upstream_ref.name,
-                        managed_upstream.upstream_ref.weight,
-                        index
-                    );
-                    return Ok(managed_upstream);
-                }
+            if is_upstream_healthy(managed_upstream) {
+                debug!(
+                    "WeightedRoundRobinBalancer selected upstream: {}, weight: {}, index: {}",
+                    managed_upstream.upstream_ref.name, managed_upstream.upstream_ref.weight, index
+                );
+                return Ok(managed_upstream);
             }
         }
 
@@ -184,14 +204,35 @@ impl LoadBalancer for RandomBalancer {
             return Err(AppError::NoUpstreamAvailable);
         }
 
-        // 创建健康上游列表
+        // 如果只有一个上游，直接检查它
+        if self.upstreams.len() == 1 {
+            return if is_upstream_healthy(&self.upstreams[0]) {
+                Ok(&self.upstreams[0])
+            } else {
+                Err(AppError::NoHealthyUpstreamAvailable)
+            };
+        }
+
+        // 尝试快速路径：随机选择几次，看是否能找到健康的上游
+        let mut rng = thread_rng();
+        for _ in 0..3 {
+            // 尝试最多3次随机选择
+            if let Some(upstream) = self.upstreams.choose(&mut rng) {
+                if is_upstream_healthy(upstream) {
+                    debug!(
+                        "RandomBalancer selected upstream: {}",
+                        upstream.upstream_ref.name
+                    );
+                    return Ok(upstream);
+                }
+            }
+        }
+
+        // 如果随机选择失败，创建健康上游列表
         let healthy_upstreams: Vec<&ManagedUpstream> = self
             .upstreams
             .iter()
-            .filter(|upstream| match &upstream.breaker {
-                Some(breaker) => breaker.is_call_permitted(),
-                None => true,
-            })
+            .filter(|upstream| is_upstream_healthy(upstream))
             .collect();
 
         // 如果没有健康的上游，返回错误
@@ -200,17 +241,17 @@ impl LoadBalancer for RandomBalancer {
             return Err(AppError::NoHealthyUpstreamAvailable);
         }
 
-        // 从健康上游中随机选择一个
+        // 随机选择一个健康的上游
         let upstream = healthy_upstreams
-            .choose(&mut thread_rng())
-            .expect("We already checked that healthy_upstreams is not empty");
+            .choose(&mut rng)
+            .expect("Should have at least one healthy upstream");
 
         debug!(
             "RandomBalancer selected upstream: {}",
             upstream.upstream_ref.name
         );
 
-        Ok(upstream)
+        Ok(*upstream)
     }
 
     async fn report_failure(&self, _upstream: &ManagedUpstream) {
