@@ -1,0 +1,91 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: llmproxy-config
+  namespace: llmproxy
+data:
+  config.yaml: |
+    http_server:
+      forwards:
+        - name: to_mixgroup
+          port: 3000
+          address: "0.0.0.0"
+          upstream_group: "mixgroup"
+          ratelimit:
+            enabled: true
+            per_second: 100
+            burst: 200
+          timeout:
+            connect: 10
+        - name: openai_group
+          port: 3001
+          address: "0.0.0.0"
+          upstream_group: "openai"
+          ratelimit:
+            enabled: true
+            per_second: 100
+            burst: 200
+          timeout:
+            connect: 10
+      admin:
+        port: 9000
+        address: "0.0.0.0"
+        timeout:
+          connect: 10
+
+    upstreams:
+      - name: openai_primary
+        url: "https://api.openai.com/v1"
+        auth:
+          type: "bearer"
+          token: "${OPENAI_API_KEY}"
+        breaker:
+          threshold: 0.5
+          cooldown: 30
+      
+      - name: anthropic_primary
+        url: "https://api.anthropic.com"
+        auth:
+          type: "bearer"
+          token: "${ANTHROPIC_API_KEY}"
+        headers:
+          - op: insert
+            key: "x-api-key"
+            value: "${ANTHROPIC_API_KEY}"
+
+    upstream_groups:
+      - name: mixgroup
+        upstreams:
+          - name: openai_primary
+            weight: 8
+          - name: anthropic_primary
+            weight: 2
+        balance:
+          strategy: "weighted_roundrobin"
+        http_client:
+          agent: "LLMProxy/1.0"
+          keepalive: 60
+          stream: true
+          timeout:
+            connect: 10
+            request: 300
+            idle: 60
+          retry:
+            enabled: true
+            attempts: 3
+            initial: 500
+          proxy:
+            enabled: false
+      
+      - name: openai
+        upstreams:
+          - name: openai_primary
+        balance:
+          strategy: "roundrobin"
+        http_client:
+          agent: "LLMProxy/1.0 (OpenAIClient)"
+          stream: true
+          timeout:
+            connect: 10
+            request: 300
+            idle: 60

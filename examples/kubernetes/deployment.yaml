@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: llmproxy
+  namespace: llmproxy
+  labels:
+    app: llmproxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: llmproxy
+  template:
+    metadata:
+      labels:
+        app: llmproxy
+    spec:
+      containers:
+        - name: llmproxy
+          image: shengyanli1982/llmproxy:latest
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--config"
+            - "/etc/llmproxy/config.yaml"
+          ports:
+            - name: to-mixgroup
+              containerPort: 3000
+            - name: openai
+              containerPort: 3001
+            - name: admin
+              containerPort: 9000
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/llmproxy
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: admin
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: admin
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: config-volume
+          configMap:
+            name: llmproxy-config

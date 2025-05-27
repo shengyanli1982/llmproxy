@@ -1,0 +1,23 @@
+version: "3"
+
+services:
+    llmproxy:
+        image: shengyanli1982/llmproxy:latest
+        container_name: llmproxy
+        restart: unless-stopped
+        ports:
+            # 转发服务端口
+            - "3000:3000" # to_mixgroup
+            # 管理界面端口
+            - "9000:9000" # admin
+        volumes:
+            - ./config.yaml:/app/config.yaml:ro
+        command: ["--config", "/app/config.yaml"]
+        environment:
+            - TZ=Asia/Shanghai
+        networks:
+            - llmproxy-network
+
+networks:
+    llmproxy-network:
+        driver: bridge
