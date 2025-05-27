@@ -208,7 +208,7 @@ impl Config {
             if let Some(auth) = &upstream.auth {
                 match auth.r#type {
                     AuthType::Bearer => {
-                        if auth.token.as_ref().map_or(true, |s| s.is_empty()) {
+                        if auth.token.as_ref().is_none_or(|s| s.is_empty()) {
                             return Err(AppError::Config(format!(
                                 "Upstream '{}' uses Bearer authentication but no valid token was provided",
                                 upstream.name
@@ -216,8 +216,8 @@ impl Config {
                         }
                     }
                     AuthType::Basic => {
-                        if auth.username.as_ref().map_or(true, |s| s.is_empty())
-                            || auth.password.as_ref().map_or(true, |s| s.is_empty())
+                        if auth.username.as_ref().is_none_or(|s| s.is_empty())
+                            || auth.password.as_ref().is_none_or(|s| s.is_empty())
                         {
                             return Err(AppError::Config(format!(
                                 "Upstream '{}' uses Basic authentication but no valid username and password were provided",
@@ -233,7 +233,7 @@ impl Config {
             for header_op in &upstream.headers {
                 match header_op.op {
                     HeaderOpType::Insert | HeaderOpType::Replace => {
-                        if header_op.value.as_ref().map_or(true, |s| s.is_empty()) {
+                        if header_op.value.as_ref().is_none_or(|s| s.is_empty()) {
                             return Err(AppError::Config(format!(
                                 "Header operation {:?} for upstream '{}' requires a valid value",
                                 header_op.op, upstream.name
@@ -427,6 +427,7 @@ impl Config {
 
 // HTTP服务器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct HttpServerConfig {
     // 转发服务配置
     #[serde(default)]
@@ -436,14 +437,6 @@ pub struct HttpServerConfig {
     pub admin: AdminConfig,
 }
 
-impl Default for HttpServerConfig {
-    fn default() -> Self {
-        Self {
-            forwards: Vec::new(),
-            admin: AdminConfig::default(),
-        }
-    }
-}
 
 // 转发服务配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -634,19 +627,13 @@ pub struct UpstreamRef {
 
 // 负载均衡策略配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct BalanceConfig {
     // 策略类型
     #[serde(default)]
     pub strategy: BalanceStrategy,
 }
 
-impl Default for BalanceConfig {
-    fn default() -> Self {
-        Self {
-            strategy: BalanceStrategy::default(),
-        }
-    }
-}
 
 // 负载均衡策略类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -754,6 +741,7 @@ impl Default for RetryConfig {
 
 // 代理配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default)]
 pub struct ProxyConfig {
     // 是否启用代理
     #[serde(default)]
@@ -763,14 +751,6 @@ pub struct ProxyConfig {
     pub url: String,
 }
 
-impl Default for ProxyConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            url: String::new(),
-        }
-    }
-}
 
 // 熔断器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]

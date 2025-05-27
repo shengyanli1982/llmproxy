@@ -151,7 +151,7 @@ impl UpstreamManager {
         }
 
         // 创建基础HTTP客户端
-        let client = client_builder.build().map_err(|e| AppError::HttpError(e))?;
+        let client = client_builder.build().map_err(AppError::HttpError)?;
 
         // 配置重试策略（根据组的重试配置）
         let middleware_client = if config.retry.enabled {
@@ -166,7 +166,7 @@ impl UpstreamManager {
                 // 使用有界抖动来避免多个客户端同时重试
                 .jitter(Jitter::Bounded)
                 // 配置最大重试次数
-                .build_with_max_retries(config.retry.attempts as u32);
+                .build_with_max_retries(config.retry.attempts);
 
             reqwest_middleware::ClientBuilder::new(client)
                 .with(RetryTransientMiddleware::new_with_policy(retry_policy))
