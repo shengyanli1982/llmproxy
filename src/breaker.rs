@@ -30,8 +30,11 @@ impl From<AppError> for UpstreamError {
 /// 上游服务熔断器
 pub struct UpstreamCircuitBreaker {
     breaker: CircuitBreaker<DefaultPolicy, UpstreamError>,
+    #[allow(dead_code)]
     name: String,
+    #[allow(dead_code)]
     group: String,
+    #[allow(dead_code)]
     url: String,
 }
 

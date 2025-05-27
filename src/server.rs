@@ -20,7 +20,7 @@ use tower_http::timeout::TimeoutLayer;
 use tracing::{debug, error, info};
 
 // 转发服务状态
-struct ForwardState {
+pub struct ForwardState {
     // 上游管理器
     upstream_manager: Arc<UpstreamManager>,
     // 转发配置
@@ -52,6 +52,11 @@ impl ForwardServer {
         });
 
         Ok(Self { addr, state })
+    }
+
+    // 获取服务器监听地址
+    pub fn get_addr(&self) -> &SocketAddr {
+        &self.addr
     }
 }
 
@@ -166,7 +171,7 @@ impl IntoSubsystem<AppError> for ForwardServer {
 }
 
 // 转发处理函数
-async fn forward_handler(
+pub async fn forward_handler(
     State(state): State<Arc<ForwardState>>,
     path: Option<Path<String>>,
     method: Method,

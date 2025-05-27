@@ -16,8 +16,7 @@ use tracing::{error, info};
 // 管理服务状态
 #[derive(Clone)]
 struct AdminState {
-    // 启动时间
-    start_time: std::time::Instant,
+    // 无需任何字段
 }
 
 // 管理服务
@@ -37,9 +36,7 @@ impl AdminServer {
 impl IntoSubsystem<AppError> for AdminServer {
     async fn run(self, subsys: SubsystemHandle) -> Result<(), AppError> {
         // 创建服务状态
-        let state = Arc::new(AdminState {
-            start_time: std::time::Instant::now(),
-        });
+        let state = Arc::new(AdminState {});
 
         // 创建路由
         let app = Router::new()
