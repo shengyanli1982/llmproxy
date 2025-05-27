@@ -1,5 +1,6 @@
 use crate::error::AppError;
 use crate::metrics::METRICS;
+use async_trait::async_trait;
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -8,17 +9,9 @@ use axum::{
 };
 use prometheus::{Encoder, TextEncoder};
 use std::net::SocketAddr;
-use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemHandle};
 use tracing::{error, info};
-
-// 管理服务状态
-#[derive(Clone)]
-struct AdminState {
-    // 启动时间
-    start_time: std::time::Instant,
-}
 
 // 管理服务
 pub struct AdminServer {
@@ -33,19 +26,13 @@ impl AdminServer {
     }
 }
 
-#[async_trait::async_trait]
+#[async_trait]
 impl IntoSubsystem<AppError> for AdminServer {
     async fn run(self, subsys: SubsystemHandle) -> Result<(), AppError> {
-        // 创建服务状态
-        let state = Arc::new(AdminState {
-            start_time: std::time::Instant::now(),
-        });
-
         // 创建路由
         let app = Router::new()
             .route("/health", get(health_handler))
-            .route("/metrics", get(metrics_handler))
-            .with_state(state);
+            .route("/metrics", get(metrics_handler));
 
         // 绑定TCP监听器
         let listener = match TcpListener::bind(self.addr).await {

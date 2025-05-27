@@ -1,23 +1,11 @@
-mod admin;
-mod args;
-mod balancer;
-mod breaker;
-mod config;
-mod r#const;
-mod error;
-mod metrics;
-mod server;
-mod upstream;
-
-use crate::admin::AdminServer;
-use crate::args::Args;
-use crate::config::Config;
-use crate::error::AppError;
-use crate::server::ForwardServer;
-use crate::upstream::UpstreamManager;
+use llmproxy::admin::AdminServer;
+use llmproxy::args::Args;
+use llmproxy::config::Config;
+use llmproxy::error::AppError;
+use llmproxy::server::ForwardServer;
+use llmproxy::upstream::UpstreamManager;
 use mimalloc::MiMalloc;
 use std::process;
-use std::sync::Arc;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemBuilder, Toplevel};
 use tracing::{error, info};
 
@@ -30,7 +18,7 @@ fn init_logging(args: &Args) {
         .with_ansi(false)
         .with_line_number(false);
 
-    // 如果启用调试模式，输出调试信息
+    // 如果启用调试模式，输出调试信息，否则只输出 info 及以上级别
     if args.debug {
         builder.with_max_level(tracing::Level::DEBUG)
     } else {
@@ -129,12 +117,9 @@ struct AppComponents {
 // 创建应用组件
 async fn create_components(config: Config) -> Result<AppComponents, AppError> {
     // 创建上游管理器
-    let upstream_manager =
+    let upstream_manager: std::sync::Arc<UpstreamManager> =
         match UpstreamManager::new(config.upstreams, config.upstream_groups).await {
-            Ok(manager) => {
-                info!("Upstream manager initialized successfully");
-                Arc::new(manager)
-            }
+            Ok(manager) => std::sync::Arc::new(manager),
             Err(e) => {
                 error!("Failed to initialize upstream manager: {}", e);
                 return Err(e);
@@ -153,7 +138,7 @@ async fn create_components(config: Config) -> Result<AppComponents, AppError> {
 
     // 创建转发服务
     let mut forward_servers = Vec::with_capacity(config.http_server.forwards.len());
-    for forward_config in config.http_server.forwards {
+    for forward_config in &config.http_server.forwards {
         match ForwardServer::new(forward_config.clone(), upstream_manager.clone()) {
             Ok(server) => {
                 info!(

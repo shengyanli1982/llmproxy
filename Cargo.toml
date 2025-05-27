@@ -59,5 +59,6 @@ openssl-sys = "0.9"
 
 [dev-dependencies]
 # 测试工具
-mockall = "0.12"
 tokio-test = "0.4"
+wiremock = "0.6"
+tempfile = "3.10"

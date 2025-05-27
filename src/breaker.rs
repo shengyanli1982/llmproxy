@@ -30,8 +30,11 @@ impl From<AppError> for UpstreamError {
 /// 上游服务熔断器
 pub struct UpstreamCircuitBreaker {
     breaker: CircuitBreaker<DefaultPolicy, UpstreamError>,
+    #[allow(dead_code)]
     name: String,
+    #[allow(dead_code)]
     group: String,
+    #[allow(dead_code)]
     url: String,
 }
 
@@ -81,6 +84,7 @@ impl UpstreamCircuitBreaker {
     }
 
     /// 检查熔断器当前是否允许调用
+    #[inline(always)]
     pub fn is_call_permitted(&self) -> bool {
         matches!(
             self.breaker.current_state(),
