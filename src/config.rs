@@ -1,6 +1,7 @@
 use crate::error::AppError;
 use crate::r#const::{
-    breaker_limits, http_client_limits, rate_limit_limits, retry_limits, weight_limits,
+    balance_strategy_labels, breaker_limits, http_client_limits, rate_limit_limits, retry_limits,
+    weight_limits,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -99,19 +100,32 @@ impl Config {
             }
 
             // 验证负载均衡策略
-            if let BalanceStrategy::WeightedRoundRobin = group.balance.strategy {
-                // 检查是否所有上游都有合理的权重设置
-                let all_default_weight = group
-                    .upstreams
-                    .iter()
-                    .all(|u| u.weight == weight_limits::MIN_WEIGHT);
-                if all_default_weight {
-                    return Err(AppError::Config(format!(
-                        "Upstream group '{}' uses weighted_roundrobin strategy but all upstreams have default weight",
-                        group.name
-                    )));
+            // 检查策略值是否有效
+            match group.balance.strategy {
+                BalanceStrategy::RoundRobin => {}
+                BalanceStrategy::WeightedRoundRobin => {
+                    // 检查是否所有上游都有合理的权重设置
+                    let all_default_weight = group
+                        .upstreams
+                        .iter()
+                        .all(|u| u.weight == weight_limits::MIN_WEIGHT);
+                    if all_default_weight {
+                        return Err(AppError::Config(format!(
+                            "Upstream group '{}' uses weighted_roundrobin strategy but all upstreams have default weight",
+                            group.name
+                        )));
+                    }
                 }
+                BalanceStrategy::Random => {}
+                BalanceStrategy::ResponseAware => {}
             }
+
+            // 记录使用的负载均衡策略，用于日志或指标
+            debug!(
+                "Upstream group '{}' uses balance strategy: {}",
+                group.name,
+                group.balance.strategy.as_str()
+            );
 
             // 验证 HTTP 客户端配置
             self.validate_http_client_config(
@@ -665,11 +679,26 @@ pub enum BalanceStrategy {
     WeightedRoundRobin,
     // 随机
     Random,
+    // 响应时间感知
+    #[serde(rename = "response_aware")]
+    ResponseAware,
 }
 
 impl Default for BalanceStrategy {
     fn default() -> Self {
         Self::RoundRobin
+    }
+}
+
+// 将 BalanceStrategy 转换为字符串标签
+impl BalanceStrategy {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::RoundRobin => balance_strategy_labels::ROUND_ROBIN,
+            Self::WeightedRoundRobin => balance_strategy_labels::WEIGHTED_ROUND_ROBIN,
+            Self::Random => balance_strategy_labels::RANDOM,
+            Self::ResponseAware => balance_strategy_labels::RESPONSE_AWARE,
+        }
     }
 }
 

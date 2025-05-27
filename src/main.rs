@@ -96,7 +96,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await
     {
         Ok(_) => {
-            info!("Application gracefully shut down");
+            info!("Application gracefully shutdown");
             Ok(())
         }
         Err(e) => {
