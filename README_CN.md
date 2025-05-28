@@ -341,7 +341,7 @@ LLMProxy 采用结构化 YAML 文件进行配置，提供灵活且强大的配�
 
 #### 上游组配置选项
 
-> ![NOTE]
+> [!NOTE]
 >
 > 参数 `upstreams[].url` 需要配置上游服务的基础 URL，例如：`https://api.openai.com/v1`，而不是`https://api.openai.com` 或者 `https://api.openai.com/v1/chat/completions`。
 
