@@ -1,0 +1,32 @@
+[Unit]
+Description=LLMProxy - 智能大语言模型负载均衡代理服务
+Documentation=https://github.com/shengyanli1982/llmproxy
+After=network.target
+
+[Service]
+# 用户和组设置
+User=llmproxy
+Group=llmproxy
+
+# 工作目录和执行命令
+WorkingDirectory=/opt/llmproxy
+ExecStart=/opt/llmproxy/llmproxyd --config /opt/llmproxy/config.yaml
+
+# 环境变量
+Environment=RUST_LOG=info
+
+# 重启策略
+Restart=on-failure
+RestartSec=5s
+
+# 资源限制
+LimitNOFILE=65535
+
+# 安全设置
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target 

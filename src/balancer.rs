@@ -413,6 +413,7 @@ impl LoadBalancer for ResponseAwareBalancer {
         // 从当前索引开始，确保公平性
         let start_index = self.current.fetch_add(1, Ordering::SeqCst) % len;
 
+        // 遍历所有上游，找到健康的最佳节点
         for i in 0..len {
             let index = (start_index + i) % len;
             let managed_upstream = &self.upstreams[index];

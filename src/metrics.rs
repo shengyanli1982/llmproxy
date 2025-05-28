@@ -50,7 +50,10 @@ impl Metrics {
             HistogramOpts::new(
                 "llmproxy_upstream_duration_seconds",
                 "The latency of requests forwarded to upstream services, in seconds.",
-            ),
+            )
+            .buckets(vec![
+                0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 20.0, 30.0, 60.0,
+            ]),
             &["group", "upstream"],
         )
         .unwrap();
@@ -80,7 +83,10 @@ impl Metrics {
             HistogramOpts::new(
                 "llmproxy_http_request_duration_seconds",
                 "The latency of incoming HTTP requests, from the moment they are received until a response is sent, in seconds.",
-            ),
+            )
+            .buckets(vec![
+                0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 20.0, 30.0, 60.0,
+            ]),
             &["forward", "method", "path"],
         )
         .unwrap();
