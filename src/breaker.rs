@@ -31,6 +31,8 @@ impl From<AppError> for UpstreamError {
 pub struct UpstreamCircuitBreaker {
     breaker: CircuitBreaker<DefaultPolicy, UpstreamError>,
     #[allow(dead_code)]
+    id: String,
+    #[allow(dead_code)]
     name: String,
     #[allow(dead_code)]
     group: String,
@@ -41,6 +43,7 @@ pub struct UpstreamCircuitBreaker {
 impl UpstreamCircuitBreaker {
     /// 创建一个新的熔断器
     pub fn new(
+        id: String,
         name: String,
         group: String,
         url: String,
@@ -64,6 +67,7 @@ impl UpstreamCircuitBreaker {
 
         Arc::new(Self {
             breaker,
+            id,
             name,
             group,
             url,
@@ -239,10 +243,11 @@ impl UpstreamCircuitBreaker {
 
 /// 创建上游服务熔断器
 pub fn create_upstream_circuit_breaker(
+    id: String,
     name: String,
     group: String,
     url: String,
     config: &BreakerConfig,
 ) -> Arc<UpstreamCircuitBreaker> {
-    UpstreamCircuitBreaker::new(name, group, url, config.threshold, config.cooldown)
+    UpstreamCircuitBreaker::new(id, name, group, url, config.threshold, config.cooldown)
 }

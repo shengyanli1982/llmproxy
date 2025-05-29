@@ -67,17 +67,13 @@ fn is_streaming_response(headers: &HeaderMap) -> bool {
     let is_event_stream = headers
         .get(http_headers::CONTENT_TYPE)
         .and_then(|v| v.to_str().ok())
-        .is_some_and(|s| {
-            s.contains(http_headers::content_types::EVENT_STREAM)
-        });
+        .is_some_and(|s| s.contains(http_headers::content_types::EVENT_STREAM));
 
     // 检查传输编码是否为分块
     let is_chunked = headers
         .get(http_headers::TRANSFER_ENCODING)
         .and_then(|v| v.to_str().ok())
-        .is_some_and(|s| {
-            s.contains(http_headers::transfer_encodings::CHUNKED)
-        });
+        .is_some_and(|s| s.contains(http_headers::transfer_encodings::CHUNKED));
 
     // 如果任一条件满足，则认为是流式响应
     is_event_stream || is_chunked

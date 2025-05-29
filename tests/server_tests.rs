@@ -9,6 +9,7 @@ use llmproxy::{
 };
 use std::sync::Arc;
 use tokio::time::Duration;
+use uuid::Uuid;
 use wiremock::{
     matchers::{method, path},
     Mock, MockServer, ResponseTemplate,
@@ -30,6 +31,7 @@ async fn create_test_upstream_manager() -> (Arc<UpstreamManager>, MockServer) {
     let upstream_configs = vec![UpstreamConfig {
         name: "test_upstream".to_string(),
         url: mock_server.uri(),
+        id: Uuid::new_v4().to_string(),
         auth: None,
         headers: vec![],
         breaker: None,

@@ -13,6 +13,9 @@ use tracing::debug;
 pub struct ManagedUpstream {
     /// 上游引用
     pub upstream_ref: UpstreamRef,
+    /// 唯一标识符
+    #[allow(dead_code)]
+    pub id: String,
     /// 熔断器（如果启用）
     pub breaker: Option<Arc<UpstreamCircuitBreaker>>,
 }
