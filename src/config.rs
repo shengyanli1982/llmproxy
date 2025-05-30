@@ -10,6 +10,7 @@ use std::io::Read;
 use std::path::Path;
 use tracing::debug;
 use url::Url;
+use uuid::Uuid;
 
 // 配置文件结构
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -564,6 +565,9 @@ pub struct UpstreamConfig {
     pub name: String,
     // 上游URL
     pub url: String,
+    // 唯一标识符 (内部使用)
+    #[serde(skip_serializing, default = "default_uuid_v4_string")]
+    pub id: String,
     // 认证配置
     #[serde(default)]
     pub auth: Option<AuthConfig>,
@@ -882,4 +886,8 @@ fn default_burst() -> u32 {
 
 fn default_stream_mode() -> bool {
     true // 默认启用流式响应支持
+}
+
+fn default_uuid_v4_string() -> String {
+    Uuid::new_v4().to_string() // 生成默认的 UUID v4 字符串
 }

@@ -46,6 +46,10 @@ impl UpstreamManager {
 
         // 构建上游映射
         for upstream in upstreams {
+            debug!(
+                "Loaded upstream: {}, id: {}, url: {:?}",
+                upstream.name, upstream.id, upstream.url
+            );
             upstream_map.insert(upstream.name.clone(), upstream);
         }
 
@@ -74,6 +78,7 @@ impl UpstreamManager {
                 let breaker = match &upstream_config.breaker {
                     Some(breaker_config) => {
                         let breaker = create_upstream_circuit_breaker(
+                            upstream_config.id.clone(),
                             upstream_ref.name.clone(),
                             group_name.clone(),
                             upstream_config.url.clone(),
@@ -87,6 +92,7 @@ impl UpstreamManager {
                 // 创建托管上游
                 let managed_upstream = ManagedUpstream {
                     upstream_ref: upstream_ref.clone(),
+                    id: upstream_config.id.clone(),
                     breaker,
                 };
 

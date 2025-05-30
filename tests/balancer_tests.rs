@@ -8,6 +8,7 @@ use llmproxy::{
 };
 use std::sync::Arc;
 use std::time::Duration;
+use uuid::Uuid;
 use wiremock::{
     matchers::{method, path},
     Mock, MockServer, ResponseTemplate,
@@ -21,6 +22,7 @@ fn create_test_managed_upstreams() -> Vec<ManagedUpstream> {
                 name: "upstream1".to_string(),
                 weight: 1,
             },
+            id: Uuid::new_v4().to_string(),
             breaker: None,
         },
         ManagedUpstream {
@@ -28,6 +30,7 @@ fn create_test_managed_upstreams() -> Vec<ManagedUpstream> {
                 name: "upstream2".to_string(),
                 weight: 2,
             },
+            id: Uuid::new_v4().to_string(),
             breaker: None,
         },
         ManagedUpstream {
@@ -35,6 +38,7 @@ fn create_test_managed_upstreams() -> Vec<ManagedUpstream> {
                 name: "upstream3".to_string(),
                 weight: 3,
             },
+            id: Uuid::new_v4().to_string(),
             breaker: None,
         },
     ]
@@ -179,6 +183,7 @@ async fn test_load_balancer_with_upstream_manager() {
         UpstreamConfig {
             name: "upstream1".to_string(),
             url: mock_server1.uri(),
+            id: Uuid::new_v4().to_string(),
             auth: None,
             headers: vec![],
             breaker: None,
@@ -186,6 +191,7 @@ async fn test_load_balancer_with_upstream_manager() {
         UpstreamConfig {
             name: "upstream2".to_string(),
             url: mock_server2.uri(),
+            id: Uuid::new_v4().to_string(),
             auth: None,
             headers: vec![],
             breaker: None,
@@ -268,6 +274,7 @@ async fn test_load_balancer_with_unavailable_upstream() {
         UpstreamConfig {
             name: "available".to_string(),
             url: mock_server.uri(),
+            id: Uuid::new_v4().to_string(),
             auth: None,
             headers: vec![],
             breaker: None,
@@ -275,6 +282,7 @@ async fn test_load_balancer_with_unavailable_upstream() {
         UpstreamConfig {
             name: "unavailable".to_string(),
             url: "http://localhost:1".to_string(), // 不可用的上游
+            id: Uuid::new_v4().to_string(),
             auth: None,
             headers: vec![],
             breaker: None,
@@ -501,6 +509,7 @@ async fn test_response_aware_with_upstream_manager() {
         UpstreamConfig {
             name: "fast".to_string(),
             url: mock_server1.uri(),
+            id: Uuid::new_v4().to_string(),
             auth: None,
             headers: vec![],
             breaker: None,
@@ -508,6 +517,7 @@ async fn test_response_aware_with_upstream_manager() {
         UpstreamConfig {
             name: "slow".to_string(),
             url: mock_server2.uri(),
+            id: Uuid::new_v4().to_string(),
             auth: None,
             headers: vec![],
             breaker: None,
@@ -576,7 +586,7 @@ async fn test_response_aware_balancer_under_load() {
 
     // 确保有足够多的上游用于测试
     if managed_upstreams.len() < 3 {
-        panic!("测试需要至少3个上游");
+        panic!("Test requires at least 3 upstreams");
     }
 
     let balancer = Arc::new(ResponseAwareBalancer::new(managed_upstreams));
@@ -597,7 +607,7 @@ async fn test_response_aware_balancer_under_load() {
             break;
         }
     }
-    let upstream2 = upstream2.expect("无法找到第二个上游");
+    let upstream2 = upstream2.expect("Could not find second upstream");
     balancer.update_metrics(upstream2, 500);
 
     // 找到上游3
@@ -611,7 +621,7 @@ async fn test_response_aware_balancer_under_load() {
             break;
         }
     }
-    let upstream3 = upstream3.expect("无法找到第三个上游");
+    let upstream3 = upstream3.expect("Could not find third upstream");
     balancer.update_metrics(upstream3, 2000);
 
     // 记录各上游名称
@@ -678,7 +688,7 @@ async fn test_response_aware_balancer_under_load() {
 
     assert!(
         name3_count <= name1_count || name3_count <= name2_count,
-        "慢速上游被选择次数不应该最多，当前: name1={}, name2={}, name3={}",
+        "Slow upstream should not be selected the most, current counts: name1={}, name2={}, name3={}",
         name1_count,
         name2_count,
         name3_count
