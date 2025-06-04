@@ -610,6 +610,7 @@ LLMProxy 的响应时间感知（`response_aware`）负载均衡算法是专为�
     -   **请求成功率**：近期请求成功完成的百分比。
 
 2.  **动态健康度与综合评分**：结合断路器状态，仅考虑健康（未熔断）的节点。对于健康节点，根据以下类似公式计算其综合性能得分，得分越低表示节点性能越优：
+
     $$\text{Score} = \text{ResponseTime} \times (\text{ProcessingRequests} + 1) \times \frac{1}{\text{SuccessRate}}$$
 
     其中：
