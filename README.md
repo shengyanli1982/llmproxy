@@ -614,6 +614,7 @@ LLMProxy's response-time aware (`response_aware`) load balancing algorithm is an
     -   **Request Success Rate**: The percentage of requests successfully completed recently.
 
 2.  **Dynamic Health & Comprehensive Scoring**: Combined with circuit breaker status, only healthy (non-broken) nodes are considered. For healthy nodes, a comprehensive performance score is calculated using a formula similar to the following, where a lower score indicates better node performance:
+
     $$\text{Score} = \text{ResponseTime} \times (\text{ProcessingRequests} + 1) \times \frac{1}{\text{SuccessRate}}$$
 
     Where:
