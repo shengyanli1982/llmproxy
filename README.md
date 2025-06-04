@@ -13,6 +13,8 @@ English | [中文](./README_CN.md)
   |
   <a href="#core-features">Core Features</a>
   |
+  <a href="#use-cases">Use Cases</a>
+  |
   <a href="#configuration-guide">Configuration Guide</a>
   |
   <a href="#advanced-deployment">Advanced Deployment</a>
@@ -22,8 +24,6 @@ English | [中文](./README_CN.md)
   <a href="#api-endpoints">API Endpoints</a>
   |
   <a href="#prometheus-metrics">Prometheus Metrics</a>
-  |
-  <a href="#use-cases">Use Cases</a>
   |
   <a href="#license">License</a>
 </p>
@@ -126,7 +126,7 @@ This request will be received by LLMProxy and forwarded to the OpenAI upstream s
 
 You've now successfully run LLMProxy! Next, you can explore more advanced configurations and features.
 
-### 2. Deployment with Docker
+### 2. Deployment with Docker (Recommended)
 
 Using Docker Compose is one of the most convenient ways to deploy LLMProxy. Complete Docker Compose configuration examples are provided in the project's `examples/config` directory.
 
@@ -237,6 +237,38 @@ networks:
     -   Provide independent management interface and API endpoints through `http_server.admin`.
     -   Offer `/health` health check endpoint for integration with various monitoring and automated operations systems.
     -   Expose rich Prometheus metrics through the `/metrics` endpoint, providing comprehensive insights into LLM proxy performance, traffic, errors, latency, upstream LLM service health status, and circuit breaker states.
+
+## Use Cases
+
+LLMProxy is designed for various enterprise-level application scenarios that require efficient, reliable, and scalable access to and management of large language model APIs:
+
+-   **Enterprise AI Application Gateway**:
+
+    -   Provides a unified LLM API access entry point for multiple applications or teams within an enterprise.
+    -   Centrally implements authentication, authorization, API key management, auditing, and security policies.
+
+-   **High-Availability, High-Concurrency LLM Services**:
+
+    -   Build high-traffic AI products for end users (such as intelligent customer service, content generation tools, AI assistants).
+    -   Ensure uninterrupted service through load balancing and failover across instances from multiple LLM providers (such as OpenAI, Anthropic, Azure OpenAI, Google Gemini) or self-built models (vLLM, Ollama).
+    -   Utilize advanced strategies like response-time awareness to dynamically allocate traffic to the best-performing nodes, enhancing user experience.
+
+-   **LLM Application Development & Testing Acceleration**:
+
+    -   Simplify the complexity of developer integration with multiple LLM APIs, decoupling application code from specific LLM services.
+    -   Easily switch between different LLM models or providers for effect evaluation and cost comparison.
+    -   Simulate different upstream responses (such as latency, errors) for test environments, or isolate test traffic.
+
+-   **Multi-Cloud/Hybrid Cloud LLM Strategy Implementation**:
+
+    -   Provide a unified LLM API access layer in complex cloud environments (such as AWS, Azure, GCP, and on-premises data centers in hybrid deployment).
+    -   Route requests to specific geographic locations or specific types of LLM services based on data sovereignty, compliance requirements, or cost factors.
+    -   Deploy as a Sidecar proxy in container orchestration platforms like Kubernetes to provide LLM access capabilities for microservices.
+
+-   **API Version & Compatibility Management**:
+    -   When backend LLM APIs upgrade or undergo incompatible changes, LLMProxy can serve as an adaptation layer, maintaining compatibility with older clients through header operations or lightweight transformations (possibly supported in future versions).
+
+By applying LLMProxy in these scenarios, enterprises can significantly enhance the reliability, performance, and manageability of their LLM applications while reducing integration and operational complexity.
 
 ## Configuration Guide
 
@@ -420,66 +452,7 @@ For detailed explanations of all available configuration options, please refer t
 
 ## Advanced Deployment
 
-LLMProxy supports various flexible deployment methods, including Docker containerized deployment, Kubernetes cluster deployment, and traditional Linux system service deployment. Here are detailed instructions for each deployment method:
-
-### Docker Deployment
-
-Using Docker Compose is one of the most convenient ways to deploy LLMProxy. Complete Docker Compose configuration examples are provided in the project's `examples/config` directory.
-
-1. **Prepare the Configuration File**:
-
-    Place your custom `config.yaml` file in the same directory as the `docker-compose.yaml` file.
-
-2. **Start the Service**:
-
-    ```bash
-    docker-compose up -d
-    ```
-
-3. **View Running Logs**:
-
-    ```bash
-    docker-compose logs -f llmproxy # llmproxy is the service name defined in the compose file
-    ```
-
-4. **Stop the Service**:
-
-    ```bash
-    docker-compose down
-    ```
-
-Docker Compose Configuration Example (refer to `examples/config/docker-compose.yaml` in the project for the latest version):
-
-```yaml
-version: "3.8" # Using a newer compose version is recommended
-
-services:
-    llmproxy:
-        image: shengyanli1982/llmproxy:latest # For production, using a specific tag version is recommended
-        container_name: llmproxy_service
-        restart: unless-stopped
-        ports:
-            # Map ports according to the forwards defined in your config.yaml
-            - "3000:3000" # Example: mapping the forwarding service listening on port 3000 in the config file
-            # - "3001:3001"
-            # Admin interface port mapping
-            - "127.0.0.1:9000:9000" # Recommended to map the admin port only to the local loopback address
-        volumes:
-            - ./config.yaml:/app/config.yaml:ro # Mount your configuration file into the container
-            # If you need to persist logs, you can mount a log directory
-            # - ./logs:/app/logs
-        command: ["--config", "/app/config.yaml"]
-        environment:
-            - TZ=America/New_York # Set container timezone
-            # You can override some configurations with environment variables, for example:
-            # - LLMPROXY_UPSTREAMS__0__AUTH__TOKEN=your_env_openai_key
-        networks:
-            - llmproxy_net
-
-networks:
-    llmproxy_net:
-        driver: bridge
-```
+LLMProxy supports various flexible deployment methods, including Kubernetes cluster deployment and traditional Linux system service deployment. Here are detailed instructions for each deployment method:
 
 ### Kubernetes Deployment
 
@@ -841,38 +814,6 @@ Below are the key metric categories and examples:
     -   Labels: `group`, `upstream`, `url`.
 
 These metrics can be scraped by Prometheus and then visualized and configured for alerting using tools like Grafana, enabling comprehensive monitoring of the LLMProxy service and the LLM API calls it proxies.
-
-## Use Cases
-
-LLMProxy is designed for various enterprise-level application scenarios that require efficient, reliable, and scalable access to and management of large language model APIs:
-
--   **Enterprise AI Application Gateway**:
-
-    -   Provides a unified LLM API access entry point for multiple applications or teams within an enterprise.
-    -   Centrally implements authentication, authorization, API key management, auditing, and security policies.
-
--   **High-Availability, High-Concurrency LLM Services**:
-
-    -   Build high-traffic AI products for end users (such as intelligent customer service, content generation tools, AI assistants).
-    -   Ensure uninterrupted service through load balancing and failover across instances from multiple LLM providers (such as OpenAI, Anthropic, Azure OpenAI, Google Gemini) or self-built models (vLLM, Ollama).
-    -   Utilize advanced strategies like response-time awareness to dynamically allocate traffic to the best-performing nodes, enhancing user experience.
-
--   **LLM Application Development & Testing Acceleration**:
-
-    -   Simplify the complexity of developer integration with multiple LLM APIs, decoupling application code from specific LLM services.
-    -   Easily switch between different LLM models or providers for effect evaluation and cost comparison.
-    -   Simulate different upstream responses (such as latency, errors) for test environments, or isolate test traffic.
-
--   **Multi-Cloud/Hybrid Cloud LLM Strategy Implementation**:
-
-    -   Provide a unified LLM API access layer in complex cloud environments (such as AWS, Azure, GCP, and on-premises data centers in hybrid deployment).
-    -   Route requests to specific geographic locations or specific types of LLM services based on data sovereignty, compliance requirements, or cost factors.
-    -   Deploy as a Sidecar proxy in container orchestration platforms like Kubernetes to provide LLM access capabilities for microservices.
-
--   **API Version & Compatibility Management**:
-    -   When backend LLM APIs upgrade or undergo incompatible changes, LLMProxy can serve as an adaptation layer, maintaining compatibility with older clients through header operations or lightweight transformations (possibly supported in future versions).
-
-By applying LLMProxy in these scenarios, enterprises can significantly enhance the reliability, performance, and manageability of their LLM applications while reducing integration and operational complexity.
 
 ## License
 
