@@ -224,7 +224,7 @@ networks:
 
 -   🛡️ **健壮的容错与故障转移**
 
-    -   **智能断路器：** 自动监测上游 LLM 服务的健康状态（基于错误率、连续失败次数），达到阈值时快速隔离故障节点。
+    -   **智能断路器：** 自动监测上游 LLM 服务的健康状态（基于错误率），达到阈值时快速隔离故障节点。
     -   **可配置的熔断策略：** 为每个上游 LLM 服务自定义熔断阈值（如失败率）和冷却时间（熔断后进入半开状态的等待时间）。
     -   **自动恢复与探测：** 熔断后定期尝试发送探测请求至故障节点，一旦服务恢复则自动将其重新纳入负载均衡池。
     -   **无缝故障转移：** 上游组内某个 LLM 服务故障或熔断时，自动将流量平滑切换至组内其他健康节点，对客户端透明，保障业务连续性。
@@ -612,15 +612,15 @@ networks:
 
 LLMProxy 采用模块化、高性能的异步架构设计，核心组件包括：
 
--   **HTTP 监听器 (Forward Servers)**：基于 Hyper 构建的异步 HTTP 服务器，负责监听客户端请求，每个 `forwards` 配置项对应一个独立的监听实例。
--   **请求处理器与路由器**：解析入站请求，根据配置的路由规则（如路径、头部）将其导向指定的上游组。
+-   **HTTP 监听器 (Forward Servers)**：基于异步 HTTP 服务器，负责监听客户端请求，每个 `forwards` 配置项对应一个独立的监听实例。
+-   **请求处理器与路由器**：解析入站请求，根据配置的路由规则将其导向指定的上游组。
 -   **上游组管理器 (Upstream Groups)**：管理一组逻辑上相关的上游 LLM 服务，内含负载均衡器和 HTTP 客户端池。
 -   **上游服务实例 (Upstreams)**：代表一个具体的后端 LLM API 端点，包含其 URL、认证信息、断路器配置等。
 -   **负载均衡器 (Load Balancer)**：为每个上游组内嵌，根据所选策略（轮询、加权、随机、响应时间感知）在健康的可用上游服务间智能分配请求。
 -   **HTTP 客户端 (HTTP Client)**：负责与上游 LLM 服务建立连接并发送请求，支持连接池、超时控制、重试、流式传输等。
 -   **断路器 (Circuit Breaker)**：为每个上游服务实例配备，持续监控其健康状况，在检测到持续失败时自动熔断，防止故障扩散，并在服务恢复后自动重试。
--   **指标收集器 (Metrics Collector)**：基于 Prometheus Rust 客户端，实时收集并暴露详细的性能和运营指标。
--   **配置管理器 (Config Manager)**：负责加载和解析 `config.yaml` 文件，并在未来可能支持动态配置更新。
+-   **指标收集器 (Metrics Collector)**：基于 Prometheus 客户端，实时收集并暴露详细的性能和运营指标。
+-   **配置管理器 (Config Manager)**：负责加载和解析 `config.yaml` 文件，并验证配置的有效性。
 
 ![architecture](./images/architecture.png)
 _图：LLMProxy 核心架构示意图 (简化版)_
@@ -633,9 +633,9 @@ LLMProxy 的响应时间感知（`response_aware`）负载均衡算法是专为�
 
 1.  **实时性能采样与平滑**：系统持续采集并记录每个上游 LLM 服务节点的关键性能指标：
 
-    -   **平均响应时间 (EWMA - Exponentially Weighted Moving Average)**：采用指数加权移动平均算法计算，平滑短期波动，更好地反映近期性能趋势。
-    -   **处理中的请求数 (In-flight Requests)**：节点当前正在处理但尚未完成的并发请求数量。
-    -   **请求成功率 (Success Rate)**：近期请求成功完成的百分比。
+    -   **平均响应时间**：采用指数加权移动平均算法计算，平滑短期波动，更好地反映近期性能趋势。
+    -   **处理中的请求数**：节点当前正在处理但尚未完成的并发请求数量。
+    -   **请求成功率**：近期请求成功完成的百分比。
 
 2.  **动态健康度与综合评分**：结合断路器状态，仅考虑健康（未熔断）的节点。对于健康节点，根据以下类似公式计算其综合性能得分，得分越低表示节点性能越优：
     $$\text{Score} = \text{ResponseTime} \times (\text{ProcessingRequests} + 1) \times \frac{1}{\text{SuccessRate}}$$
@@ -649,16 +649,16 @@ LLMProxy 的响应时间感知（`response_aware`）负载均衡算法是专为�
 ![score](./images/response_aware_parameter_impact_cn.png)
 _图：响应时间感知算法中各参数对选择概率的影响（示意图）_
 
-1.  **智能节点选择**：
+3.  **智能节点选择**：
 
     -   当新请求到达时，负载均衡器遍历当前上游组内所有健康（未熔断）的节点。
     -   计算每个健康节点的实时性能得分。
     -   选择得分最低（即综合表现最佳）的节点来处理当前请求。
     -   所选节点的处理中请求计数会相应增加。
 
-2.  **持续自适应调整**：
+4.  **持续自适应调整**：
     -   请求完成后，记录其实际响应时间、是否成功等信息。
-    -   这些信息会用于更新节点的 EWMA 响应时间、成功率等统计数据。
+    -   这些信息会用于更新节点的平均响应时间、成功率等统计数据。
     -   处理中请求计数相应减少。
     -   这个持续的反馈循环使得算法能够动态适应上游 LLM 服务性能的实时变化。
 
@@ -667,7 +667,7 @@ _图：响应时间感知算法中各参数对选择概率的影响（示意图�
 -   **动态适应性**：自动适应上游 LLM 服务性能的实时波动和突发负载，无需人工干预。
 -   **LLM 优化**：特别适合处理 LLM 请求的高延迟和延迟不确定性（从毫秒级到数分钟级别均可适用）。
 -   **多维度考量**：综合考虑延迟、并发和成功率，避免将流量集中到单一慢节点或过载节点。
--   **平滑分配**：EWMA 等平滑技术避免因瞬时抖动导致决策剧烈摇摆，提供更稳定的负载分配。
+-   **平滑分配**：指数加权移动平均等平滑技术避免因瞬时抖动导致决策剧烈摇摆，提供更稳定的负载分配。
 -   **高并发性能**：算法设计注重效率，确保在高并发场景下自身开销极小。
 -   **故障规避**：与断路器机制紧密集成，自动排除故障或熔断的节点。
 
@@ -709,7 +709,7 @@ LLMProxy 为每个上游服务实例集成了强大的熔断器模式，旨在�
 
     -   初始和正常运行状态。所有指向该上游服务的请求都被允许通过。
     -   LLMProxy 持续监控发往此上游的请求的成功与失败情况（通常基于 HTTP 状态码或连接错误）。
-    -   如果在定义的统计窗口内，失败率（或连续失败次数）达到了配置的阈值（`breaker.threshold`），熔断器转换到"开启"状态。
+    -   如果在定义的统计窗口内，失败率达到了配置的阈值（`breaker.threshold`），熔断器转换到"开启"状态。
 
 2.  **开启状态（Open）**：
 
@@ -736,7 +736,7 @@ LLMProxy 为每个上游服务实例集成了强大的熔断器模式，旨在�
 -   **自动恢复检测**：无需人工干预，自动探测上游服务是否恢复，并在恢复后重新纳入服务。
 -   **精细化配置**：可以为每个上游服务实例（`upstreams[].breaker`）独立配置熔断阈值和冷却时间，以适应不同服务的特性。
 -   **提升系统整体弹性**：使系统在面对部分后端 LLM 服务不稳定或故障时，仍能保持部分功能可用或优雅降级。
--   **可观测性**：通过 Prometheus 指标（如 `llmproxy_circuitbreaker_state_changes_total`）监控各上游熔断器的状态变化和行为，便于运维。
+-   **可观测性**：通过 Prometheus 指标监控各上游熔断器的状态变化和行为，便于运维。
 
 #### 配置示例
 
@@ -789,64 +789,52 @@ LLMProxy 对外暴露以下主要类型的 HTTP API 端点：
 
 LLMProxy 通过管理端点的 `/metrics` 路径暴露全面的 Prometheus 指标，用于实时监控系统性能、请求处理、上游服务健康状况和内部组件状态。这些指标对于运维、故障排查和容量规划至关重要。
 
-以下是一些关键指标类别和示例 (实际指标名称和标签可能随版本更新)：
+以下是关键指标类别和示例：
 
 ### HTTP 服务器与请求指标 (针对客户端到 LLMProxy 的入站请求)
 
 -   `llmproxy_http_requests_total` (计数器)
     -   描述：接收到的 HTTP 请求总数。
-    -   标签：`forward_name` (转发服务名称), `method` (HTTP 方法), `path` (请求路径，可能被泛化处理以控制基数)。
--   `llmproxy_http_request_duration_seconds` (直方图/摘要)
+    -   标签：`forward` (转发服务名称), `method` (HTTP 方法), `path` (请求路径)。
+-   `llmproxy_http_request_duration_seconds` (直方图)
     -   描述：处理 HTTP 请求的延迟分布。
-    -   标签：`forward_name`, `method`, `status_code` (响应状态码)。
--   `llmproxy_http_responses_total` (计数器)
-    -   描述：返回的 HTTP 响应总数。
-    -   标签：`forward_name`, `method`, `status_code`。
--   `llmproxy_http_requests_in_flight` (仪表)
-    -   描述：当前正在处理的 HTTP 请求数。
-    -   标签：`forward_name`。
+    -   标签：`forward`, `method`, `path`。
+-   `llmproxy_http_request_errors_total` (计数器)
+    -   描述：处理 HTTP 请求时发生的错误总数。
+    -   标签：`forward`, `error`, `status`。
+-   `llmproxy_ratelimit_total` (计数器)
+    -   描述：因速率限制而被拒绝的请求总数。
+    -   标签：`forward`。
 
 ### 上游客户端指标 (针对 LLMProxy 到后端 LLM 服务的出站请求)
 
 -   `llmproxy_upstream_requests_total` (计数器)
     -   描述：向上游 LLM 服务发送的请求总数。
-    -   标签：`upstream_group_name`, `upstream_name` (具体上游服务名), `target_url`.
--   `llmproxy_upstream_request_duration_seconds` (直方图/摘要)
+    -   标签：`group` (上游组名称), `upstream` (上游服务名)。
+-   `llmproxy_upstream_duration_seconds` (直方图)
     -   描述：向上游 LLM 服务发送请求并获得响应的延迟分布。
-    -   标签：`upstream_group_name`, `upstream_name`, `http_status_code` (上游返回的状态码).
+    -   标签：`group`, `upstream`。
 -   `llmproxy_upstream_errors_total` (计数器)
-    -   描述：与上游 LLM 服务通信时发生的错误总数（包括连接错误、超时、非 2xx 响应等）。
-    -   标签：`upstream_group_name`, `upstream_name`, `error_type` (例如 `connect_timeout`, `request_timeout`, `http_5xx`).
--   `llmproxy_upstream_connections_active` (仪表)
-    -   描述：到上游 LLM 服务的活动连接数。
-    -   标签：`upstream_group_name`, `upstream_name`.
-
-### 负载均衡器指标
-
--   `llmproxy_loadbalancer_requests_total` (计数器)
-    -   描述：负载均衡器选择上游节点的总次数。
-    -   标签：`upstream_group_name`, `selected_upstream_name`, `strategy` (负载均衡策略).
--   `llmproxy_loadbalancer_no_healthy_upstreams_total` (计数器)
-    -   描述：因上游组内无健康可用节点而导致请求失败的次数。
-    -   标签：`upstream_group_name`.
+    -   描述：与上游 LLM 服务通信时发生的错误总数。
+    -   标签：`error` (错误类型), `group`, `upstream`。
 
 ### 断路器指标
 
 -   `llmproxy_circuitbreaker_state_changes_total` (计数器)
     -   描述：断路器状态转换的总次数。
-    -   标签：`upstream_group_name`, `upstream_name`, `target_url`, `from_state`, `to_state`.
+    -   标签：`group`, `upstream`, `url`, `from` (原状态), `to` (新状态)。
 -   `llmproxy_circuitbreaker_calls_total` (计数器)
     -   描述：通过断路器处理的调用总数（包括成功、失败、被拒绝的）。
-    -   标签：`upstream_group_name`, `upstream_name`, `target_url`, `result` (`success`, `failure`, `rejected_open`).
--   `llmproxy_circuitbreaker_state` (仪表)
-    -   描述：断路器当前状态 (例如 0=Closed, 1=Open, 2=HalfOpen)。
-    -   标签：`upstream_group_name`, `upstream_name`, `target_url`.
-
-### 速率限制指标 (Rate Limiting)
-
--   `llmproxy_ratelimit_requests_rejected_total` (计数器)
-    -   描述：因速率限制而被拒绝的请求总数。
-    -   标签：`forward_name`, `client_ip` (如果基于 IP 限流且能获取)。
+    -   标签：`group`, `upstream`, `url`, `result` (结果类型)。
+-   `llmproxy_circuitbreaker_opened_total` (计数器)
+    -   描述：断路器开启的总次数。
+    -   标签：`group`, `upstream`, `url`。
+-   `llmproxy_circuitbreaker_closed_total` (计数器)
+    -   描述：断路器关闭的总次数。
+    -   标签：`group`, `upstream`, `url`。
+-   `llmproxy_circuitbreaker_half_opened_total` (计数器)
+    -   描述：断路器半开的总次数。
+    -   标签：`group`, `upstream`, `url`。
 
 这些指标可以通过 Prometheus 抓取后，使用 Grafana 等工具进行可视化和告警配置，从而实现对 LLMProxy 服务及其代理的 LLM API 调用的全面监控。
 
