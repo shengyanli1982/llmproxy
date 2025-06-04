@@ -51,13 +51,13 @@ LLMProxy 有效解决了企业级 LLM API 部署中的关键挑战：
 
 **步骤 1：下载预编译的二进制文件**
 
-请前往项目的 [GitHub Releases](https://github.com/shengyanli1982/llmproxy/releases) 页面，下载适用于您操作系统（如 Windows, Linux, macOS）的最新预编译二进制文件压缩包 (例如 `llmproxyd-Linux-x64-<version>.zip` 或 `llmproxyd-Windows-x64-<version>.zip`)。
+请前往项目的 [GitHub Releases](https://github.com/shengyanli1982/llmproxy/releases) 页面，下载适用于你操作系统（如 Windows, Linux, macOS）的最新预编译二进制文件压缩包 (例如 `llmproxyd-Linux-x64-<version>.zip` 或 `llmproxyd-Windows-x64-<version>.zip`)。
 
-下载后，请解压缩文件，您会得到一个名为 `llmproxyd-<os>-<arch>` (Linux/macOS) 或 `llmproxyd-windows-x64.exe` (Windows) 的可执行文件。
+下载后，请解压缩文件，你会得到一个名为 `llmproxyd-<os>-<arch>` (Linux/macOS) 或 `llmproxyd-windows-x64.exe` (Windows) 的可执行文件。
 
 **步骤 2：创建配置文件**
 
-在与可执行文件相同的目录下，创建一个名为 `config.yaml` 的配置文件。LLMProxy 专为代理大语言模型设计，以下是一个最小化的配置示例，用于将本地 `3000` 端口的请求转发到 OpenAI API。请注意，您需要将 `YOUR_OPENAI_API_KEY_HERE` 替换为您的真实 OpenAI API 密钥才能使其正常工作：
+在与可执行文件相同的目录下，创建一个名为 `config.yaml` 的配置文件。LLMProxy 专为代理大语言模型设计，以下是一个最小化的配置示例，用于将本地 `3000` 端口的请求转发到 OpenAI API。请注意，你需要将 `YOUR_OPENAI_API_KEY_HERE` 替换为你的真实 OpenAI API 密钥才能使其正常工作：
 
 ```yaml
 http_server:
@@ -75,8 +75,8 @@ upstreams:
       url: "https://api.openai.com/v1"  # OpenAI API 的基础 URL
       auth:
           type: "bearer"                # 认证类型为 Bearer Token
-          token: "YOUR_OPENAI_API_KEY_HERE" # !!重要!! 请务必替换为您的真实 OpenAI API 密钥
-                                      # 如果没有 OpenAI 密钥，您可以选择其他 LLM 服务或使用模拟服务进行测试
+          token: "YOUR_OPENAI_API_KEY_HERE" # !!重要!! 请务必替换为你的真实 OpenAI API 密钥
+                                      # 如果没有 OpenAI 密钥，你可以选择其他 LLM 服务或使用模拟服务进行测试
 
 upstream_groups:
     - name: "openai_main_group"         # 上游组名称
@@ -105,11 +105,11 @@ upstream_groups:
     .\llmproxyd-windows-x64.exe --config config.yaml
     ```
 
-如果一切顺利，您会看到 LLMProxy 启动并开始监听配置的端口。
+如果一切顺利，你会看到 LLMProxy 启动并开始监听配置的端口。
 
 **步骤 4：测试代理服务**
 
-打开另一个终端，使用 `curl` 或类似的工具向 LLMProxy 配置的转发端口发送一个 LLM API 请求。例如，如果您的 `config.yaml` 中 `llm_openai_service` 服务监听的是 `3000` 端口，并且上游是 OpenAI API，您可以尝试发送一个聊天请求 (请确保您的请求体符合 OpenAI API 格式，并根据需要替换请求体中的 API Key)：
+打开另一个终端，使用 `curl` 或类似的工具向 LLMProxy 配置的转发端口发送一个 LLM API 请求。例如，如果你的 `config.yaml` 中 `llm_openai_service` 服务监听的是 `3000` 端口，并且上游是 OpenAI API，你可以尝试发送一个聊天请求 (请确保你的请求体符合 OpenAI API 格式，并根据需要替换请求体中的 API Key)：
 
 ```bash
 curl http://localhost:3000/v1/chat/completions \
@@ -122,9 +122,9 @@ curl http://localhost:3000/v1/chat/completions \
   }'
 ```
 
-此请求将被 LLMProxy 接收，并根据配置（包括认证、负载均衡等）转发到您在 `config.yaml` 中定义的 OpenAI 上游服务 (`https://api.openai.com/v1`)。您应该能看到来自 OpenAI API 的 JSON 响应。如果上游服务支持流式响应并且您在请求中启用了流式传输（例如 `"stream": true`），LLMProxy 也会正确处理流式数据。
+此请求将被 LLMProxy 接收，并根据配置（包括认证、负载均衡等）转发到你在 `config.yaml` 中定义的 OpenAI 上游服务 (`https://api.openai.com/v1`)。你应该能看到来自 OpenAI API 的 JSON 响应。如果上游服务支持流式响应并且你在请求中启用了流式传输（例如 `"stream": true`），LLMProxy 也会正确处理流式数据。
 
-现在您已经成功运行了 LLMProxy！接下来，您可以探索更高级的配置和功能。
+现在你已经成功运行了 LLMProxy！接下来，你可以探索更高级的配置和功能。
 
 ### 2. 使用 Docker 部署 (推荐)
 
@@ -163,13 +163,13 @@ services:
         container_name: llmproxy
         restart: unless-stopped
         ports:
-            # 转发服务端口映射 (根据您的 config.yaml 进行调整)
+            # 转发服务端口映射 (根据你的 config.yaml 进行调整)
             - "3000:3000" # 例如：llm_openai_service
             # - "3001:3001" # 其他转发服务
             # 管理界面端口映射
             - "9000:9000" # admin
         volumes:
-            - ./config.yaml:/app/config.yaml:ro # 挂载您的配置文件
+            - ./config.yaml:/app/config.yaml:ro # 挂载你的配置文件
         command: ["--config", "/app/config.yaml"]
         environment:
             - TZ=Asia/Shanghai # 根据需要设置时区
@@ -455,7 +455,7 @@ LLMProxy 支持多种灵活的部署方式，包括 Kubernetes 集群部署和�
 
 1. **准备配置文件和密钥**：
 
-    - 将您的`config.yaml`内容放入`examples/config/kubernetes/configmap.yaml`中，或通过其他方式创建 ConfigMap。
+    - 将你的`config.yaml`内容放入`examples/config/kubernetes/configmap.yaml`中，或通过其他方式创建 ConfigMap。
     - **强烈建议**：将 API 密钥等敏感信息存储在 Kubernetes Secrets 中，并通过环境变量或卷挂载的方式注入到 Pod 中，然后在 `config.yaml` 中引用这些环境变量。
 
 2. **应用部署清单**：
@@ -492,7 +492,7 @@ LLMProxy 支持多种灵活的部署方式，包括 Kubernetes 集群部署和�
     - **集群内部访问** (通过 Service 名称)：
       `http://llmproxy.llmproxy.svc.cluster.local:<port>` (port 根据 Service 定义)
     - **集群外部访问**：
-      通常通过配置 Ingress 资源实现，或者使用 `LoadBalancer`类型的 Service (如果您的 K8s 环境支持)。进行端口转发测试：
+      通常通过配置 Ingress 资源实现，或者使用 `LoadBalancer`类型的 Service (如果你的 K8s 环境支持)。进行端口转发测试：
         ```bash
         kubectl port-forward svc/llmproxy -n llmproxy 3000:3000 9000:9000 # 将服务端口转发到本地
         ```
@@ -507,7 +507,7 @@ LLMProxy 支持多种灵活的部署方式，包括 Kubernetes 集群部署和�
 
     ```bash
     # 示例版本，请替换为最新版
-    VERSION="0.1.0" # 假设这是您下载的版本
+    VERSION="0.1.0" # 假设这是你下载的版本
     curl -L -o llmproxyd-Linux-x64.zip https://github.com/shengyanli1982/llmproxy/releases/download/v${VERSION}/llmproxyd-Linux-x64-${VERSION}.zip
     unzip llmproxyd-Linux-x64.zip
     sudo mv llmproxyd-Linux-x64 /usr/local/bin/llmproxyd
@@ -519,7 +519,7 @@ LLMProxy 支持多种灵活的部署方式，包括 Kubernetes 集群部署和�
     ```bash
     sudo mkdir -p /etc/llmproxy
     sudo nano /etc/llmproxy/config.yaml
-    # 在编辑器中粘贴您的配置内容，并确保 API 密钥等敏感信息得到妥善处理
+    # 在编辑器中粘贴你的配置内容，并确保 API 密钥等敏感信息得到妥善处理
     # (例如，后续版本可能支持从环境变量读取)
     ```
 
@@ -737,7 +737,7 @@ LLMProxy 对外暴露以下主要类型的 HTTP API 端点：
 
 -   **路径与端口**：由 `http_server.forwards[]` 配置中的 `port`, `address` 以及客户端请求的原始路径共同决定。
     -   _示例_：若配置了 `port: 3000`, `address: "0.0.0.0"`，则客户端向 `http://<llmproxy_host>:3000/v1/chat/completions` 发起的请求会被此转发服务处理。
--   _描述_：这些是 LLMProxy 的主要工作端点。客户端应用程序（如您的 AI 应用后端）将标准的 LLM API 请求（例如 OpenAI, Anthropic 格式）发送至这些端点。
+-   _描述_：这些是 LLMProxy 的主要工作端点。客户端应用程序（如你的 AI 应用后端）将标准的 LLM API 请求（例如 OpenAI, Anthropic 格式）发送至这些端点。
 -   _协议_：HTTP (LLMProxy 本身目前不直接处理 HTTPS 终止；建议在前面使用反向代理如 Nginx 处理 TLS)。
 -   _用途_：LLMProxy 接收这些请求，根据配置的 `upstream_group` 进行负载均衡、认证注入、头部修改、断路等处理，然后将请求转发至选定的上游 LLM API 服务，并将上游的响应（包括流式响应）返回给客户端。
 
