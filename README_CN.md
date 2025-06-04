@@ -13,6 +13,8 @@
   |
   <a href="#核心功能">核心功能</a>
   |
+  <a href="#应用场景">应用场景</a>
+  |
   <a href="#配置指南">配置指南</a>
   |
   <a href="#部署进阶">部署进阶</a>
@@ -22,8 +24,6 @@
   <a href="#api-端点">API 端点</a>
   |
   <a href="#prometheus-指标">Prometheus 指标</a>
-  |
-  <a href="#应用场景">应用场景</a>
   |
   <a href="#许可证">许可证</a>
 </p>
@@ -126,7 +126,7 @@ curl http://localhost:3000/v1/chat/completions \
 
 现在您已经成功运行了 LLMProxy！接下来，您可以探索更高级的配置和功能。
 
-### 2. 使用 Docker 部署
+### 2. 使用 Docker 部署 (推荐)
 
 使用 Docker Compose 是部署 LLMProxy 最便捷的方式之一。项目的`examples/config`目录中提供了完整的 Docker Compose 配置示例。
 
@@ -233,6 +233,38 @@ networks:
     -   通过`http_server.admin`提供独立的管理界面和 API 端点。
     -   提供 `/health` 健康检查端点，便于集成到各类监控和自动化运维体系。
     -   通过 `/metrics` 端点暴露丰富的 Prometheus 指标，全面洞察 LLM 代理性能、流量、错误、延迟、上游 LLM 服务健康状况及断路器状态等。
+
+## 应用场景
+
+LLMProxy 专为需要高效、可靠、可扩展地访问和管理大语言模型 API 的各类企业级应用场景而设计：
+
+-   **企业级 AI 应用网关**：
+
+    -   为企业内部多个应用或团队提供统一的 LLM API 访问入口。
+    -   集中实施认证、授权、API 密钥管理、审计和安全策略。
+
+-   **高可用、高并发 LLM 服务**：
+
+    -   构建面向最终用户的高流量 AI 产品（如智能客服、内容生成工具、AI 助手）。
+    -   通过跨多个 LLM 提供商（如 OpenAI, Anthropic, Azure OpenAI, Google Gemini）或自建模型（vLLM, Ollama）的实例进行负载均衡和故障转移，确保服务不中断。
+    -   利用响应时间感知等高级策略，动态分配流量至性能最佳的节点，提升用户体验。
+
+-   **LLM 应用开发与测试加速**：
+
+    -   简化开发人员与多种 LLM API 的集成复杂度，使应用代码与具体 LLM 服务解耦。
+    -   在不同 LLM 模型或提供商之间轻松切换，方便进行效果评估和成本比较。
+    -   为测试环境模拟不同的上游响应（如延迟、错误），或隔离测试流量。
+
+-   **多云/混合云 LLM 策略实施**：
+
+    -   在复杂的云环境中（如 AWS, Azure, GCP 及本地数据中心混合部署）提供统一的 LLM API 访问层。
+    -   根据数据主权、合规性要求或成本因素，将请求路由到特定地理位置或特定类型的 LLM 服务。
+    -   作为 Sidecar 代理部署在 Kubernetes 等容器编排平台中，为微服务提供 LLM 访问能力。
+
+-   **API 版本与兼容性管理**：
+    -   当后端 LLM API 升级或发生不兼容变更时，LLMProxy 可作为适配层，通过头部操作或轻量级转换（未来可能支持）保持对旧版客户端的兼容。
+
+通过在这些场景中应用 LLMProxy，企业可以显著提升其 LLM 应用的可靠性、性能和可管理性，同时降低集成和运营的复杂性。
 
 ## 配置指南
 
@@ -416,66 +448,7 @@ upstream_groups:
 
 ## 部署进阶
 
-LLMProxy 支持多种灵活的部署方式，包括 Docker 容器化部署、Kubernetes 集群部署和传统 Linux 系统服务部署。以下是各部署方法的详细说明：
-
-### Docker 部署
-
-使用 Docker Compose 是部署 LLMProxy 最便捷的方式之一。项目的`examples/config`目录中提供了完整的 Docker Compose 配置示例。
-
-1. **准备配置文件**：
-
-    将自定义的`config.yaml`文件放置在与`docker-compose.yaml`相同的目录中。
-
-2. **启动服务**：
-
-    ```bash
-    docker-compose up -d
-    ```
-
-3. **查看运行日志**：
-
-    ```bash
-    docker-compose logs -f llmproxy # llmproxy 是 compose 文件中定义的服务名
-    ```
-
-4. **停止服务**：
-
-    ```bash
-    docker-compose down
-    ```
-
-Docker Compose 配置示例 (请参考项目 `examples/config/docker-compose.yaml` 以获取最新版本)：
-
-```yaml
-version: "3.8" # 建议使用较新的 compose 版本
-
-services:
-    llmproxy:
-        image: shengyanli1982/llmproxy:latest # 生产环境建议使用具体的 tag 版本
-        container_name: llmproxy_service
-        restart: unless-stopped
-        ports:
-            # 根据您的 config.yaml 中 forwards 定义的端口进行映射
-            - "3000:3000" # 示例: 映射配置文件中监听3000端口的转发服务
-            # - "3001:3001"
-            # 管理界面端口映射
-            - "127.0.0.1:9000:9000" # 建议将管理端口仅映射到本地回环地址
-        volumes:
-            - ./config.yaml:/app/config.yaml:ro # 将您的配置文件挂载到容器内
-            # 如果需要持久化日志，可以挂载日志目录
-            # - ./logs:/app/logs
-        command: ["--config", "/app/config.yaml"]
-        environment:
-            - TZ=Asia/Shanghai # 设置容器时区
-            # 可以通过环境变量覆盖部分配置，例如：
-            # - LLMPROXY_UPSTREAMS__0__AUTH__TOKEN=your_env_openai_key
-        networks:
-            - llmproxy_net
-
-networks:
-    llmproxy_net:
-        driver: bridge
-```
+LLMProxy 支持多种灵活的部署方式，包括 Kubernetes 集群部署和传统 Linux 系统服务部署。以下是各部署方法的详细说明：
 
 ### Kubernetes 部署
 
@@ -837,38 +810,6 @@ LLMProxy 通过管理端点的 `/metrics` 路径暴露全面的 Prometheus 指�
     -   标签：`group`, `upstream`, `url`。
 
 这些指标可以通过 Prometheus 抓取后，使用 Grafana 等工具进行可视化和告警配置，从而实现对 LLMProxy 服务及其代理的 LLM API 调用的全面监控。
-
-## 应用场景
-
-LLMProxy 专为需要高效、可靠、可扩展地访问和管理大语言模型 API 的各类企业级应用场景而设计：
-
--   **企业级 AI 应用网关**：
-
-    -   为企业内部多个应用或团队提供统一的 LLM API 访问入口。
-    -   集中实施认证、授权、API 密钥管理、审计和安全策略。
-
--   **高可用、高并发 LLM 服务**：
-
-    -   构建面向最终用户的高流量 AI 产品（如智能客服、内容生成工具、AI 助手）。
-    -   通过跨多个 LLM 提供商（如 OpenAI, Anthropic, Azure OpenAI, Google Gemini）或自建模型（vLLM, Ollama）的实例进行负载均衡和故障转移，确保服务不中断。
-    -   利用响应时间感知等高级策略，动态分配流量至性能最佳的节点，提升用户体验。
-
--   **LLM 应用开发与测试加速**：
-
-    -   简化开发人员与多种 LLM API 的集成复杂度，使应用代码与具体 LLM 服务解耦。
-    -   在不同 LLM 模型或提供商之间轻松切换，方便进行效果评估和成本比较。
-    -   为测试环境模拟不同的上游响应（如延迟、错误），或隔离测试流量。
-
--   **多云/混合云 LLM 策略实施**：
-
-    -   在复杂的云环境中（如 AWS, Azure, GCP 及本地数据中心混合部署）提供统一的 LLM API 访问层。
-    -   根据数据主权、合规性要求或成本因素，将请求路由到特定地理位置或特定类型的 LLM 服务。
-    -   作为 Sidecar 代理部署在 Kubernetes 等容器编排平台中，为微服务提供 LLM 访问能力。
-
--   **API 版本与兼容性管理**：
-    -   当后端 LLM API 升级或发生不兼容变更时，LLMProxy 可作为适配层，通过头部操作或轻量级转换（未来可能支持）保持对旧版客户端的兼容。
-
-通过在这些场景中应用 LLMProxy，企业可以显著提升其 LLM 应用的可靠性、性能和可管理性，同时降低集成和运营的复杂性。
 
 ## 许可证
 
