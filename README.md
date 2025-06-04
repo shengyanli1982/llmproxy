@@ -650,7 +650,7 @@ LLMProxy's response-time aware (`response_aware`) load balancing algorithm is an
     -   $\text{ProcessingRequests}$ is the number of concurrent requests currently being processed by the node
     -   $\text{SuccessRate}$ is the node's request success rate (a value between 0-1)
 
-![score](./images/response_aware_parameter_impact_cn.png)
+![score](./images/response_aware_parameter_impact_en.png)
 _Figure: Impact of various parameters on selection probability in the response-time aware algorithm (illustration)_
 
 3.  **Intelligent Node Selection**:
