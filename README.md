@@ -240,12 +240,12 @@ networks:
 
 ## Use Cases
 
-LLMProxy is designed for various enterprise-level application scenarios that require efficient, reliable, and scalable access to and management of large language model APIs:
+LLMProxy is designed for enterprise-level application scenarios that require efficient, reliable, and scalable access to and management of large language model APIs:
 
 -   **Enterprise AI Application Gateway**:
 
     -   Provides a unified LLM API access entry point for multiple applications or teams within an enterprise.
-    -   Centrally implements authentication, authorization, API key management, auditing, and security policies.
+    -   Centrally implements access authentication and API key configuration for large language models.
 
 -   **High-Availability, High-Concurrency LLM Services**:
 
@@ -263,7 +263,7 @@ LLMProxy is designed for various enterprise-level application scenarios that req
 
     -   Provide a unified LLM API access layer in complex cloud environments (such as AWS, Azure, GCP, and on-premises data centers in hybrid deployment).
     -   Route requests to specific geographic locations or specific types of LLM services based on data sovereignty, compliance requirements, or cost factors.
-    -   Deploy as a Sidecar proxy in container orchestration platforms like Kubernetes to provide LLM access capabilities for microservices.
+    -   Deploy as an independent service in container orchestration platforms like Kubernetes to provide LLM access capabilities for microservices.
 
 -   **API Version & Compatibility Management**:
     -   When backend LLM APIs upgrade or undergo incompatible changes, LLMProxy can serve as an adaptation layer, maintaining compatibility with older clients through header operations or lightweight transformations (possibly supported in future versions).
@@ -431,7 +431,6 @@ upstream_groups:
 
 1. **Security Recommendations**:
 
-    - In production environments, **never hardcode sensitive credentials like API keys directly in configuration files**. Prioritize using environment variable substitution or professional key management services (such as HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, etc.) for credential management. Future versions of LLMProxy plan to support loading sensitive configurations from environment variables.
     - Strictly limit access to the admin interface (`admin` service). Bind it to the local loopback address (`address: "127.0.0.1"`), and consider using firewall rules or a reverse proxy (like Nginx) to add additional authentication and access control.
 
 2. **Performance & Cost Optimization**:
