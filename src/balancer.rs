@@ -1,6 +1,7 @@
 use crate::breaker::UpstreamCircuitBreaker;
 use crate::config::{BalanceStrategy, UpstreamRef};
 use crate::error::AppError;
+use crate::r#const::balance_strategy_labels;
 use async_trait::async_trait;
 use rand::{seq::SliceRandom, thread_rng};
 use std::any::Any;
@@ -117,7 +118,7 @@ impl LoadBalancer for RoundRobinBalancer {
     }
 
     fn as_str(&self) -> &'static str {
-        crate::r#const::balance_strategy_labels::ROUND_ROBIN
+        balance_strategy_labels::ROUND_ROBIN
     }
 }
 
@@ -206,7 +207,7 @@ impl LoadBalancer for WeightedRoundRobinBalancer {
     }
 
     fn as_str(&self) -> &'static str {
-        crate::r#const::balance_strategy_labels::WEIGHTED_ROUND_ROBIN
+        balance_strategy_labels::WEIGHTED_ROUND_ROBIN
     }
 }
 
@@ -290,6 +291,55 @@ impl LoadBalancer for RandomBalancer {
 
     fn as_str(&self) -> &'static str {
         crate::r#const::balance_strategy_labels::RANDOM
+    }
+}
+
+// 故障转移负载均衡器
+pub struct FailoverBalancer {
+    // 服务器列表（按优先级顺序排列）
+    upstreams: Vec<ManagedUpstream>,
+}
+
+impl FailoverBalancer {
+    // 创建新的故障转移负载均衡器
+    pub fn new(upstreams: Vec<ManagedUpstream>) -> Self {
+        Self { upstreams }
+    }
+}
+
+#[async_trait]
+impl LoadBalancer for FailoverBalancer {
+    async fn select_upstream(&self) -> Result<&ManagedUpstream, AppError> {
+        if self.upstreams.is_empty() {
+            return Err(AppError::NoUpstreamAvailable);
+        }
+
+        // 按顺序尝试每个上游，找到第一个健康的
+        for (index, upstream) in self.upstreams.iter().enumerate() {
+            if is_upstream_healthy(upstream) {
+                debug!(
+                    "FailoverBalancer selected upstream: {}, index: {}",
+                    upstream.upstream_ref.name, index
+                );
+                return Ok(upstream);
+            }
+        }
+
+        // 所有上游的熔断器都开启
+        debug!("All upstreams have open circuit breakers");
+        Err(AppError::NoHealthyUpstreamAvailable)
+    }
+
+    async fn report_failure(&self, _upstream: &ManagedUpstream) {
+        // 故障转移策略下不需要特殊处理失败
+    }
+
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn as_str(&self) -> &'static str {
+        balance_strategy_labels::FAILOVER
     }
 }
 
@@ -483,7 +533,7 @@ impl LoadBalancer for ResponseAwareBalancer {
     }
 
     fn as_str(&self) -> &'static str {
-        crate::r#const::balance_strategy_labels::RESPONSE_AWARE
+        balance_strategy_labels::RESPONSE_AWARE
     }
 }
 
@@ -497,5 +547,6 @@ pub fn create_load_balancer(
         BalanceStrategy::WeightedRoundRobin => Arc::new(WeightedRoundRobinBalancer::new(upstreams)),
         BalanceStrategy::Random => Arc::new(RandomBalancer::new(upstreams)),
         BalanceStrategy::ResponseAware => Arc::new(ResponseAwareBalancer::new(upstreams)),
+        BalanceStrategy::Failover => Arc::new(FailoverBalancer::new(upstreams)),
     }
 }

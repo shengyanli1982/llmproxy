@@ -1,7 +1,7 @@
 use llmproxy::{
     balancer::{
-        LoadBalancer, ManagedUpstream, RandomBalancer, ResponseAwareBalancer, RoundRobinBalancer,
-        WeightedRoundRobinBalancer,
+        FailoverBalancer, LoadBalancer, ManagedUpstream, RandomBalancer, ResponseAwareBalancer,
+        RoundRobinBalancer, WeightedRoundRobinBalancer,
     },
     config::{BalanceConfig, BalanceStrategy, UpstreamConfig, UpstreamGroupConfig, UpstreamRef},
     upstream::UpstreamManager,
@@ -693,4 +693,101 @@ async fn test_response_aware_balancer_under_load() {
         name2_count,
         name3_count
     );
+}
+
+#[tokio::test]
+async fn test_failover_balancer_creation() {
+    let managed_upstreams = create_test_managed_upstreams();
+    let balancer = FailoverBalancer::new(managed_upstreams);
+
+    // 由于字段是私有的，我们不能直接访问它们
+    // 但我们可以测试 select_upstream 方法
+    let upstream = balancer.select_upstream().await.unwrap();
+    assert_eq!(upstream.upstream_ref.name, "upstream1");
+}
+
+#[tokio::test]
+async fn test_failover_balancer_selection_order() {
+    // 创建上游列表
+    let managed_upstreams = create_test_managed_upstreams();
+    let balancer = FailoverBalancer::new(managed_upstreams);
+
+    // 第一次选择应该返回第一个上游
+    let first = balancer.select_upstream().await.unwrap();
+    assert_eq!(first.upstream_ref.name, "upstream1");
+}
+
+#[tokio::test]
+async fn test_load_balancer_factory_failover() {
+    let managed_upstreams = create_test_managed_upstreams();
+
+    // 使用工厂函数创建故障转移负载均衡器
+    let balancer = llmproxy::balancer::create_load_balancer(
+        &BalanceStrategy::Failover,
+        managed_upstreams.clone(),
+    );
+
+    // 验证创建的是正确的类型
+    assert_eq!(balancer.as_str(), "failover");
+
+    // 验证可以正确选择上游
+    assert!(balancer.select_upstream().await.is_ok());
+}
+
+#[tokio::test]
+async fn test_failover_balancer_with_unavailable_upstream() {
+    // 创建带有熔断器的上游列表
+    let mut managed_upstreams = vec![
+        ManagedUpstream {
+            upstream_ref: UpstreamRef {
+                name: "unavailable".to_string(),
+                weight: 1,
+            },
+            id: Uuid::new_v4().to_string(),
+            breaker: None,
+        },
+        ManagedUpstream {
+            upstream_ref: UpstreamRef {
+                name: "available".to_string(),
+                weight: 1,
+            },
+            id: Uuid::new_v4().to_string(),
+            breaker: None,
+        },
+    ];
+
+    // 为第一个上游创建熔断器并设置为不可用
+    let breaker_config = llmproxy::config::BreakerConfig {
+        threshold: 0.5,
+        cooldown: 30,
+    };
+    let breaker = llmproxy::breaker::create_upstream_circuit_breaker(
+        managed_upstreams[0].id.clone(),
+        managed_upstreams[0].upstream_ref.name.clone(),
+        "test_group".to_string(),
+        "http://example.com".to_string(),
+        &breaker_config,
+    );
+
+    // 手动触发熔断器
+    for _ in 0..10 {
+        let _ = breaker
+            .call_async(|| async {
+                Err::<(), _>(llmproxy::breaker::UpstreamError("test failure".to_string()))
+            })
+            .await;
+    }
+
+    // 确认熔断器已开启
+    assert!(!breaker.is_call_permitted());
+
+    // 设置熔断器
+    managed_upstreams[0].breaker = Some(breaker);
+
+    // 创建故障转移负载均衡器
+    let balancer = FailoverBalancer::new(managed_upstreams);
+
+    // 由于第一个上游不可用，应该选择第二个上游
+    let selected = balancer.select_upstream().await.unwrap();
+    assert_eq!(selected.upstream_ref.name, "available");
 }

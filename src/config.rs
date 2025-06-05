@@ -119,6 +119,16 @@ impl Config {
                 }
                 BalanceStrategy::Random => {}
                 BalanceStrategy::ResponseAware => {}
+                BalanceStrategy::Failover => {
+                    // 故障转移策略不需要特殊验证，但需要至少有两个上游才有意义
+                    if group.upstreams.len() < 2 {
+                        debug!(
+                            "Upstream group '{}' uses failover strategy but has only {} upstream(s), consider adding more for better failover capability",
+                            group.name,
+                            group.upstreams.len()
+                        );
+                    }
+                }
             }
 
             // 记录使用的负载均衡策略，用于日志或指标
@@ -686,6 +696,9 @@ pub enum BalanceStrategy {
     // 响应时间感知
     #[serde(rename = "response_aware")]
     ResponseAware,
+    // 故障转移
+    #[serde(rename = "failover")]
+    Failover,
 }
 
 impl Default for BalanceStrategy {
@@ -702,6 +715,7 @@ impl BalanceStrategy {
             Self::WeightedRoundRobin => balance_strategy_labels::WEIGHTED_ROUND_ROBIN,
             Self::Random => balance_strategy_labels::RANDOM,
             Self::ResponseAware => balance_strategy_labels::RESPONSE_AWARE,
+            Self::Failover => balance_strategy_labels::FAILOVER,
         }
     }
 }

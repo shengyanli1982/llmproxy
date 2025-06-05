@@ -46,6 +46,18 @@ http_server:
       timeout:
         connect: 10
 
+    # 示例 3: 转发到故障转移上游组 (failover_group)
+    - name: to_failover # [必填] 转发服务名称。
+      port: 3002 # [必填] 监听端口。
+      address: "0.0.0.0" # [可选] 监听地址。
+      upstream_group: "failover_group" # [必填] 关联的上游组名称。
+      ratelimit:
+        enabled: true
+        per_second: 100
+        burst: 200
+      timeout:
+        connect: 10
+
   #-----------------------------------------------------------------------------
   # 管理服务 (admin)
   #-----------------------------------------------------------------------------
@@ -145,6 +157,7 @@ upstream_groups:
         #   "weighted_roundrobin": 加权轮询。根据为每个上游定义的权重分配请求。
         #   "random": 随机。随机选择一个上游。
         #   "response_aware": 响应时间感知。选择平均响应时间最短的上游。
+        #   "failover": 故障转移。按照上游列表的顺序尝试，如果当前的上游不可用，则使用后面的上游。
     # [可选] HTTP 客户端配置。定义 LLMProxy 如何与此组中的上游服务通信。
     # 如果省略，将使用全局默认的 HTTP 客户端配置。
     http_client:
@@ -225,6 +238,28 @@ upstream_groups:
         idle: 60
       retry:
         enabled: false # 假设 Anthropic 请求默认不进行重试
+      proxy:
+        enabled: false
+        # url: ""
+
+  # 示例 4: 故障转移上游组 (使用故障转移负载均衡)
+  - name: failover_group # [必填] 上游组名称。
+    upstreams:
+      - name: openai_primary # 主要上游，优先使用
+      - name: custom_service_basic_auth # 备用上游，当主要上游不可用时使用
+      # 可以添加更多备用上游，按照优先级顺序排列
+    balance:
+      strategy: "failover" # 故障转移策略，按照上游列表的顺序尝试
+    http_client:
+      agent: "LLMProxy/1.0 (FailoverClient)"
+      keepalive: 60
+      stream: true
+      timeout:
+        connect: 10
+        request: 300
+        idle: 60
+      retry:
+        enabled: false # 故障转移模式下通常不需要重试，因为会自动切换到下一个上游
       proxy:
         enabled: false
         # url: ""
