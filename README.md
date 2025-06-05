@@ -208,6 +208,7 @@ networks:
         -   **Weighted Round Robin** - Distribute requests to different LLM services according to preset weights (e.g., service processing capacity, cost considerations).
         -   **Random** - Randomly select an available LLM service.
         -   **Response Aware** - Especially suitable for LLM services, monitoring node performance in real-time (response latency, concurrent load, success rate) and dynamically directing requests to the currently optimal node, maximizing throughput and user experience.
+        -   **Failover** - Try upstream services in the order they are listed. If the current upstream is unavailable, automatically switch to the next one, providing sequential backup capability.
     -   Set weights for each upstream LLM service in the weighted round-robin strategy.
 
 -   🔁 **Flexible Traffic Control & QoS Assurance**
@@ -319,7 +320,7 @@ LLMProxy uses structured YAML files for configuration, offering flexible and pow
 | `upstream_groups[].name`                        | String  | -              | **[Required]** Unique identifier name for the upstream group                                                                                                                          |
 | `upstream_groups[].upstreams[].name`            | String  | -              | **[Required]** Referenced upstream LLM service name, must be defined in the `upstreams` section                                                                                       |
 | `upstream_groups[].upstreams[].weight`          | Integer | 1              | Weight value effective only when `balance.strategy` is `weighted_roundrobin`, used for proportional request allocation                                                                |
-| `upstream_groups[].balance.strategy`            | String  | "roundrobin"   | Load balancing strategy: `roundrobin`, `weighted_roundrobin`, `random`, or `response_aware`                                                                                           |
+| `upstream_groups[].balance.strategy`            | String  | "roundrobin"   | Load balancing strategy: `roundrobin`, `weighted_roundrobin`, `random`, `response_aware` or `failover`                                                                                |
 | `upstream_groups[].http_client.agent`           | String  | "LLMProxy/1.0" | User-Agent header value sent to upstream LLM services                                                                                                                                 |
 | `upstream_groups[].http_client.keepalive`       | Integer | 60             | TCP Keepalive time (seconds), range 0-600, 0 means disabled. Helps keep connections with upstream LLM services active, reducing latency                                               |
 | `upstream_groups[].http_client.stream`          | Boolean | true           | Whether to enable streaming support for requests to upstream. Critical for LLM API streaming responses (server-sent events)                                                           |
@@ -409,7 +410,8 @@ upstream_groups:
               # "roundrobin" (default round-robin),
               # "weighted_roundrobin" (weighted round-robin),
               # "random" (random),
-              # "response_aware" (response time aware, recommended for LLM)
+              # "response_aware" (response time aware, recommended for LLM),
+              # "failover" (failover strategy, tries upstreams in order)
       http_client: # [Optional] Define how LLMProxy communicates with upstream LLM services in this group
           agent: "LLMProxy/1.0 (OpenAI-Group)" # [Optional] Custom User-Agent header
           keepalive: 90 # [Optional] TCP keepalive time (seconds) (0-600, 0=disabled, default: 60)
