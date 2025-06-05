@@ -144,6 +144,8 @@ pub mod balance_strategy_labels {
     pub const RANDOM: &str = "random";
     // 响应时间感知
     pub const RESPONSE_AWARE: &str = "response_aware";
+    // 故障转移
+    pub const FAILOVER: &str = "failover";
 }
 
 // 熔断器限制
