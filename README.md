@@ -435,7 +435,29 @@ upstream_groups:
               url: "http://user:pass@your-proxy-server.com:8080" # Proxy server URL
 ```
 
-### Multi-tenancy Configuration Example
+### Configuration Best Practices
+
+1. **Security Recommendations**:
+
+    - Strictly limit access to the admin interface (`admin` service). Bind it to the local loopback address (`address: "127.0.0.1"`), and consider using firewall rules or a reverse proxy (like Nginx) to add additional authentication and access control.
+
+2. **Performance & Cost Optimization**:
+
+    - Fine-tune timeout configurations (`timeout.connect`, `timeout.request`, `timeout.idle`) and retry strategies (`retry`) based on the characteristics of different LLM service providers' APIs (such as response time, concurrency limits, billing models).
+    - For LLM services that support streaming responses, ensure `http_client.stream: true` (this is the default value) to receive and forward data with minimal latency.
+    - Configure rate limits (`ratelimit`) reasonably to both protect backend LLM services from overload and meet business needs during peak periods.
+    - Leverage the `weighted_roundrobin` load balancing strategy, combined with the cost and performance of different LLM services, to direct more traffic to services with better price-performance ratios.
+    - For latency-sensitive applications, prioritize using the `response_aware` load balancing strategy, which can dynamically select the best-performing upstream service at any given time.
+
+3. **Reliability & Resilience Design**:
+    - Configure reasonable circuit breaker parameters (`breaker.threshold`, `breaker.cooldown`) for each upstream LLM service (`upstreams`). Threshold settings need to balance the sensitivity of fault detection and the inherent volatility of the service.
+    - Configure multiple upstream LLM service instances in each upstream group (`upstream_groups`) to achieve redundancy and automatic failover. These can be different regional nodes of the same provider or alternative services from different providers.
+    - Enable request retries (`http_client.retry.enabled: true`) only for idempotent or safely retryable LLM API calls. Note that some LLM operations (such as content generation) may not be idempotent.
+    - Regularly monitor Prometheus metrics data about circuit breaker status, upstream error rates, request latency, etc., and use this information to optimize configurations and troubleshoot potential issues.
+
+For detailed explanations of all available configuration options, please refer to the `config.default.yaml` file included with the LLMProxy project as a complete reference.
+
+### Example: Multi-tenancy Configuration
 
 LLMProxy can easily achieve multi-tenancy or service isolation by mapping different `forwards` (listening on different ports) to different `upstream_groups`. Each `upstream_group` can have its own independent upstream LLM services, load balancing strategies, and client behavior configurations. This allows a single LLMProxy instance to serve multiple independent clients or applications while maintaining configuration and traffic isolation.
 
@@ -503,28 +525,6 @@ upstream_groups:
           timeout:
               request: 360
 ```
-
-### Configuration Best Practices
-
-1. **Security Recommendations**:
-
-    - Strictly limit access to the admin interface (`admin` service). Bind it to the local loopback address (`address: "127.0.0.1"`), and consider using firewall rules or a reverse proxy (like Nginx) to add additional authentication and access control.
-
-2. **Performance & Cost Optimization**:
-
-    - Fine-tune timeout configurations (`timeout.connect`, `timeout.request`, `timeout.idle`) and retry strategies (`retry`) based on the characteristics of different LLM service providers' APIs (such as response time, concurrency limits, billing models).
-    - For LLM services that support streaming responses, ensure `http_client.stream: true` (this is the default value) to receive and forward data with minimal latency.
-    - Configure rate limits (`ratelimit`) reasonably to both protect backend LLM services from overload and meet business needs during peak periods.
-    - Leverage the `weighted_roundrobin` load balancing strategy, combined with the cost and performance of different LLM services, to direct more traffic to services with better price-performance ratios.
-    - For latency-sensitive applications, prioritize using the `response_aware` load balancing strategy, which can dynamically select the best-performing upstream service at any given time.
-
-3. **Reliability & Resilience Design**:
-    - Configure reasonable circuit breaker parameters (`breaker.threshold`, `breaker.cooldown`) for each upstream LLM service (`upstreams`). Threshold settings need to balance the sensitivity of fault detection and the inherent volatility of the service.
-    - Configure multiple upstream LLM service instances in each upstream group (`upstream_groups`) to achieve redundancy and automatic failover. These can be different regional nodes of the same provider or alternative services from different providers.
-    - Enable request retries (`http_client.retry.enabled: true`) only for idempotent or safely retryable LLM API calls. Note that some LLM operations (such as content generation) may not be idempotent.
-    - Regularly monitor Prometheus metrics data about circuit breaker status, upstream error rates, request latency, etc., and use this information to optimize configurations and troubleshoot potential issues.
-
-For detailed explanations of all available configuration options, please refer to the `config.default.yaml` file included with the LLMProxy project as a complete reference.
 
 ## Advanced Deployment
 

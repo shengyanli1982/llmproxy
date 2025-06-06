@@ -431,7 +431,29 @@ upstream_groups:
               url: "http://user:pass@your-proxy-server.com:8080" # 代理服务器URL
 ```
 
-### 多租户配置示例
+### 配置最佳实践
+
+1. **安全建议**：
+
+    - 严格限制管理接口（`admin`服务）的访问。将其绑定到本地回环地址（`address: "127.0.0.1"`），并考虑使用防火墙规则或反向代理（如 Nginx）为其添加额外的认证和访问控制。
+
+2. **性能与成本优化**：
+
+    - 针对不同 LLM 服务提供商的 API 特性（如响应时间、并发限制、计费模型），精细调整各项超时配置（`timeout.connect`, `timeout.request`, `timeout.idle`）和重试策略（`retry`）。
+    - 对于支持流式响应的 LLM 服务，务必确保 `http_client.stream: true`（此为默认值），以最低延迟接收和转发数据。
+    - 合理配置速率限制（`ratelimit`），既要保护后端 LLM 服务免遭过载，也要满足业务高峰期的需求。
+    - 利用 `weighted_roundrobin` 负载均衡策略，结合不同 LLM 服务的成本和性能，将更多流量导向性价比高的服务。
+    - 对于延迟敏感型应用，优先考虑使用 `response_aware` 负载均衡策略，它能动态选择当前表现最佳的上游服务。
+
+3. **可靠性与弹性设计**：
+    - 为每个上游 LLM 服务（`upstreams`）配置合理的断路器参数（`breaker.threshold`, `breaker.cooldown`）。阈值设置需权衡故障检测的灵敏度和服务自身的波动性。
+    - 在每个上游组（`upstream_groups`）中配置多个上游 LLM 服务实例（可以是同一提供商的不同区域节点，或不同提供商的可替代服务），以实现冗余和自动故障转移。
+    - 仅对幂等或可安全重试的 LLM API 调用启用请求重试（`http_client.retry.enabled: true`）。注意某些 LLM 操作（如生成内容）可能不是幂等的。
+    - 定期监控 Prometheus 指标中关于断路器状态、上游错误率、请求延迟等数据，据此优化配置和排查潜在问题。
+
+有关所有可用配置选项的详细说明，请参阅 LLMProxy 项目附带的`config.default.yaml`文件作为完整参考。
+
+### 示例: 多租户配置
 
 LLMProxy 通过将不同的`forwards`（监听不同端口）映射到不同的`upstream_groups`，可以轻松实现多租户或服务隔离。每个`upstream_group`可以拥有自己独立的上游 LLM 服务、负载均衡策略和客户端行为配置。这使得单个 LLMProxy 实例能够为多个独立的客户端或应用提供服务，同时保持配置和流量的隔离。
 
@@ -499,28 +521,6 @@ upstream_groups:
           timeout:
               request: 360
 ```
-
-### 配置最佳实践
-
-1. **安全建议**：
-
-    - 严格限制管理接口（`admin`服务）的访问。将其绑定到本地回环地址（`address: "127.0.0.1"`），并考虑使用防火墙规则或反向代理（如 Nginx）为其添加额外的认证和访问控制。
-
-2. **性能与成本优化**：
-
-    - 针对不同 LLM 服务提供商的 API 特性（如响应时间、并发限制、计费模型），精细调整各项超时配置（`timeout.connect`, `timeout.request`, `timeout.idle`）和重试策略（`retry`）。
-    - 对于支持流式响应的 LLM 服务，务必确保 `http_client.stream: true`（此为默认值），以最低延迟接收和转发数据。
-    - 合理配置速率限制（`ratelimit`），既要保护后端 LLM 服务免遭过载，也要满足业务高峰期的需求。
-    - 利用 `weighted_roundrobin` 负载均衡策略，结合不同 LLM 服务的成本和性能，将更多流量导向性价比高的服务。
-    - 对于延迟敏感型应用，优先考虑使用 `response_aware` 负载均衡策略，它能动态选择当前表现最佳的上游服务。
-
-3. **可靠性与弹性设计**：
-    - 为每个上游 LLM 服务（`upstreams`）配置合理的断路器参数（`breaker.threshold`, `breaker.cooldown`）。阈值设置需权衡故障检测的灵敏度和服务自身的波动性。
-    - 在每个上游组（`upstream_groups`）中配置多个上游 LLM 服务实例（可以是同一提供商的不同区域节点，或不同提供商的可替代服务），以实现冗余和自动故障转移。
-    - 仅对幂等或可安全重试的 LLM API 调用启用请求重试（`http_client.retry.enabled: true`）。注意某些 LLM 操作（如生成内容）可能不是幂等的。
-    - 定期监控 Prometheus 指标中关于断路器状态、上游错误率、请求延迟等数据，据此优化配置和排查潜在问题。
-
-有关所有可用配置选项的详细说明，请参阅 LLMProxy 项目附带的`config.default.yaml`文件作为完整参考。
 
 ## 部署进阶
 
