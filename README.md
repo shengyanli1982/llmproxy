@@ -248,6 +248,12 @@ LLMProxy is designed for enterprise-level application scenarios that require eff
     -   Provides a unified LLM API access entry point for multiple applications or teams within an enterprise.
     -   Centrally implements access authentication and API key configuration for large language models.
 
+-   **Multi-tenancy and Service Isolation**:
+
+    -   Achieve a multi-tenant architecture within a single LLMProxy instance by configuring independent `forwards` and `upstream_groups` for different teams, applications, or customers (tenants).
+    -   Assign a unique access endpoint (port) to each tenant and apply separate routing rules, API keys, rate limits, and load balancing strategies.
+    -   This is particularly useful for SaaS platforms that need to provide customized LLM services to different customers, or for isolating resources and billing for different departments within an enterprise.
+
 -   **High-Availability, High-Concurrency LLM Services**:
 
     -   Build high-traffic AI products for end users (such as intelligent customer service, content generation tools, AI assistants).
@@ -450,6 +456,75 @@ upstream_groups:
     - Regularly monitor Prometheus metrics data about circuit breaker status, upstream error rates, request latency, etc., and use this information to optimize configurations and troubleshoot potential issues.
 
 For detailed explanations of all available configuration options, please refer to the `config.default.yaml` file included with the LLMProxy project as a complete reference.
+
+### Example: Multi-tenancy Configuration
+
+LLMProxy can easily achieve multi-tenancy or service isolation by mapping different `forwards` (listening on different ports) to different `upstream_groups`. Each `upstream_group` can have its own independent upstream LLM services, load balancing strategies, and client behavior configurations. This allows a single LLMProxy instance to serve multiple independent clients or applications while maintaining configuration and traffic isolation.
+
+The following example shows how to configure independent proxy services for two tenants (`tenant-a` and `tenant-b`):
+
+-   `tenant-a` accesses the service on port `3001` with its own dedicated OpenAI API key and rate limiting policy.
+-   `tenant-b` accesses the service on port `3002`, uses a different API key, is configured with a Failover strategy, and has stricter rate limits.
+
+```yaml
+http_server:
+    forwards:
+        - name: "tenant-a-service"
+          port: 3001
+          address: "0.0.0.0"
+          upstream_group: "tenant-a-group"
+          ratelimit:
+              enabled: true
+              per_second: 50 # Rate limit for Tenant A
+              burst: 100
+        - name: "tenant-b-service"
+          port: 3002
+          address: "0.0.0.0"
+          upstream_group: "tenant-b-group"
+          ratelimit:
+              enabled: true
+              per_second: 20 # Rate limit for Tenant B
+              burst: 40
+
+upstreams:
+    - name: "openai_primary_for_a"
+      url: "https://api.openai.com/v1"
+      auth:
+          type: "bearer"
+          token: "TENANT_A_OPENAI_API_KEY" # API key for Tenant A
+    - name: "openai_primary_for_b"
+      url: "https://api.openai.com/v1"
+      auth:
+          type: "bearer"
+          token: "TENANT_B_OPENAI_API_KEY" # API key for Tenant B
+    - name: "openai_backup_for_b"
+      url: "https://api.openai.com/v1"
+      auth:
+          type: "bearer"
+          token: "TENANT_B_BACKUP_API_KEY" # Backup API key for Tenant B
+
+upstream_groups:
+    # Configuration group for Tenant A
+    - name: "tenant-a-group"
+      upstreams:
+          - name: "openai_primary_for_a"
+      balance:
+          strategy: "roundrobin" # Simple round-robin
+      http_client:
+          timeout:
+              request: 300
+
+    # Configuration group for Tenant B
+    - name: "tenant-b-group"
+      upstreams:
+          - name: "openai_primary_for_b" # Primary service
+          - name: "openai_backup_for_b" # Backup service
+      balance:
+          strategy: "failover" # Automatically switch to backup on failure
+      http_client:
+          timeout:
+              request: 360
+```
 
 ## Advanced Deployment
 

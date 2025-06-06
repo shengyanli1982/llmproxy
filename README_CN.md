@@ -244,6 +244,12 @@ LLMProxy 专为需要高效、可靠、可扩展地访问和管理大语言模�
     -   为企业内部多个应用或团队提供统一的 LLM API 访问入口。
     -   集中实施对大模型 API 的访问认证、API 密钥设置。
 
+-   **多租户与服务隔离**：
+
+    -   通过为不同团队、应用或客户（租户）配置独立的`forwards`和`upstream_groups`，在单个 LLMProxy 实例中实现多租户架构。
+    -   为每个租户分配唯一的访问端点（端口），并应用独立的路由规则、API 密钥、速率限制和负载均衡策略。
+    -   这对于需要为不同客户提供定制化 LLM 服务的 SaaS 平台，或在企业内部为不同部门隔离资源和计费的场景尤为适用。
+
 -   **高可用、高并发 LLM 服务**：
 
     -   构建面向最终用户的高流量 AI 产品（如智能客服、内容生成工具、AI 助手）。
@@ -446,6 +452,75 @@ upstream_groups:
     - 定期监控 Prometheus 指标中关于断路器状态、上游错误率、请求延迟等数据，据此优化配置和排查潜在问题。
 
 有关所有可用配置选项的详细说明，请参阅 LLMProxy 项目附带的`config.default.yaml`文件作为完整参考。
+
+### 示例: 多租户配置
+
+LLMProxy 通过将不同的`forwards`（监听不同端口）映射到不同的`upstream_groups`，可以轻松实现多租户或服务隔离。每个`upstream_group`可以拥有自己独立的上游 LLM 服务、负载均衡策略和客户端行为配置。这使得单个 LLMProxy 实例能够为多个独立的客户端或应用提供服务，同时保持配置和流量的隔离。
+
+以下示例展示了如何为两个租户（`tenant-a` 和 `tenant-b`）配置独立的代理服务：
+
+-   `tenant-a` 在端口 `3001` 上访问，拥有专属的 OpenAI API 密钥和速率限制策略。
+-   `tenant-b` 在端口 `3002` 上访问，使用不同的 API 密钥，并配置了故障转移（Failover）策略，同时有更严格的速率限制。
+
+```yaml
+http_server:
+    forwards:
+        - name: "tenant-a-service"
+          port: 3001
+          address: "0.0.0.0"
+          upstream_group: "tenant-a-group"
+          ratelimit:
+              enabled: true
+              per_second: 50 # 租户A的速率限制
+              burst: 100
+        - name: "tenant-b-service"
+          port: 3002
+          address: "0.0.0.0"
+          upstream_group: "tenant-b-group"
+          ratelimit:
+              enabled: true
+              per_second: 20 # 租户B的速率限制
+              burst: 40
+
+upstreams:
+    - name: "openai_primary_for_a"
+      url: "https://api.openai.com/v1"
+      auth:
+          type: "bearer"
+          token: "TENANT_A_OPENAI_API_KEY" # 租户A的密钥
+    - name: "openai_primary_for_b"
+      url: "https://api.openai.com/v1"
+      auth:
+          type: "bearer"
+          token: "TENANT_B_OPENAI_API_KEY" # 租户B的密钥
+    - name: "openai_backup_for_b"
+      url: "https://api.openai.com/v1"
+      auth:
+          type: "bearer"
+          token: "TENANT_B_BACKUP_API_KEY" # 租户B的备用密钥
+
+upstream_groups:
+    # 租户A的配置组
+    - name: "tenant-a-group"
+      upstreams:
+          - name: "openai_primary_for_a"
+      balance:
+          strategy: "roundrobin" # 简单轮询
+      http_client:
+          timeout:
+              request: 300
+
+    # 租户B的配置组
+    - name: "tenant-b-group"
+      upstreams:
+          - name: "openai_primary_for_b" # 主要服务
+          - name: "openai_backup_for_b" # 备用服务
+      balance:
+          strategy: "failover" # 故障时自动切换到备用
+      http_client:
+          timeout:
+              request: 360
+```
 
 ## 部署进阶
 
