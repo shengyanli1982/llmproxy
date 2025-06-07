@@ -10,12 +10,14 @@ use std::path::PathBuf;
     version,
     about = "An intelligent load balancer with smart scheduling that unifies diverse LLMs (Public/Private Cloud, vLLM, Ollama), \nenabling seamless multi-cloud and hybrid-cloud adoption little client-side code modifications.\n\n\
              Key Features:\n\
-             - Flexible Request Forwarding: Multiple, named forwarding instances with per-instance address/port and upstream group routing.\n\
-             - Powerful Upstream Management: Named upstream services with configurable URL, auth (Bearer/Basic/None), and header ops.\n\
-             - Intelligent Load Balancing: Upstream grouping with multiple load balancing strategies (RR, WRR, Random).\n\
-             - Fine-grained Traffic Control: IP-based rate limiting with configurable per-second requests and burst.\n\
-             - Robust Connectivity: Configurable timeouts, keepalive, retries, and outbound proxy support.\n\
-             - Easy Configuration & Extensibility: Clear, modular YAML configuration for easy setup and extensibility.\n\n\
+             - Unified LLM Access & High Availability: Manages multiple LLM services (public/private APIs, vLLM/Ollama) with intelligent routing and failover.\n\
+             - LLM-Optimized Load Balancing: Supports multiple strategies (round-robin, weighted, response-time aware, random, failover) specifically tuned for LLM workloads.\n\
+             - Powerful Fault Tolerance: Built-in circuit breaker pattern isolates failing upstream services to prevent cascading failures.\n\
+             - Seamless Scaling & Cost Control: Easily add or reduce upstream LLM services and prioritize resources through flexible load balancing.\n\
+             - Simplified Integration: Provides a unified API entry point while shielding backend differences with minimal client code changes.\n\
+             - Enhanced Observability: Detailed Prometheus metrics for real-time monitoring of LLM service calls and proxy performance.\n\
+             - Fine-grained Traffic Control: Configure rate limits and QoS policies to protect backend LLM services.\n\
+             - Enterprise-grade Security: Supports various authentication methods and secure connection management.\n\n\
              Author: shengyanli1982\n\
              Email: shengyanlee36@gmail.com\n\
              GitHub: https://github.com/shengyanli1982"
