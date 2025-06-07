@@ -268,20 +268,70 @@ async fn test_delete_referenced_upstream() {
     assert!(config.upstreams.iter().any(|u| u.name == "test_upstream"));
 }
 
-/// 测试删除不存在的上游服务（幂等性测试）
+/// 测试删除不存在的上游服务
 #[test]
 async fn test_delete_nonexistent_upstream() {
     // 设置测试环境
     let (config_state, _, _) = setup_test_env();
     let (_, mut processor) = create_task_processor(Arc::clone(&config_state), None);
 
-    // 尝试删除不存在的上游
+    // 删除不存在的上游
     let result = process_single_task(
         &mut processor,
         AdminTask::DeleteUpstream("nonexistent_upstream".to_string()),
     )
     .await;
 
-    // 应该成功（幂等性）
+    // 验证操作成功（幂等性）
     assert!(result.is_ok());
+}
+
+/// 测试删除上游服务的幂等性
+#[test]
+async fn test_delete_upstream_idempotent() {
+    // 设置测试环境
+    let (config_state, _, _) = setup_test_env();
+
+    // 先创建一个不被引用的上游
+    {
+        let (_, mut processor) = create_task_processor(Arc::clone(&config_state), None);
+        let new_upstream = UpstreamConfig {
+            name: "to_be_deleted".to_string(),
+            url: "http://localhost:9090".to_string(),
+            id: Uuid::new_v4().to_string(),
+            auth: None,
+            headers: vec![],
+            breaker: None,
+        };
+
+        let result =
+            process_single_task(&mut processor, AdminTask::CreateUpstream(new_upstream)).await;
+        assert!(result.is_ok());
+    }
+
+    // 第一次删除
+    {
+        let (_, mut processor) = create_task_processor(Arc::clone(&config_state), None);
+        let result = process_single_task(
+            &mut processor,
+            AdminTask::DeleteUpstream("to_be_deleted".to_string()),
+        )
+        .await;
+        assert!(result.is_ok());
+    }
+
+    // 第二次删除（测试幂等性）
+    {
+        let (_, mut processor) = create_task_processor(Arc::clone(&config_state), None);
+        let result = process_single_task(
+            &mut processor,
+            AdminTask::DeleteUpstream("to_be_deleted".to_string()),
+        )
+        .await;
+        assert!(result.is_ok(), "第二次删除应该成功，体现幂等性");
+    }
+
+    // 验证上游确实已被删除
+    let config = config_state.read().await;
+    assert!(!config.upstreams.iter().any(|u| u.name == "to_be_deleted"));
 }

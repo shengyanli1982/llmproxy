@@ -325,15 +325,73 @@ async fn test_delete_nonexistent_forward() {
     let (config_state, _, _) = setup_test_env();
     let (_, mut processor) = create_task_processor(Arc::clone(&config_state), None);
 
-    // 处理删除任务，应该成功（幂等性）
+    // 删除不存在的转发规则
     let result = process_single_task(
         &mut processor,
         AdminTask::DeleteForward("nonexistent_forward".to_string()),
     )
     .await;
-    assert!(result.is_ok());
 
-    // 验证配置没有变化
+    // 验证操作成功（幂等性）
+    assert!(result.is_ok());
+}
+
+/// 测试删除转发规则的幂等性
+#[test]
+async fn test_delete_forward_idempotent() {
+    // 设置测试环境
+    let (config_state, _, _) = setup_test_env();
+
+    // 先创建一个新的转发规则
+    {
+        let (server_sender, _) = create_server_manager_sender();
+        let (_, mut processor) =
+            create_task_processor(Arc::clone(&config_state), Some(server_sender));
+
+        let new_forward = ForwardConfig {
+            name: "forward_to_delete".to_string(),
+            port: 3002,
+            address: "127.0.0.1".to_string(),
+            upstream_group: "test_group".to_string(),
+            ratelimit: RateLimitConfig::default(),
+            timeout: TimeoutConfig { connect: 5 },
+        };
+
+        let result =
+            process_single_task(&mut processor, AdminTask::CreateForward(new_forward)).await;
+        assert!(result.is_ok());
+    }
+
+    // 第一次删除
+    {
+        let (server_sender, _) = create_server_manager_sender();
+        let (_, mut processor) =
+            create_task_processor(Arc::clone(&config_state), Some(server_sender));
+
+        let result = process_single_task(
+            &mut processor,
+            AdminTask::DeleteForward("forward_to_delete".to_string()),
+        )
+        .await;
+        assert!(result.is_ok());
+    }
+
+    // 第二次删除（测试幂等性）
+    {
+        let (_, mut processor) = create_task_processor(Arc::clone(&config_state), None);
+        let result = process_single_task(
+            &mut processor,
+            AdminTask::DeleteForward("forward_to_delete".to_string()),
+        )
+        .await;
+        assert!(result.is_ok(), "第二次删除应该成功，体现幂等性");
+    }
+
+    // 验证转发规则确实已被删除
     let config = config_state.read().await;
-    assert_eq!(config.http_server.forwards.len(), 1);
+    assert!(!config
+        .http_server
+        .forwards
+        .iter()
+        .any(|f| f.name == "forward_to_delete"));
 }

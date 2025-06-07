@@ -328,20 +328,76 @@ async fn test_delete_referenced_upstream_group() {
         .any(|g| g.name == "test_group"));
 }
 
-/// 测试删除不存在的上游组（幂等性测试）
+/// 测试删除不存在的上游组
 #[test]
 async fn test_delete_nonexistent_upstream_group() {
     // 设置测试环境
     let (config_state, _, _) = setup_test_env();
     let (_, mut processor) = create_task_processor(Arc::clone(&config_state), None);
 
-    // 尝试删除不存在的上游组
+    // 删除不存在的上游组
     let result = process_single_task(
         &mut processor,
         AdminTask::DeleteUpstreamGroup("nonexistent_group".to_string()),
     )
     .await;
 
-    // 应该成功（幂等性）
+    // 验证操作成功（幂等性）
     assert!(result.is_ok());
+}
+
+/// 测试删除上游组的幂等性
+#[test]
+async fn test_delete_upstream_group_idempotent() {
+    // 设置测试环境
+    let (config_state, _, _) = setup_test_env();
+
+    // 先创建一个不被引用的上游组
+    {
+        let (_, mut processor) = create_task_processor(Arc::clone(&config_state), None);
+        let new_group = UpstreamGroupConfig {
+            name: "group_to_delete".to_string(),
+            upstreams: vec![UpstreamRef {
+                name: "test_upstream".to_string(),
+                weight: 1,
+            }],
+            balance: BalanceConfig {
+                strategy: BalanceStrategy::RoundRobin,
+            },
+            http_client: HttpClientConfig::default(),
+        };
+
+        let result =
+            process_single_task(&mut processor, AdminTask::CreateUpstreamGroup(new_group)).await;
+        assert!(result.is_ok());
+    }
+
+    // 第一次删除
+    {
+        let (_, mut processor) = create_task_processor(Arc::clone(&config_state), None);
+        let result = process_single_task(
+            &mut processor,
+            AdminTask::DeleteUpstreamGroup("group_to_delete".to_string()),
+        )
+        .await;
+        assert!(result.is_ok());
+    }
+
+    // 第二次删除（测试幂等性）
+    {
+        let (_, mut processor) = create_task_processor(Arc::clone(&config_state), None);
+        let result = process_single_task(
+            &mut processor,
+            AdminTask::DeleteUpstreamGroup("group_to_delete".to_string()),
+        )
+        .await;
+        assert!(result.is_ok(), "第二次删除应该成功，体现幂等性");
+    }
+
+    // 验证上游组确实已被删除
+    let config = config_state.read().await;
+    assert!(!config
+        .upstream_groups
+        .iter()
+        .any(|g| g.name == "group_to_delete"));
 }
