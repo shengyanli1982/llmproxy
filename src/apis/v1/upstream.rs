@@ -10,14 +10,17 @@ use axum::{
 };
 use tracing::debug;
 
+const UPSTREAM_PATH: &str = "/api/v1/admin/upstreams";
+const UPSTREAM_PATH_WITH_NAME: &str = "/api/v1/admin/upstreams/{name}";
+
 // 上游路由
 pub fn upstream_routes(config: ConfigState, sender: TaskSender) -> Router {
     Router::new()
-        .route("/api/v1/admin/upstreams", get(list_upstreams))
-        .route("/api/v1/admin/upstreams", post(create_upstream))
-        .route("/api/v1/admin/upstreams/{name}", get(get_upstream))
-        .route("/api/v1/admin/upstreams/{name}", put(update_upstream))
-        .route("/api/v1/admin/upstreams/{name}", delete(delete_upstream))
+        .route(UPSTREAM_PATH, get(list_upstreams))
+        .route(UPSTREAM_PATH, post(create_upstream))
+        .route(UPSTREAM_PATH_WITH_NAME, get(get_upstream))
+        .route(UPSTREAM_PATH_WITH_NAME, put(update_upstream))
+        .route(UPSTREAM_PATH_WITH_NAME, delete(delete_upstream))
         .with_state((config, sender))
 }
 

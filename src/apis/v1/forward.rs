@@ -13,6 +13,9 @@ use axum::{
 };
 use tracing::debug;
 
+const FORWARD_PATH: &str = "/api/v1/admin/forwards";
+const FORWARD_PATH_WITH_NAME: &str = "/api/v1/admin/forwards/{name}";
+
 // 转发规则路由
 pub fn forward_routes(
     config: ConfigState,
@@ -20,11 +23,11 @@ pub fn forward_routes(
     server_manager_sender: ServerManagerSender,
 ) -> Router {
     Router::new()
-        .route("/api/v1/admin/forwards", get(list_forwards))
-        .route("/api/v1/admin/forwards", post(create_forward))
-        .route("/api/v1/admin/forwards/{name}", get(get_forward))
-        .route("/api/v1/admin/forwards/{name}", put(update_forward))
-        .route("/api/v1/admin/forwards/{name}", delete(delete_forward))
+        .route(FORWARD_PATH, get(list_forwards))
+        .route(FORWARD_PATH, post(create_forward))
+        .route(FORWARD_PATH_WITH_NAME, get(get_forward))
+        .route(FORWARD_PATH_WITH_NAME, put(update_forward))
+        .route(FORWARD_PATH_WITH_NAME, delete(delete_forward))
         .with_state((config, sender, server_manager_sender))
 }
 

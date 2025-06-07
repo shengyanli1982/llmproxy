@@ -384,7 +384,10 @@ async fn test_delete_forward_idempotent() {
             AdminTask::DeleteForward("forward_to_delete".to_string()),
         )
         .await;
-        assert!(result.is_ok(), "第二次删除应该成功，体现幂等性");
+        assert!(
+            result.is_ok(),
+            "Second deletion should succeed, demonstrating idempotence"
+        );
     }
 
     // 验证转发规则确实已被删除

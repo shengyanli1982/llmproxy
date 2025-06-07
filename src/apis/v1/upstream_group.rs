@@ -10,23 +10,17 @@ use axum::{
 };
 use tracing::debug;
 
+const UPSTREAM_GROUP_PATH: &str = "/api/v1/admin/upstreamgroups";
+const UPSTREAM_GROUP_PATH_WITH_NAME: &str = "/api/v1/admin/upstreamgroups/{name}";
+
 // 上游组路由
 pub fn upstream_group_routes(config: ConfigState, sender: TaskSender) -> Router {
     Router::new()
-        .route("/api/v1/admin/upstreamgroups", get(list_upstream_groups))
-        .route("/api/v1/admin/upstreamgroups", post(create_upstream_group))
-        .route(
-            "/api/v1/admin/upstreamgroups/{name}",
-            get(get_upstream_group),
-        )
-        .route(
-            "/api/v1/admin/upstreamgroups/{name}",
-            put(update_upstream_group),
-        )
-        .route(
-            "/api/v1/admin/upstreamgroups/{name}",
-            delete(delete_upstream_group),
-        )
+        .route(UPSTREAM_GROUP_PATH, get(list_upstream_groups))
+        .route(UPSTREAM_GROUP_PATH, post(create_upstream_group))
+        .route(UPSTREAM_GROUP_PATH_WITH_NAME, get(get_upstream_group))
+        .route(UPSTREAM_GROUP_PATH_WITH_NAME, put(update_upstream_group))
+        .route(UPSTREAM_GROUP_PATH_WITH_NAME, delete(delete_upstream_group))
         .with_state((config, sender))
 }
 

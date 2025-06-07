@@ -31,7 +31,7 @@ async fn test_complete_resource_lifecycle() {
         let (_, mut processor) = create_task_processor(Arc::clone(&config_state), None);
         let result =
             process_single_task(&mut processor, AdminTask::CreateUpstream(upstream.clone())).await;
-        assert!(result.is_ok(), "创建上游失败: {:?}", result);
+        assert!(result.is_ok(), "Failed to create upstream: {:?}", result);
     }
 
     // 2. 创建一个引用该上游的上游组
@@ -56,7 +56,11 @@ async fn test_complete_resource_lifecycle() {
             AdminTask::CreateUpstreamGroup(group.clone()),
         )
         .await;
-        assert!(result.is_ok(), "创建上游组失败: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Failed to create upstream group: {:?}",
+            result
+        );
     }
 
     // 3. 创建一个引用该上游组的转发规则
@@ -75,7 +79,7 @@ async fn test_complete_resource_lifecycle() {
         let (_, mut processor) = create_task_processor(Arc::clone(&config_state), None);
         let result =
             process_single_task(&mut processor, AdminTask::CreateForward(forward.clone())).await;
-        assert!(result.is_ok(), "创建转发规则失败: {:?}", result);
+        assert!(result.is_ok(), "Failed to create forward: {:?}", result);
     }
 
     // 4. 验证所有资源都已创建
@@ -83,11 +87,11 @@ async fn test_complete_resource_lifecycle() {
         let config = config_state.read().await;
         assert!(
             config.upstreams.iter().any(|u| u.name == upstream_name),
-            "上游未创建成功"
+            "Upstream was not created successfully"
         );
         assert!(
             config.upstream_groups.iter().any(|g| g.name == group_name),
-            "上游组未创建成功"
+            "Upstream group was not created successfully"
         );
         assert!(
             config
@@ -95,7 +99,7 @@ async fn test_complete_resource_lifecycle() {
                 .forwards
                 .iter()
                 .any(|f| f.name == forward_name),
-            "转发规则未创建成功"
+            "Forward rule was not created successfully"
         );
     }
 
@@ -108,7 +112,10 @@ async fn test_complete_resource_lifecycle() {
         )
         .await;
 
-        assert!(result.is_err(), "删除被引用的上游应该失败");
+        assert!(
+            result.is_err(),
+            "Deleting a referenced upstream should fail"
+        );
         match result {
             Err(ApiError::StillReferenced {
                 resource_type,
@@ -118,7 +125,7 @@ async fn test_complete_resource_lifecycle() {
                 assert_eq!(resource_type, "Upstream");
                 assert_eq!(name, upstream_name);
             }
-            _ => panic!("预期 StillReferenced 错误，但得到: {:?}", result),
+            _ => panic!("Expected StillReferenced error, but got: {:?}", result),
         }
     }
 
@@ -131,17 +138,22 @@ async fn test_complete_resource_lifecycle() {
         )
         .await;
 
-        assert!(result.is_err(), "删除被引用的上游组应该失败");
+        assert!(
+            result.is_err(),
+            "Deleting a referenced upstream group should fail"
+        );
         match result {
             Err(ApiError::StillReferenced {
                 resource_type,
                 name,
-                ..
+                referenced_by,
             }) => {
                 assert_eq!(resource_type, "UpstreamGroup");
                 assert_eq!(name, group_name);
+                assert_eq!(referenced_by.len(), 1);
+                assert!(referenced_by[0].contains(forward_name));
             }
-            _ => panic!("预期 StillReferenced 错误，但得到: {:?}", result),
+            _ => panic!("Expected StillReferenced error, but got: {:?}", result),
         }
     }
 
@@ -154,7 +166,7 @@ async fn test_complete_resource_lifecycle() {
         )
         .await;
 
-        assert!(result.is_ok(), "删除转发规则失败: {:?}", result);
+        assert!(result.is_ok(), "Failed to delete forward: {:?}", result);
     }
 
     // 8. 现在可以删除上游组
@@ -166,7 +178,11 @@ async fn test_complete_resource_lifecycle() {
         )
         .await;
 
-        assert!(result.is_ok(), "删除上游组失败: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Failed to delete upstream group: {:?}",
+            result
+        );
     }
 
     // 9. 最后可以删除上游
@@ -178,7 +194,7 @@ async fn test_complete_resource_lifecycle() {
         )
         .await;
 
-        assert!(result.is_ok(), "删除上游失败: {:?}", result);
+        assert!(result.is_ok(), "Failed to delete upstream: {:?}", result);
     }
 
     // 10. 验证所有资源都已删除
@@ -186,11 +202,11 @@ async fn test_complete_resource_lifecycle() {
         let config = config_state.read().await;
         assert!(
             !config.upstreams.iter().any(|u| u.name == upstream_name),
-            "上游未删除成功"
+            "Upstream was not deleted successfully"
         );
         assert!(
             !config.upstream_groups.iter().any(|g| g.name == group_name),
-            "上游组未删除成功"
+            "Upstream group was not deleted successfully"
         );
         assert!(
             !config
@@ -198,7 +214,7 @@ async fn test_complete_resource_lifecycle() {
                 .forwards
                 .iter()
                 .any(|f| f.name == forward_name),
-            "转发规则未删除成功"
+            "Forward rule was not deleted successfully"
         );
     }
 }
@@ -300,12 +316,12 @@ async fn test_concurrent_operations() {
     // 验证所有操作都成功
     assert!(
         update_upstream_result.is_ok(),
-        "更新上游失败: {:?}",
+        "Failed to update upstream: {:?}",
         update_upstream_result
     );
     assert!(
         update_group_result.is_ok(),
-        "更新上游组失败: {:?}",
+        "Failed to update upstream group: {:?}",
         update_group_result
     );
 
@@ -318,7 +334,7 @@ async fn test_concurrent_operations() {
             .upstreams
             .iter()
             .find(|u| u.name == upstream_name)
-            .expect("上游不存在");
+            .expect("Upstream does not exist");
         assert_eq!(upstream.url, "http://updated-concurrent:9090");
 
         // 验证上游组已更新
@@ -326,7 +342,7 @@ async fn test_concurrent_operations() {
             .upstream_groups
             .iter()
             .find(|g| g.name == group_name)
-            .expect("上游组不存在");
+            .expect("Upstream group does not exist");
         assert_eq!(group.upstreams[0].weight, 2);
     }
 }
@@ -468,7 +484,10 @@ async fn test_cascading_reference_check() {
         )
         .await;
 
-        assert!(result.is_err(), "删除被多个上游组引用的上游应该失败");
+        assert!(
+            result.is_err(),
+            "Deleting an upstream referenced by multiple groups should fail"
+        );
         match result {
             Err(ApiError::StillReferenced {
                 resource_type,
@@ -482,7 +501,7 @@ async fn test_cascading_reference_check() {
                 assert!(referenced_by.iter().any(|r| r.contains(group1_name)));
                 assert!(referenced_by.iter().any(|r| r.contains(group2_name)));
             }
-            _ => panic!("预期 StillReferenced 错误，但得到: {:?}", result),
+            _ => panic!("Expected StillReferenced error, but got: {:?}", result),
         }
     }
 
@@ -495,7 +514,10 @@ async fn test_cascading_reference_check() {
         )
         .await;
 
-        assert!(result.is_err(), "删除被转发规则引用的上游组应该失败");
+        assert!(
+            result.is_err(),
+            "Deleting an upstream group referenced by a forward rule should fail"
+        );
         match result {
             Err(ApiError::StillReferenced {
                 resource_type,
@@ -507,7 +529,7 @@ async fn test_cascading_reference_check() {
                 assert_eq!(referenced_by.len(), 1);
                 assert!(referenced_by[0].contains(forward1_name));
             }
-            _ => panic!("预期 StillReferenced 错误，但得到: {:?}", result),
+            _ => panic!("Expected StillReferenced error, but got: {:?}", result),
         }
     }
 
@@ -520,7 +542,7 @@ async fn test_cascading_reference_check() {
         )
         .await;
 
-        assert!(result.is_ok(), "删除转发规则1失败: {:?}", result);
+        assert!(result.is_ok(), "Failed to delete forward 1: {:?}", result);
     }
 
     // 10. 现在可以删除上游组1
@@ -532,7 +554,11 @@ async fn test_cascading_reference_check() {
         )
         .await;
 
-        assert!(result.is_ok(), "删除上游组1失败: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Failed to delete upstream group 1: {:?}",
+            result
+        );
     }
 
     // 11. 尝试删除上游1 (仍应该失败，因为还被上游组2引用)
@@ -544,7 +570,10 @@ async fn test_cascading_reference_check() {
         )
         .await;
 
-        assert!(result.is_err(), "删除仍被上游组2引用的上游1应该失败");
+        assert!(
+            result.is_err(),
+            "Deleting upstream 1 still referenced by group 2 should fail"
+        );
         match result {
             Err(ApiError::StillReferenced {
                 resource_type,
@@ -556,7 +585,7 @@ async fn test_cascading_reference_check() {
                 assert_eq!(referenced_by.len(), 1);
                 assert!(referenced_by[0].contains(group2_name));
             }
-            _ => panic!("预期 StillReferenced 错误，但得到: {:?}", result),
+            _ => panic!("Expected StillReferenced error, but got: {:?}", result),
         }
     }
 
@@ -569,7 +598,7 @@ async fn test_cascading_reference_check() {
         )
         .await;
 
-        assert!(result.is_ok(), "删除转发规则2失败: {:?}", result);
+        assert!(result.is_ok(), "Failed to delete forward 2: {:?}", result);
     }
 
     // 13. 删除上游组2
@@ -581,7 +610,11 @@ async fn test_cascading_reference_check() {
         )
         .await;
 
-        assert!(result.is_ok(), "删除上游组2失败: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Failed to delete upstream group 2: {:?}",
+            result
+        );
     }
 
     // 14. 现在可以删除上游1和上游2
@@ -593,7 +626,7 @@ async fn test_cascading_reference_check() {
         )
         .await;
 
-        assert!(result.is_ok(), "删除上游1失败: {:?}", result);
+        assert!(result.is_ok(), "Failed to delete upstream 1: {:?}", result);
     }
 
     {
@@ -604,7 +637,7 @@ async fn test_cascading_reference_check() {
         )
         .await;
 
-        assert!(result.is_ok(), "删除上游2失败: {:?}", result);
+        assert!(result.is_ok(), "Failed to delete upstream 2: {:?}", result);
     }
 
     // 15. 验证所有资源都已删除

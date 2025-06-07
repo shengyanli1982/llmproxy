@@ -391,7 +391,10 @@ async fn test_delete_upstream_group_idempotent() {
             AdminTask::DeleteUpstreamGroup("group_to_delete".to_string()),
         )
         .await;
-        assert!(result.is_ok(), "第二次删除应该成功，体现幂等性");
+        assert!(
+            result.is_ok(),
+            "Second deletion should succeed, demonstrating idempotence"
+        );
     }
 
     // 验证上游组确实已被删除
