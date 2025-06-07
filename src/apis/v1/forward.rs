@@ -22,9 +22,9 @@ pub fn forward_routes(
     Router::new()
         .route("/api/v1/admin/forwards", get(list_forwards))
         .route("/api/v1/admin/forwards", post(create_forward))
-        .route("/api/v1/admin/forwards/:name", get(get_forward))
-        .route("/api/v1/admin/forwards/:name", put(update_forward))
-        .route("/api/v1/admin/forwards/:name", delete(delete_forward))
+        .route("/api/v1/admin/forwards/{name}", get(get_forward))
+        .route("/api/v1/admin/forwards/{name}", put(update_forward))
+        .route("/api/v1/admin/forwards/{name}", delete(delete_forward))
         .with_state((config, sender, server_manager_sender))
 }
 

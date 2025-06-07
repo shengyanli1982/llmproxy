@@ -16,15 +16,15 @@ pub fn upstream_group_routes(config: ConfigState, sender: TaskSender) -> Router 
         .route("/api/v1/admin/upstream-groups", get(list_upstream_groups))
         .route("/api/v1/admin/upstream-groups", post(create_upstream_group))
         .route(
-            "/api/v1/admin/upstream-groups/:name",
+            "/api/v1/admin/upstream-groups/{name}",
             get(get_upstream_group),
         )
         .route(
-            "/api/v1/admin/upstream-groups/:name",
+            "/api/v1/admin/upstream-groups/{name}",
             put(update_upstream_group),
         )
         .route(
-            "/api/v1/admin/upstream-groups/:name",
+            "/api/v1/admin/upstream-groups/{name}",
             delete(delete_upstream_group),
         )
         .with_state((config, sender))

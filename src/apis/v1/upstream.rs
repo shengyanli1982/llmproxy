@@ -15,9 +15,9 @@ pub fn upstream_routes(config: ConfigState, sender: TaskSender) -> Router {
     Router::new()
         .route("/api/v1/admin/upstreams", get(list_upstreams))
         .route("/api/v1/admin/upstreams", post(create_upstream))
-        .route("/api/v1/admin/upstreams/:name", get(get_upstream))
-        .route("/api/v1/admin/upstreams/:name", put(update_upstream))
-        .route("/api/v1/admin/upstreams/:name", delete(delete_upstream))
+        .route("/api/v1/admin/upstreams/{name}", get(get_upstream))
+        .route("/api/v1/admin/upstreams/{name}", put(update_upstream))
+        .route("/api/v1/admin/upstreams/{name}", delete(delete_upstream))
         .with_state((config, sender))
 }
 
