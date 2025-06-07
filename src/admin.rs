@@ -1,3 +1,5 @@
+use crate::apis::v1::{create_admin_api_router, types::ServerManagerSender};
+use crate::config::Config;
 use crate::error::AppError;
 use crate::metrics::METRICS;
 use async_trait::async_trait;
@@ -9,6 +11,7 @@ use axum::{
 };
 use prometheus::{Encoder, TextEncoder};
 use std::net::SocketAddr;
+use std::sync::{Arc, RwLock};
 use tokio::net::TcpListener;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemHandle};
 use tracing::{error, info};
@@ -17,22 +20,38 @@ use tracing::{error, info};
 pub struct AdminServer {
     // 监听地址
     addr: SocketAddr,
+    // 配置引用
+    config: Arc<RwLock<Config>>,
+    // 服务器管理任务发送器
+    sender: ServerManagerSender,
 }
 
 impl AdminServer {
     // 创建新的管理服务
-    pub fn new(addr: SocketAddr) -> Self {
-        Self { addr }
+    pub fn new(
+        addr: SocketAddr,
+        config: Arc<RwLock<Config>>,
+        server_manager_sender: ServerManagerSender,
+    ) -> Self {
+        Self {
+            addr,
+            config,
+            sender: server_manager_sender,
+        }
     }
 }
 
 #[async_trait]
 impl IntoSubsystem<AppError> for AdminServer {
     async fn run(self, subsys: SubsystemHandle) -> Result<(), AppError> {
+        // 创建 API 路由
+        let api_router = create_admin_api_router(Arc::clone(&self.config), self.sender);
+
         // 创建路由
         let app = Router::new()
             .route("/health", get(health_handler))
-            .route("/metrics", get(metrics_handler));
+            .route("/metrics", get(metrics_handler))
+            .merge(api_router);
 
         // 绑定TCP监听器
         let listener = match TcpListener::bind(self.addr).await {

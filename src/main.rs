@@ -2,10 +2,11 @@ use llmproxy::admin::AdminServer;
 use llmproxy::args::Args;
 use llmproxy::config::Config;
 use llmproxy::error::AppError;
-use llmproxy::server::ForwardServer;
+use llmproxy::manager::ServerManager;
 use llmproxy::upstream::UpstreamManager;
 use mimalloc::MiMalloc;
 use std::process;
+use std::sync::{Arc, RwLock};
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemBuilder, Toplevel};
 use tracing::{error, info};
 
@@ -62,8 +63,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
+    // 创建共享配置引用
+    let shared_config = Arc::new(RwLock::new(config));
+
     // 创建应用组件
-    let components = match create_components(config).await {
+    let components = match create_components(Arc::clone(&shared_config)).await {
         Ok(components) => components,
         Err(e) => {
             error!("Failed to create application components: {}", e);
@@ -73,19 +77,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 创建优雅关闭顶层管理器
     let toplevel = Toplevel::new(|s| async move {
+        // 启动服务器管理子系统
+        let server_manager = components.server_manager;
+        s.start(SubsystemBuilder::new(
+            "server_manager",
+            move |s| async move { server_manager.run(s).await },
+        ));
+
         // 启动管理服务子系统
         let admin_server = components.admin_server;
         s.start(SubsystemBuilder::new("admin_server", move |s| async move {
             admin_server.run(s).await
         }));
-
-        // 启动所有转发服务子系统
-        for (i, forward_server) in components.forward_servers.into_iter().enumerate() {
-            let subsystem_name = format!("forward_server_{}", i);
-            s.start(SubsystemBuilder::new(subsystem_name, move |s| async move {
-                forward_server.run(s).await
-            }));
-        }
     });
 
     // 等待关闭
@@ -110,56 +113,56 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 struct AppComponents {
     // 管理服务
     admin_server: AdminServer,
-    // 转发服务列表
-    forward_servers: Vec<ForwardServer>,
+    // 服务器管理器
+    server_manager: ServerManager,
 }
 
 // 创建应用组件
-async fn create_components(config: Config) -> Result<AppComponents, AppError> {
+async fn create_components(shared_config: Arc<RwLock<Config>>) -> Result<AppComponents, AppError> {
+    // 获取配置的只读视图并克隆必要数据，然后释放锁
+    let (upstreams, upstream_groups, admin_address, admin_port) = {
+        let config = shared_config.read().unwrap();
+        (
+            config.upstreams.clone(),
+            config.upstream_groups.clone(),
+            config.http_server.admin.address.clone(),
+            config.http_server.admin.port,
+        )
+    };
+
     // 创建上游管理器
-    let upstream_manager: std::sync::Arc<UpstreamManager> =
-        match UpstreamManager::new(config.upstreams, config.upstream_groups).await {
-            Ok(manager) => std::sync::Arc::new(manager),
+    let upstream_manager: Arc<UpstreamManager> =
+        match UpstreamManager::new(upstreams, upstream_groups).await {
+            Ok(manager) => Arc::new(manager),
             Err(e) => {
                 error!("Failed to initialize upstream manager: {}", e);
                 return Err(e);
             }
         };
 
-    // 创建管理服务
-    let admin_addr = format!(
-        "{}:{}",
-        config.http_server.admin.address, config.http_server.admin.port
-    )
-    .parse()
-    .map_err(|e| AppError::Config(format!("Invalid admin server address: {}", e)))?;
-    let admin_server = AdminServer::new(admin_addr);
-    info!("Admin server initialized successfully: {}", admin_addr);
+    // 创建服务器管理器
+    let (server_sender, server_receiver) = ServerManager::create_channel();
+    let server_manager = ServerManager::new(
+        Arc::clone(&shared_config),
+        upstream_manager.clone(),
+        server_receiver,
+    );
+    info!("Server manager initialized successfully");
 
-    // 创建转发服务
-    let mut forward_servers = Vec::with_capacity(config.http_server.forwards.len());
-    for forward_config in &config.http_server.forwards {
-        match ForwardServer::new(forward_config.clone(), upstream_manager.clone()) {
-            Ok(server) => {
-                info!(
-                    "Forwarding service {} initialized successfully",
-                    forward_config.name
-                );
-                forward_servers.push(server);
-            }
-            Err(e) => {
-                error!(
-                    "Failed to initialize forwarding service {}: {}",
-                    forward_config.name, e
-                );
-                return Err(e);
-            }
-        }
-    }
+    // 创建管理服务
+    let admin_addr = format!("{}:{}", admin_address, admin_port)
+        .parse()
+        .map_err(|e| AppError::Config(format!("Invalid admin server address: {}", e)))?;
+    let admin_server = AdminServer::new(
+        admin_addr,
+        Arc::clone(&shared_config),
+        server_sender.clone(),
+    );
+    info!("Admin server initialized successfully: {}", admin_addr);
 
     // 返回应用组件
     Ok(AppComponents {
         admin_server,
-        forward_servers,
+        server_manager,
     })
 }

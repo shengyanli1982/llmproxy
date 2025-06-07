@@ -1,11 +1,13 @@
 // 导出所有公共模块
 pub mod admin;
+pub mod apis;
 pub mod args;
 pub mod balancer;
 pub mod breaker;
 pub mod config;
 pub mod r#const;
 pub mod error;
+pub mod manager;
 pub mod metrics;
 pub mod server;
 pub mod upstream;

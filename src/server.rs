@@ -58,6 +58,96 @@ impl ForwardServer {
     pub fn get_addr(&self) -> &SocketAddr {
         &self.addr
     }
+
+    // 使用外部关闭信号运行服务
+    pub async fn run_with_shutdown(
+        self,
+        shutdown_rx: tokio::sync::oneshot::Receiver<()>,
+    ) -> Result<(), AppError> {
+        // 创建路由
+        let app = Router::new()
+            .route("/{*path}", axum::routing::any(forward_handler))
+            .with_state(self.state.clone());
+
+        // 应用超时配置
+        let timeout_config = &self.state.config.timeout;
+
+        // 创建服务构建器和层
+        let layers = tower::ServiceBuilder::new()
+            // 添加连接超时中间件
+            .layer(TimeoutLayer::new(Duration::from_secs(
+                timeout_config.connect,
+            )));
+
+        // 应用所有中间件
+        let mut app = app.layer(layers.into_inner());
+
+        // 如果启用了限流，添加限流中间件
+        if self.state.config.ratelimit.enabled {
+            // 获取转发服务名称，用于指标记录
+            let forward_name = self.state.config.name.clone();
+
+            // 创建限流配置
+            let governor_conf = GovernorConfigBuilder::default()
+                .per_second(self.state.config.ratelimit.per_second as u64)
+                .burst_size(self.state.config.ratelimit.burst)
+                // 添加自定义错误处理，记录限流指标
+                .error_handler(move |err: GovernorError| {
+                    if let GovernorError::TooManyRequests { .. } = err {
+                        // 记录限流指标
+                        METRICS
+                            .ratelimit_total()
+                            .with_label_values(&[&forward_name])
+                            .inc();
+                    }
+
+                    let status = match err {
+                        GovernorError::TooManyRequests { .. } => StatusCode::TOO_MANY_REQUESTS,
+                        _ => StatusCode::INTERNAL_SERVER_ERROR,
+                    };
+
+                    status.into_response()
+                })
+                .finish()
+                .unwrap();
+
+            // 创建限流中间件并应用
+            app = app.layer(GovernorLayer {
+                config: Arc::new(governor_conf),
+            });
+        }
+
+        // 绑定TCP监听器
+        let listener = match TcpListener::bind(self.addr).await {
+            Ok(listener) => {
+                info!(
+                    "Forwarding service {} listening on {}",
+                    self.state.config.name, self.addr
+                );
+                listener
+            }
+            Err(e) => {
+                error!("Failed to bind forwarding service: {}", e);
+                return Err(AppError::Io(e));
+            }
+        };
+
+        // 使用tokio::select!监听服务器和关闭信号
+        tokio::select! {
+            result = axum::serve(listener, app) => {
+                if let Err(e) = result {
+                    error!("Forwarding service error: {}", e);
+                } else {
+                    info!("Forwarding service completed normally");
+                }
+                Ok(())
+            }
+            _ = shutdown_rx => {
+                info!("Shutdown signal received, stopping forwarding service");
+                Ok(())
+            }
+        }
+    }
 }
 
 // 检查响应是否为流式响应
