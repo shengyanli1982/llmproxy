@@ -36,10 +36,7 @@ async fn list_forwards(
 ) -> Result<Json<ApiResponse<PaginatedResponse<ForwardConfig>>>, ApiError> {
     // 获取配置并立即释放锁
     let forwards = {
-        let config_guard = config
-            .read()
-            .map_err(|e| ApiError::InternalError(format!("Failed to read config: {}", e)))?;
-
+        let config_guard = config.read().await;
         config_guard.http_server.forwards.clone()
     };
 
@@ -103,9 +100,7 @@ async fn get_forward(
 ) -> Result<Json<ApiResponse<ForwardConfig>>, ApiError> {
     // 获取配置并立即释放锁
     let forward = {
-        let config_guard = config
-            .read()
-            .map_err(|e| ApiError::InternalError(format!("Failed to read config: {}", e)))?;
+        let config_guard = config.read().await;
 
         config_guard
             .http_server
@@ -145,9 +140,7 @@ async fn update_forward(
 
     // 获取当前配置并立即释放锁
     let current_forward = {
-        let config_guard = config
-            .read()
-            .map_err(|e| ApiError::InternalError(format!("Failed to read config: {}", e)))?;
+        let config_guard = config.read().await;
 
         // 查找当前的转发规则
         config_guard

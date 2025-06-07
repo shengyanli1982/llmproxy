@@ -6,7 +6,8 @@ use llmproxy::manager::ServerManager;
 use llmproxy::upstream::UpstreamManager;
 use mimalloc::MiMalloc;
 use std::process;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemBuilder, Toplevel};
 use tracing::{error, info};
 
@@ -121,7 +122,7 @@ struct AppComponents {
 async fn create_components(shared_config: Arc<RwLock<Config>>) -> Result<AppComponents, AppError> {
     // 获取配置的只读视图并克隆必要数据，然后释放锁
     let (upstreams, upstream_groups, admin_address, admin_port) = {
-        let config = shared_config.read().unwrap();
+        let config = shared_config.read().await;
         (
             config.upstreams.clone(),
             config.upstream_groups.clone(),

@@ -6,13 +6,13 @@ use crate::upstream::UpstreamManager;
 use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
 use std::net::SocketAddr;
-use std::sync::{Arc, RwLock};
-use tokio::sync::mpsc;
+use std::sync::Arc;
+use tokio::sync::{mpsc, RwLock};
 use tokio::task::JoinHandle;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemHandle};
 use tracing::{debug, error, info};
 
-const SERVER_MANAGER_TASK_CHANNEL_SIZE: usize = 1024;
+pub const SERVER_MANAGER_TASK_CHANNEL_SIZE: usize = 1024;
 
 // 服务器管理器
 pub struct ServerManager {
@@ -55,7 +55,7 @@ impl ServerManager {
     // 启动初始服务器
     async fn start_initial_servers(&mut self) -> Result<(), AppError> {
         let forwards = {
-            let config = self.config.read().unwrap();
+            let config = self.config.read().await;
             config.http_server.forwards.clone()
         };
 
@@ -150,7 +150,7 @@ impl ServerManager {
     async fn update_servers(&mut self) -> Result<(), AppError> {
         // 获取需要的配置数据，并在读取后立即释放锁
         let (configured_servers, to_start) = {
-            let config = self.config.read().unwrap();
+            let config = self.config.read().await;
 
             // 获取当前配置中的所有转发规则名称
             let configured_servers: HashSet<String> = config

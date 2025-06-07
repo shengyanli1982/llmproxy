@@ -29,9 +29,7 @@ async fn list_upstreams(
 ) -> Result<Json<ApiResponse<PaginatedResponse<UpstreamConfig>>>, ApiError> {
     // 获取配置并立即释放锁
     let upstreams = {
-        let config_guard = config
-            .read()
-            .map_err(|e| ApiError::InternalError(format!("Failed to read config: {}", e)))?;
+        let config_guard = config.read().await;
 
         config_guard.upstreams.clone()
     };
@@ -84,9 +82,7 @@ async fn get_upstream(
 ) -> Result<Json<ApiResponse<UpstreamConfig>>, ApiError> {
     // 获取配置并立即释放锁
     let upstream = {
-        let config_guard = config
-            .read()
-            .map_err(|e| ApiError::InternalError(format!("Failed to read config: {}", e)))?;
+        let config_guard = config.read().await;
 
         config_guard
             .upstreams

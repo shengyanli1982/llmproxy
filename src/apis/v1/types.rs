@@ -1,7 +1,7 @@
 use crate::config::{Config, ForwardConfig, UpstreamConfig, UpstreamGroupConfig};
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, RwLock};
-use tokio::sync::mpsc;
+use std::sync::Arc;
+use tokio::sync::{mpsc, RwLock};
 
 // 配置状态，使用读写锁保护
 pub type ConfigState = Arc<RwLock<Config>>;
@@ -46,6 +46,8 @@ pub struct TaskProcessor {
     pub receiver: mpsc::Receiver<AdminTask>,
     // 配置状态
     pub config: ConfigState,
+    // 服务器管理器发送器
+    pub sender: Option<ServerManagerSender>,
 }
 
 // 任务发送器

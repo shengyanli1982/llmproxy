@@ -1,6 +1,6 @@
 use crate::apis::v1::{
     error::ApiError,
-    types::{AdminTask, TaskProcessor, TaskResult},
+    types::{AdminTask, ServerManagerTask, TaskProcessor, TaskResult},
     validation::ConfigValidation,
 };
 use crate::config::{Config, ForwardConfig, UpstreamConfig, UpstreamGroupConfig};
@@ -49,12 +49,8 @@ impl TaskService {
         info!("Admin API task processor stopped");
     }
 
-    pub fn get_config(processor: &TaskProcessor) -> Result<Config, ApiError> {
-        processor
-            .config
-            .read()
-            .map(|config| config.clone())
-            .map_err(|e| ApiError::InternalError(format!("Failed to read config: {}", e)))
+    pub async fn get_config(processor: &TaskProcessor) -> Result<Config, ApiError> {
+        Ok(processor.config.read().await.clone())
     }
 
     // ===== 上游处理方法 =====
@@ -64,10 +60,7 @@ impl TaskService {
     ) -> TaskResult {
         debug!("Creating upstream: {}", upstream.name);
 
-        let mut config = processor
-            .config
-            .write()
-            .map_err(|e| ApiError::InternalError(format!("Failed to acquire write lock: {}", e)))?;
+        let mut config = processor.config.write().await;
 
         // 检查名称是否已存在
         if config.upstreams.iter().any(|u| u.name == upstream.name) {
@@ -96,10 +89,7 @@ impl TaskService {
     ) -> TaskResult {
         debug!("Updating upstream: {}", name);
 
-        let mut config = processor
-            .config
-            .write()
-            .map_err(|e| ApiError::InternalError(format!("Failed to acquire write lock: {}", e)))?;
+        let mut config = processor.config.write().await;
 
         // 查找要更新的上游索引
         let index = config
@@ -134,10 +124,7 @@ impl TaskService {
     async fn delete_upstream(processor: &mut TaskProcessor, name: String) -> TaskResult {
         debug!("Deleting upstream: {}", name);
 
-        let mut config = processor
-            .config
-            .write()
-            .map_err(|e| ApiError::InternalError(format!("Failed to acquire write lock: {}", e)))?;
+        let mut config = processor.config.write().await;
 
         // 检查是否存在
         if !config.upstreams.iter().any(|u| u.name == name) {
@@ -177,10 +164,7 @@ impl TaskService {
     ) -> TaskResult {
         debug!("Creating upstream group: {}", group.name);
 
-        let mut config = processor
-            .config
-            .write()
-            .map_err(|e| ApiError::InternalError(format!("Failed to acquire write lock: {}", e)))?;
+        let mut config = processor.config.write().await;
 
         // 检查名称是否已存在
         if config.upstream_groups.iter().any(|g| g.name == group.name) {
@@ -221,10 +205,7 @@ impl TaskService {
     ) -> TaskResult {
         debug!("Updating upstream group: {}", name);
 
-        let mut config = processor
-            .config
-            .write()
-            .map_err(|e| ApiError::InternalError(format!("Failed to acquire write lock: {}", e)))?;
+        let mut config = processor.config.write().await;
 
         // 查找要更新的上游组索引
         let index = config
@@ -268,10 +249,7 @@ impl TaskService {
     async fn delete_upstream_group(processor: &mut TaskProcessor, name: String) -> TaskResult {
         debug!("Deleting upstream group: {}", name);
 
-        let mut config = processor
-            .config
-            .write()
-            .map_err(|e| ApiError::InternalError(format!("Failed to acquire write lock: {}", e)))?;
+        let mut config = processor.config.write().await;
 
         // 检查是否存在
         if !config.upstream_groups.iter().any(|g| g.name == name) {
@@ -308,10 +286,7 @@ impl TaskService {
     async fn create_forward(processor: &mut TaskProcessor, forward: ForwardConfig) -> TaskResult {
         debug!("Creating forward: {}", forward.name);
 
-        let mut config = processor
-            .config
-            .write()
-            .map_err(|e| ApiError::InternalError(format!("Failed to acquire write lock: {}", e)))?;
+        let mut config = processor.config.write().await;
 
         // 检查名称是否已存在
         if config
@@ -327,13 +302,12 @@ impl TaskService {
         }
 
         // 检查引用的上游组是否存在
-        let group_names: HashSet<_> = config
+        let group_exists = config
             .upstream_groups
             .iter()
-            .map(|g| g.name.clone())
-            .collect();
+            .any(|g| g.name == forward.upstream_group);
 
-        if !group_names.contains(&forward.upstream_group) {
+        if !group_exists {
             return Err(ApiError::ReferenceNotFound {
                 resource_type: "UpstreamGroup".into(),
                 name: forward.upstream_group.clone(),
@@ -346,7 +320,17 @@ impl TaskService {
         }
 
         // 添加到配置中
-        config.http_server.forwards.push(forward);
+        config.http_server.forwards.push(forward.clone());
+
+        // 发送服务器启动任务
+        if let Some(sender) = &processor.sender {
+            if let Err(e) = sender.send(ServerManagerTask::StartServer(forward)).await {
+                error!("Failed to send server start task: {}", e);
+                return Err(ApiError::InternalError(
+                    "Failed to send server management task".into(),
+                ));
+            }
+        }
 
         Ok(())
     }
@@ -359,10 +343,7 @@ impl TaskService {
     ) -> TaskResult {
         debug!("Updating forward: {}", name);
 
-        let mut config = processor
-            .config
-            .write()
-            .map_err(|e| ApiError::InternalError(format!("Failed to acquire write lock: {}", e)))?;
+        let mut config = processor.config.write().await;
 
         // 查找要更新的转发规则索引
         let index = config
@@ -381,13 +362,12 @@ impl TaskService {
         }
 
         // 检查引用的上游组是否存在
-        let group_names: HashSet<_> = config
+        let group_exists = config
             .upstream_groups
             .iter()
-            .map(|g| g.name.clone())
-            .collect();
+            .any(|g| g.name == forward.upstream_group);
 
-        if !group_names.contains(&forward.upstream_group) {
+        if !group_exists {
             return Err(ApiError::ReferenceNotFound {
                 resource_type: "UpstreamGroup".into(),
                 name: forward.upstream_group.clone(),
@@ -399,8 +379,36 @@ impl TaskService {
             return Err(ApiError::ValidationError(e.to_string()));
         }
 
+        // 检查是否需要重新启动服务器
+        let need_restart = config.http_server.forwards[index].port != forward.port
+            || config.http_server.forwards[index].address != forward.address;
+
         // 更新配置
-        config.http_server.forwards[index] = forward;
+        let _ = std::mem::replace(&mut config.http_server.forwards[index], forward.clone());
+
+        // 如果需要重新启动服务器，发送停止和启动任务
+        if need_restart && processor.sender.is_some() {
+            let sender = processor.sender.as_ref().unwrap();
+
+            // 发送停止任务
+            if let Err(e) = sender
+                .send(ServerManagerTask::StopServer(name.clone()))
+                .await
+            {
+                error!("Failed to send server stop task: {}", e);
+                return Err(ApiError::InternalError(
+                    "Failed to send server stop task".into(),
+                ));
+            }
+
+            // 发送启动任务
+            if let Err(e) = sender.send(ServerManagerTask::StartServer(forward)).await {
+                error!("Failed to send server start task: {}", e);
+                return Err(ApiError::InternalError(
+                    "Failed to send server start task".into(),
+                ));
+            }
+        }
 
         Ok(())
     }
@@ -409,10 +417,7 @@ impl TaskService {
     async fn delete_forward(processor: &mut TaskProcessor, name: String) -> TaskResult {
         debug!("Deleting forward: {}", name);
 
-        let mut config = processor
-            .config
-            .write()
-            .map_err(|e| ApiError::InternalError(format!("Failed to acquire write lock: {}", e)))?;
+        let mut config = processor.config.write().await;
 
         // 检查是否存在
         if !config.http_server.forwards.iter().any(|f| f.name == name) {
@@ -422,6 +427,16 @@ impl TaskService {
 
         // 执行删除
         config.http_server.forwards.retain(|f| f.name != name);
+
+        // 发送服务器停止任务
+        if let Some(sender) = &processor.sender {
+            if let Err(e) = sender.send(ServerManagerTask::StopServer(name)).await {
+                error!("Failed to send server stop task: {}", e);
+                return Err(ApiError::InternalError(
+                    "Failed to send server stop task".into(),
+                ));
+            }
+        }
 
         Ok(())
     }

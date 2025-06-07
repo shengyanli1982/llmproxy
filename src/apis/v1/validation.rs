@@ -6,6 +6,7 @@ use crate::config::{
 use crate::r#const::{
     breaker_limits, http_client_limits, rate_limit_limits, retry_limits, weight_limits,
 };
+use std::collections::HashSet;
 use url::Url;
 
 /// 为 Config 添加校验辅助方法
@@ -19,7 +20,15 @@ impl ConfigValidation for Config {
     fn validate_upstream_config(&self, upstream: &UpstreamConfig) -> Result<(), ApiError> {
         // 验证URL
         if let Err(e) = Url::parse(&upstream.url) {
-            return Err(ApiError::ValidationError(format!("Invalid URL: {}", e)));
+            return Err(ApiError::ValidationError(format!("invalid URL: {}", e)));
+        }
+
+        // 确保 URL 包含协议和主机
+        let url = Url::parse(&upstream.url).unwrap(); // 前面已经检查过解析错误
+        if url.scheme().is_empty() || url.host_str().is_none() {
+            return Err(ApiError::ValidationError(
+                "invalid URL: missing scheme or host".into(),
+            ));
         }
 
         // 验证认证配置
@@ -93,8 +102,20 @@ impl ConfigValidation for Config {
         // 验证上游引用列表
         if group.upstreams.is_empty() {
             return Err(ApiError::ValidationError(
-                "Upstream group must have at least one upstream".into(),
+                "Upstream group must have at least one upstream, empty list is not allowed".into(),
             ));
+        }
+
+        // 验证引用的上游是否存在
+        let upstream_names: HashSet<_> = self.upstreams.iter().map(|u| u.name.clone()).collect();
+
+        for upstream_ref in &group.upstreams {
+            if !upstream_names.contains(&upstream_ref.name) {
+                return Err(ApiError::ReferenceNotFound {
+                    resource_type: "Upstream".into(),
+                    name: upstream_ref.name.clone(),
+                });
+            }
         }
 
         // 验证权重
@@ -204,6 +225,32 @@ impl ConfigValidation for Config {
     }
 
     fn validate_forward_config(&self, forward: &ForwardConfig) -> Result<(), ApiError> {
+        // 验证端口
+        if forward.port == 0 {
+            return Err(ApiError::ValidationError(
+                "Invalid port: cannot be 0".into(),
+            ));
+        }
+
+        // 验证地址
+        if forward.address.is_empty() {
+            return Err(ApiError::ValidationError(
+                "Invalid address: cannot be empty".into(),
+            ));
+        }
+
+        // 验证引用的上游组是否存在
+        let group_exists = self
+            .upstream_groups
+            .iter()
+            .any(|g| g.name == forward.upstream_group);
+        if !group_exists {
+            return Err(ApiError::ReferenceNotFound {
+                resource_type: "UpstreamGroup".into(),
+                name: forward.upstream_group.clone(),
+            });
+        }
+
         // 验证限流配置
         if forward.ratelimit.enabled {
             if forward.ratelimit.per_second < rate_limit_limits::MIN_PER_SECOND
@@ -224,6 +271,13 @@ impl ConfigValidation for Config {
                     rate_limit_limits::MIN_BURST,
                     rate_limit_limits::MAX_BURST
                 )));
+            }
+        } else {
+            // 即使未启用限流，也验证配置值的有效性
+            if forward.ratelimit.per_second == 0 {
+                return Err(ApiError::ValidationError(
+                    "Rate limit per_second cannot be 0, even when rate limiting is disabled".into(),
+                ));
             }
         }
 

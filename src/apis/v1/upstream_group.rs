@@ -13,18 +13,18 @@ use tracing::debug;
 // 上游组路由
 pub fn upstream_group_routes(config: ConfigState, sender: TaskSender) -> Router {
     Router::new()
-        .route("/api/v1/admin/upstream-groups", get(list_upstream_groups))
-        .route("/api/v1/admin/upstream-groups", post(create_upstream_group))
+        .route("/api/v1/admin/upstreamgroups", get(list_upstream_groups))
+        .route("/api/v1/admin/upstreamgroups", post(create_upstream_group))
         .route(
-            "/api/v1/admin/upstream-groups/{name}",
+            "/api/v1/admin/upstreamgroups/{name}",
             get(get_upstream_group),
         )
         .route(
-            "/api/v1/admin/upstream-groups/{name}",
+            "/api/v1/admin/upstreamgroups/{name}",
             put(update_upstream_group),
         )
         .route(
-            "/api/v1/admin/upstream-groups/{name}",
+            "/api/v1/admin/upstreamgroups/{name}",
             delete(delete_upstream_group),
         )
         .with_state((config, sender))
@@ -36,11 +36,8 @@ async fn list_upstream_groups(
     State((config, _)): State<(ConfigState, TaskSender)>,
     Query(query): Query<PaginationQuery>,
 ) -> Result<Json<ApiResponse<PaginatedResponse<UpstreamGroupConfig>>>, ApiError> {
-    // 获取配置并立即释放锁
     let groups = {
-        let config_guard = config
-            .read()
-            .map_err(|e| ApiError::InternalError(format!("Failed to read config: {}", e)))?;
+        let config_guard = config.read().await;
 
         config_guard.upstream_groups.clone()
     };
@@ -93,9 +90,7 @@ async fn get_upstream_group(
 ) -> Result<Json<ApiResponse<UpstreamGroupConfig>>, ApiError> {
     // 获取配置并立即释放锁
     let group = {
-        let config_guard = config
-            .read()
-            .map_err(|e| ApiError::InternalError(format!("Failed to read config: {}", e)))?;
+        let config_guard = config.read().await;
 
         config_guard
             .upstream_groups

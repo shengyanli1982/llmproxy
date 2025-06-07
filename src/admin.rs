@@ -11,8 +11,10 @@ use axum::{
 };
 use prometheus::{Encoder, TextEncoder};
 use std::net::SocketAddr;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use tokio::net::TcpListener;
+#[warn(unused_imports)]
+use tokio::sync::RwLock;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemHandle};
 use tracing::{error, info};
 
@@ -28,15 +30,11 @@ pub struct AdminServer {
 
 impl AdminServer {
     // 创建新的管理服务
-    pub fn new(
-        addr: SocketAddr,
-        config: Arc<RwLock<Config>>,
-        server_manager_sender: ServerManagerSender,
-    ) -> Self {
+    pub fn new(addr: SocketAddr, config: Arc<RwLock<Config>>, sender: ServerManagerSender) -> Self {
         Self {
             addr,
             config,
-            sender: server_manager_sender,
+            sender,
         }
     }
 }
