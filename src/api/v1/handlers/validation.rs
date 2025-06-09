@@ -39,7 +39,7 @@ pub fn validate_upstream_payload(upstream: &UpstreamConfig) -> Result<(), ApiErr
     if let Some(auth) = &upstream.auth {
         match auth.r#type {
             AuthType::Bearer => {
-                if auth.token.as_ref().map_or(true, |s| s.is_empty()) {
+                if auth.token.as_ref().is_none_or(|s| s.is_empty()) {
                     return Err(ApiError::validation_error_with_details(
                         "Upstream configuration validation failed",
                         vec![ErrorDetail {
@@ -52,8 +52,8 @@ pub fn validate_upstream_payload(upstream: &UpstreamConfig) -> Result<(), ApiErr
                 }
             }
             AuthType::Basic => {
-                if auth.username.as_ref().map_or(true, |s| s.is_empty())
-                    || auth.password.as_ref().map_or(true, |s| s.is_empty())
+                if auth.username.as_ref().is_none_or(|s| s.is_empty())
+                    || auth.password.as_ref().is_none_or(|s| s.is_empty())
                 {
                     return Err(ApiError::validation_error_with_details(
                         "Upstream configuration validation failed",
@@ -73,7 +73,7 @@ pub fn validate_upstream_payload(upstream: &UpstreamConfig) -> Result<(), ApiErr
     for header_op in &upstream.headers {
         match header_op.op {
             HeaderOpType::Insert | HeaderOpType::Replace => {
-                if header_op.value.as_ref().map_or(true, |s| s.is_empty()) {
+                if header_op.value.as_ref().is_none_or(|s| s.is_empty()) {
                     return Err(ApiError::validation_error_with_details(
                         "Upstream configuration validation failed",
                         vec![ErrorDetail {

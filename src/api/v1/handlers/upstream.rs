@@ -1,14 +1,17 @@
-use crate::api::v1::handlers::validation::{
-    check_config_integrity, check_upstream_references, validate_upstream_payload,
+use crate::api::v1::handlers::{
+    util::next_id,
+    validation::{check_config_integrity, check_upstream_references, validate_upstream_payload},
 };
 use crate::api::v1::models::{ApiError, ApiResponse};
 use crate::config::{Config, UpstreamConfig};
+use axum::http::StatusCode;
 use axum::{
     extract::{Path, State},
     Json,
 };
 use std::sync::{Arc, RwLock};
-use tracing::info;
+use std::time::Instant;
+use tracing::{error, info, warn};
 
 /// 获取所有上游
 ///
@@ -24,11 +27,28 @@ use tracing::info;
 pub async fn get_all_upstreams(
     State(config): State<Arc<RwLock<Arc<Config>>>>,
 ) -> Result<ApiResponse<Vec<UpstreamConfig>>, ApiError> {
+    let request_id = next_id();
+    info!(
+        "[request: {}] API request started: Get all upstreams",
+        request_id
+    );
+    let start_time = Instant::now();
+
     // 获取配置的只读锁
     let config_guard = config.read().unwrap();
-    let config = Arc::clone(&config_guard);
-    // 克隆上游列表以避免长时间持有锁
-    let upstreams = config.upstreams.clone();
+
+    // 避免克隆整个配置对象，只克隆上游列表
+    let upstreams_count = config_guard.upstreams.len();
+    let upstreams = config_guard.upstreams.clone();
+
+    // 立即释放锁
+    drop(config_guard);
+
+    let elapsed = start_time.elapsed();
+    info!(
+        "[request: {}] API request completed: Get all upstreams, time: {:?}, result count: {}",
+        request_id, elapsed, upstreams_count
+    );
 
     // 返回上游列表
     Ok(ApiResponse::new(Some(upstreams)))
@@ -53,12 +73,37 @@ pub async fn get_upstream(
     State(config): State<Arc<RwLock<Arc<Config>>>>,
     Path(name): Path<String>,
 ) -> Result<ApiResponse<UpstreamConfig>, ApiError> {
+    let request_id = next_id();
+    info!(
+        "[request: {}] API request started: Get upstream '{}'",
+        request_id, name
+    );
+    let start_time = Instant::now();
+
     // 获取配置的只读锁
     let config_guard = config.read().unwrap();
-    let config = Arc::clone(&config_guard);
 
     // 查找指定名称的上游
-    let upstream = config.upstreams.iter().find(|u| u.name == name).cloned();
+    let upstream = config_guard
+        .upstreams
+        .iter()
+        .find(|u| u.name == name)
+        .cloned();
+
+    // 立即释放锁
+    drop(config_guard);
+
+    let elapsed = start_time.elapsed();
+    match &upstream {
+        Some(_) => info!(
+            "[request: {}] API request completed: Get upstream '{}', time: {:?}, status: success",
+            request_id, name, elapsed
+        ),
+        None => warn!(
+            "[request: {}] API request completed: Get upstream '{}', time: {:?}, status: not found",
+            request_id, name, elapsed
+        ),
+    }
 
     match upstream {
         Some(upstream) => Ok(ApiResponse::new(Some(upstream))),
@@ -84,44 +129,73 @@ pub async fn create_upstream(
     State(config): State<Arc<RwLock<Arc<Config>>>>,
     Json(upstream): Json<UpstreamConfig>,
 ) -> Result<ApiResponse<UpstreamConfig>, ApiError> {
+    let request_id = next_id();
+    info!(
+        "[request: {}] API request started: Create upstream '{}'",
+        request_id, upstream.name
+    );
+    let start_time = Instant::now();
+
     // 第一阶段：载荷验证
-    validate_upstream_payload(&upstream)?;
+    if let Err(e) = validate_upstream_payload(&upstream) {
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Create upstream '{}', time: {:?}, status: validation error, error: {}",
+            request_id, upstream.name, elapsed, e
+        );
+        return Err(e);
+    }
 
     // 获取配置的写锁
     let mut config_guard = config.write().unwrap();
-    let current_config = Arc::clone(&config_guard);
 
     // 检查名称是否已存在
-    if current_config
+    if config_guard
         .upstreams
         .iter()
         .any(|u| u.name == upstream.name)
     {
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Create upstream '{}', time: {:?}, status: resource conflict",
+            request_id, upstream.name, elapsed
+        );
+        drop(config_guard); // 释放锁
         return Err(ApiError::resource_conflict(format!(
             "Upstream '{}' already exists",
             upstream.name
         )));
     }
 
-    // 创建新配置的克隆
-    let mut new_config = (*current_config).clone();
+    // 创建新配置的克隆，使用 Arc::make_mut 进行写时复制优化
+    let new_config = Arc::make_mut(&mut *config_guard);
 
     // 添加新上游
     new_config.upstreams.push(upstream.clone());
 
     // 第二阶段：集成验证
     if let Err(e) = check_config_integrity(&new_config) {
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Create upstream '{}', time: {:?}, status: integration validation error, error: {}",
+            request_id, upstream.name, elapsed, e
+        );
+        drop(config_guard); // 释放锁
         return Err(e);
     }
 
-    // 更新配置
-    *config_guard = Arc::new(new_config);
+    // 锁会在作用域结束时自动释放
+    drop(config_guard);
 
-    info!("Upstream '{}' created", upstream.name);
+    let elapsed = start_time.elapsed();
+    info!(
+        "[request: {}] API request completed: Create upstream '{}', time: {:?}, status: success",
+        request_id, upstream.name, elapsed
+    );
 
     // 返回创建的上游
     Ok(ApiResponse::with_code_and_message(
-        201,
+        StatusCode::CREATED.as_u16(),
         Some(upstream.clone()),
         format!("Upstream '{}' created successfully", upstream.name),
     ))
@@ -149,8 +223,20 @@ pub async fn update_upstream(
     Path(name): Path<String>,
     Json(upstream): Json<UpstreamConfig>,
 ) -> Result<ApiResponse<UpstreamConfig>, ApiError> {
+    let request_id = next_id();
+    info!(
+        "[request: {}] API request started: Update upstream '{}'",
+        request_id, name
+    );
+    let start_time = Instant::now();
+
     // 检查路径参数和请求体中的名称是否匹配
     if name != upstream.name {
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Update upstream, time: {:?}, status: validation error, path parameter '{}' does not match request body name '{}'",
+            request_id, elapsed, name, upstream.name
+        );
         return Err(ApiError::validation_error(format!(
             "Path parameter name '{}' does not match request body name '{}'. The name field cannot be updated. To change the name, please delete the existing upstream and create a new one.",
             name, upstream.name
@@ -158,37 +244,57 @@ pub async fn update_upstream(
     }
 
     // 第一阶段：载荷验证
-    validate_upstream_payload(&upstream)?;
-
-    // 获取配置的写锁
-    let mut config_guard = config.write().unwrap();
-    let current_config = Arc::clone(&config_guard);
-
-    // 检查上游是否存在
-    if !current_config.upstreams.iter().any(|u| u.name == name) {
-        return Err(ApiError::resource_not_found("Upstream", name));
-    }
-
-    // 创建新配置的克隆
-    let mut new_config = (*current_config).clone();
-
-    // 查找并更新上游
-    let index = new_config
-        .upstreams
-        .iter()
-        .position(|u| u.name == name)
-        .unwrap();
-    new_config.upstreams[index] = upstream.clone();
-
-    // 第二阶段：集成验证
-    if let Err(e) = check_config_integrity(&new_config) {
+    if let Err(e) = validate_upstream_payload(&upstream) {
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Update upstream '{}', time: {:?}, status: validation error, error: {}",
+            request_id, name, elapsed, e
+        );
         return Err(e);
     }
 
-    // 更新配置
-    *config_guard = Arc::new(new_config);
+    // 获取配置的写锁
+    let mut config_guard = config.write().unwrap();
 
-    info!("Upstream '{}' updated", name);
+    // 检查上游是否存在
+    let upstream_index = match config_guard.upstreams.iter().position(|u| u.name == name) {
+        Some(index) => index,
+        None => {
+            let elapsed = start_time.elapsed();
+            warn!(
+                "[request: {}] API request failed: Update upstream '{}', time: {:?}, status: resource not found",
+                request_id, name, elapsed
+            );
+            drop(config_guard); // 释放锁
+            return Err(ApiError::resource_not_found("Upstream", name));
+        }
+    };
+
+    // 创建新配置的克隆，使用 Arc::make_mut 进行写时复制优化
+    let new_config = Arc::make_mut(&mut *config_guard);
+
+    // 更新上游
+    new_config.upstreams[upstream_index] = upstream.clone();
+
+    // 第二阶段：集成验证
+    if let Err(e) = check_config_integrity(&new_config) {
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Update upstream '{}', time: {:?}, status: integration validation error, error: {}",
+            request_id, name, elapsed, e
+        );
+        drop(config_guard); // 释放锁
+        return Err(e);
+    }
+
+    // 锁会在作用域结束时自动释放
+    drop(config_guard);
+
+    let elapsed = start_time.elapsed();
+    info!(
+        "[request: {}] API request completed: Update upstream '{}', time: {:?}, status: success",
+        request_id, name, elapsed
+    );
 
     // 返回更新后的上游
     Ok(ApiResponse::with_message(
@@ -214,6 +320,7 @@ pub async fn update_upstream(
             "message": "Upstream deleted successfully",
             "data": null
         })),
+        (status = 400, description = "Invalid request", body = ApiError),
         (status = 404, description = "Resource not found", body = ApiError),
         (status = 409, description = "Resource in use", body = ApiError)
     )
@@ -222,33 +329,66 @@ pub async fn delete_upstream(
     State(config): State<Arc<RwLock<Arc<Config>>>>,
     Path(name): Path<String>,
 ) -> Result<ApiResponse<()>, ApiError> {
+    let request_id = next_id();
+    info!(
+        "[request: {}] API request started: Delete upstream '{}'",
+        request_id, name
+    );
+    let start_time = Instant::now();
+
     // 获取配置的写锁
     let mut config_guard = config.write().unwrap();
-    let current_config = Arc::clone(&config_guard);
 
     // 检查上游是否存在
-    if !current_config.upstreams.iter().any(|u| u.name == name) {
-        return Err(ApiError::resource_not_found("Upstream", name));
-    }
+    let upstream_index = match config_guard.upstreams.iter().position(|u| u.name == name) {
+        Some(index) => index,
+        None => {
+            let elapsed = start_time.elapsed();
+            warn!(
+                "[request: {}] API request failed: Delete upstream '{}', time: {:?}, status: resource not found",
+                request_id, name, elapsed
+            );
+            drop(config_guard); // 释放锁
+            return Err(ApiError::resource_not_found("Upstream", name));
+        }
+    };
 
-    // 检查上游是否被任何上游组引用
-    check_upstream_references(&current_config, &name)?;
+    // 创建新配置的克隆，使用 Arc::make_mut 进行写时复制优化
+    let new_config = Arc::make_mut(&mut *config_guard);
 
-    // 创建新配置的克隆
-    let mut new_config = (*current_config).clone();
-
-    // 删除上游
-    new_config.upstreams.retain(|u| u.name != name);
-
-    // 第二阶段：集成验证
-    if let Err(e) = check_config_integrity(&new_config) {
+    // 检查上游引用
+    if let Err(e) = check_upstream_references(&new_config, &name) {
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Delete upstream '{}', time: {:?}, status: dependency check failed, error: {}",
+            request_id, name, elapsed, e
+        );
+        drop(config_guard); // 释放锁
         return Err(e);
     }
 
-    // 更新配置
-    *config_guard = Arc::new(new_config);
+    // 删除上游
+    new_config.upstreams.remove(upstream_index);
 
-    info!("Upstream '{}' deleted", name);
+    // 第二阶段：集成验证
+    if let Err(e) = check_config_integrity(&new_config) {
+        let elapsed = start_time.elapsed();
+        error!(
+            "[request: {}] API request failed: Delete upstream '{}', time: {:?}, status: integration validation error, error: {}",
+            request_id, name, elapsed, e
+        );
+        drop(config_guard); // 释放锁
+        return Err(e);
+    }
+
+    // 锁会在作用域结束时自动释放
+    drop(config_guard);
+
+    let elapsed = start_time.elapsed();
+    info!(
+        "[request: {}] API request completed: Delete upstream '{}', time: {:?}, status: success",
+        request_id, name, elapsed
+    );
 
     // 返回成功响应
     Ok(ApiResponse::with_message(

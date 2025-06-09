@@ -1,14 +1,20 @@
-use crate::api::v1::handlers::validation::{
-    check_config_integrity, check_upstream_group_references, validate_upstream_group_payload,
+use crate::api::v1::handlers::{
+    util::next_id,
+    validation::{
+        check_config_integrity, check_upstream_group_references, validate_upstream_group_payload,
+    },
 };
 use crate::api::v1::models::{ApiError, ApiResponse};
+
 use crate::config::{Config, UpstreamGroupConfig};
+use axum::http::StatusCode;
 use axum::{
     extract::{Path, State},
     Json,
 };
 use std::sync::{Arc, RwLock};
-use tracing::info;
+use std::time::Instant;
+use tracing::{error, info, warn};
 
 /// 获取所有上游组
 ///
@@ -24,11 +30,30 @@ use tracing::info;
 pub async fn get_all_upstream_groups(
     State(config): State<Arc<RwLock<Arc<Config>>>>,
 ) -> Result<ApiResponse<Vec<UpstreamGroupConfig>>, ApiError> {
+    let request_id = next_id();
+    info!(
+        "[request: {}] API request started: Get all upstream groups",
+        request_id
+    );
+    let start_time = Instant::now();
+
     // 获取配置的只读锁
     let config_guard = config.read().unwrap();
-    let config = Arc::clone(&config_guard);
-    // 克隆上游组列表以避免长时间持有锁
-    let upstream_groups = config.upstream_groups.clone();
+
+    // 避免克隆整个配置对象，只克隆上游组列表
+    let upstream_groups_count = config_guard.upstream_groups.len();
+    let upstream_groups = config_guard.upstream_groups.clone();
+
+    // 立即释放锁
+    drop(config_guard);
+
+    let elapsed = start_time.elapsed();
+    info!(
+        "[request: {}] API request completed: Get all upstream groups, time: {:?}, result count: {}",
+        request_id,
+        elapsed,
+        upstream_groups_count
+    );
 
     // 返回上游组列表
     Ok(ApiResponse::new(Some(upstream_groups)))
@@ -53,16 +78,37 @@ pub async fn get_upstream_group(
     State(config): State<Arc<RwLock<Arc<Config>>>>,
     Path(name): Path<String>,
 ) -> Result<ApiResponse<UpstreamGroupConfig>, ApiError> {
+    let request_id = next_id();
+    info!(
+        "[request: {}] API request started: Get upstream group '{}'",
+        request_id, name
+    );
+    let start_time = Instant::now();
+
     // 获取配置的只读锁
     let config_guard = config.read().unwrap();
-    let config = Arc::clone(&config_guard);
 
     // 查找指定名称的上游组
-    let upstream_group = config
+    let upstream_group = config_guard
         .upstream_groups
         .iter()
         .find(|g| g.name == name)
         .cloned();
+
+    // 立即释放锁
+    drop(config_guard);
+
+    let elapsed = start_time.elapsed();
+    match &upstream_group {
+        Some(_) => info!(
+            "[request: {}] API request completed: Get upstream group '{}', time: {:?}, status: success",
+            request_id, name, elapsed
+        ),
+        None => warn!(
+            "[request: {}] API request completed: Get upstream group '{}', time: {:?}, status: not found",
+            request_id, name, elapsed
+        ),
+    }
 
     match upstream_group {
         Some(group) => Ok(ApiResponse::new(Some(group))),
@@ -88,8 +134,22 @@ pub async fn create_upstream_group(
     State(config): State<Arc<RwLock<Arc<Config>>>>,
     Json(group): Json<UpstreamGroupConfig>,
 ) -> Result<ApiResponse<UpstreamGroupConfig>, ApiError> {
+    let request_id = next_id();
+    info!(
+        "[request: {}] API request started: Create upstream group '{}'",
+        request_id, group.name
+    );
+    let start_time = Instant::now();
+
     // 第一阶段：载荷验证
-    validate_upstream_group_payload(&group)?;
+    if let Err(e) = validate_upstream_group_payload(&group) {
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Create upstream group '{}', time: {:?}, status: validation error, error: {}",
+            request_id, group.name, elapsed, e
+        );
+        return Err(e);
+    }
 
     // 获取配置的写锁
     let mut config_guard = config.write().unwrap();
@@ -101,6 +161,11 @@ pub async fn create_upstream_group(
         .iter()
         .any(|g| g.name == group.name)
     {
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Create upstream group '{}', time: {:?}, status: resource conflict",
+            request_id, group.name, elapsed
+        );
         return Err(ApiError::resource_conflict(format!(
             "Upstream group '{}' already exists",
             group.name
@@ -115,17 +180,26 @@ pub async fn create_upstream_group(
 
     // 第二阶段：集成验证
     if let Err(e) = check_config_integrity(&new_config) {
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Create upstream group '{}', time: {:?}, status: integration validation error, error: {}",
+            request_id, group.name, elapsed, e
+        );
         return Err(e);
     }
 
     // 更新配置
     *config_guard = Arc::new(new_config);
 
-    info!("Upstream group '{}' created", group.name);
+    let elapsed = start_time.elapsed();
+    info!(
+        "[request: {}] API request completed: Create upstream group '{}', time: {:?}, status: success",
+        request_id, group.name, elapsed
+    );
 
     // 返回创建的上游组
     Ok(ApiResponse::with_code_and_message(
-        201,
+        StatusCode::CREATED.as_u16(),
         Some(group.clone()),
         format!("Upstream group '{}' created successfully", group.name),
     ))
@@ -153,8 +227,19 @@ pub async fn update_upstream_group(
     Path(name): Path<String>,
     Json(group): Json<UpstreamGroupConfig>,
 ) -> Result<ApiResponse<UpstreamGroupConfig>, ApiError> {
+    let request_id = next_id();
+    info!(
+        "[request: {}] API request started: Update upstream group '{}'",
+        request_id, name
+    );
+    let start_time = Instant::now();
+
     // 检查路径参数和请求体中的名称是否匹配
     if name != group.name {
+        let elapsed = start_time.elapsed();
+        warn!("[request: {}] API request failed: Update upstream group, time: {:?}, status: validation error, path parameter '{}' does not match request body name '{}'", 
+            request_id, elapsed, name, group.name
+        );
         return Err(ApiError::validation_error(format!(
             "Path parameter name '{}' does not match request body name '{}'. The name field cannot be updated. To change the name, please delete the existing upstream group and create a new one.",
             name, group.name
@@ -162,7 +247,14 @@ pub async fn update_upstream_group(
     }
 
     // 第一阶段：载荷验证
-    validate_upstream_group_payload(&group)?;
+    if let Err(e) = validate_upstream_group_payload(&group) {
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Update upstream group '{}', time: {:?}, status: validation error, error: {}",
+            request_id, name, elapsed, e
+        );
+        return Err(e);
+    }
 
     // 获取配置的写锁
     let mut config_guard = config.write().unwrap();
@@ -174,6 +266,11 @@ pub async fn update_upstream_group(
         .iter()
         .any(|g| g.name == name)
     {
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Update upstream group '{}', time: {:?}, status: resource not found",
+            request_id, name, elapsed
+        );
         return Err(ApiError::resource_not_found("Upstream group", name));
     }
 
@@ -190,13 +287,22 @@ pub async fn update_upstream_group(
 
     // 第二阶段：集成验证
     if let Err(e) = check_config_integrity(&new_config) {
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Update upstream group '{}', time: {:?}, status: integration validation error, error: {}",
+            request_id, name, elapsed, e
+        );
         return Err(e);
     }
 
     // 更新配置
     *config_guard = Arc::new(new_config);
 
-    info!("Upstream group '{}' updated", name);
+    let elapsed = start_time.elapsed();
+    info!(
+        "[request: {}] API request completed: Update upstream group '{}', time: {:?}, status: success",
+        request_id, name, elapsed
+    );
 
     // 返回更新后的上游组
     Ok(ApiResponse::with_message(
@@ -230,6 +336,13 @@ pub async fn delete_upstream_group(
     State(config): State<Arc<RwLock<Arc<Config>>>>,
     Path(name): Path<String>,
 ) -> Result<ApiResponse<()>, ApiError> {
+    let request_id = next_id();
+    info!(
+        "[request: {}] API request started: Delete upstream group '{}'",
+        request_id, name
+    );
+    let start_time = Instant::now();
+
     // 获取配置的写锁
     let mut config_guard = config.write().unwrap();
     let current_config = Arc::clone(&config_guard);
@@ -240,27 +353,53 @@ pub async fn delete_upstream_group(
         .iter()
         .any(|g| g.name == name)
     {
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Delete upstream group '{}', time: {:?}, status: resource not found",
+            request_id, name, elapsed
+        );
         return Err(ApiError::resource_not_found("Upstream group", name));
     }
-
-    // 检查上游组是否被任何转发服务引用
-    check_upstream_group_references(&current_config, &name)?;
 
     // 创建新配置的克隆
     let mut new_config = (*current_config).clone();
 
-    // 删除上游组
-    new_config.upstream_groups.retain(|g| g.name != name);
+    // 检查上游组引用
+    if let Err(e) = check_upstream_group_references(&new_config, &name) {
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Delete upstream group '{}', time: {:?}, status: dependency check failed, error: {}",
+            request_id, name, elapsed, e
+        );
+        return Err(e);
+    }
+
+    // 查找并删除上游组
+    let index = new_config
+        .upstream_groups
+        .iter()
+        .position(|g| g.name == name)
+        .unwrap();
+    new_config.upstream_groups.remove(index);
 
     // 第二阶段：集成验证
     if let Err(e) = check_config_integrity(&new_config) {
+        let elapsed = start_time.elapsed();
+        error!(
+            "[request: {}] API request failed: Delete upstream group '{}', time: {:?}, status: integration validation error, error: {}",
+            request_id, name, elapsed, e
+        );
         return Err(e);
     }
 
     // 更新配置
     *config_guard = Arc::new(new_config);
 
-    info!("Upstream group '{}' deleted", name);
+    let elapsed = start_time.elapsed();
+    info!(
+        "[request: {}] API request completed: Delete upstream group '{}', time: {:?}, status: success",
+        request_id, name, elapsed
+    );
 
     // 返回成功响应
     Ok(ApiResponse::with_message(

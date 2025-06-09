@@ -1,12 +1,17 @@
-use crate::api::v1::handlers::validation::{check_config_integrity, validate_forward_payload};
+use crate::api::v1::handlers::{
+    util::next_id,
+    validation::{check_config_integrity, validate_forward_payload},
+};
 use crate::api::v1::models::{ApiError, ApiResponse};
 use crate::config::{Config, ForwardConfig};
+use axum::http::StatusCode;
 use axum::{
     extract::{Path, State},
     Json,
 };
 use std::sync::{Arc, RwLock};
-use tracing::info;
+use std::time::Instant;
+use tracing::{error, info, warn};
 
 /// 获取所有转发服务
 ///
@@ -22,11 +27,31 @@ use tracing::info;
 pub async fn get_all_forwards(
     State(config): State<Arc<RwLock<Arc<Config>>>>,
 ) -> Result<ApiResponse<Vec<ForwardConfig>>, ApiError> {
+    let request_id = next_id();
+
+    info!(
+        "[request: {}] API request started: Get all forward services",
+        request_id
+    );
+    let start_time = Instant::now();
+
     // 获取配置的只读锁
     let config_guard = config.read().unwrap();
-    let config = Arc::clone(&config_guard);
-    // 克隆转发服务列表以避免长时间持有锁
-    let forwards = config.http_server.forwards.clone();
+
+    // 避免克隆整个配置对象，只克隆转发服务列表
+    let forwards_count = config_guard.http_server.forwards.len();
+    let forwards = config_guard.http_server.forwards.clone();
+
+    // 立即释放锁
+    drop(config_guard);
+
+    let elapsed = start_time.elapsed();
+    info!(
+        "[request: {}] API request completed: Get all forward services, time: {:?}, result count: {}",
+        request_id,
+        elapsed,
+        forwards_count
+    );
 
     // 返回转发服务列表
     Ok(ApiResponse::new(Some(forwards)))
@@ -51,21 +76,42 @@ pub async fn get_forward(
     State(config): State<Arc<RwLock<Arc<Config>>>>,
     Path(name): Path<String>,
 ) -> Result<ApiResponse<ForwardConfig>, ApiError> {
+    let request_id = next_id();
+    info!(
+        "[request: {}] API request started: Get forward service '{}'",
+        request_id, name
+    );
+    let start_time = Instant::now();
+
     // 获取配置的只读锁
     let config_guard = config.read().unwrap();
-    let config = Arc::clone(&config_guard);
 
     // 查找指定名称的转发服务
-    let forward = config
+    let forward = config_guard
         .http_server
         .forwards
         .iter()
         .find(|f| f.name == name)
         .cloned();
 
+    // 立即释放锁
+    drop(config_guard);
+
+    let elapsed = start_time.elapsed();
+    match &forward {
+        Some(_) => info!(
+            "[request: {}] API request completed: Get forward service '{}', time: {:?}, status: success",
+            request_id, name, elapsed
+        ),
+        None => warn!(
+            "[request: {}] API request completed: Get forward service '{}', time: {:?}, status: not found",
+            request_id, name, elapsed
+        ),
+    }
+
     match forward {
         Some(forward) => Ok(ApiResponse::new(Some(forward))),
-        None => Err(ApiError::resource_not_found("转发服务", name)),
+        None => Err(ApiError::resource_not_found("Forward service", name)),
     }
 }
 
@@ -87,8 +133,22 @@ pub async fn create_forward(
     State(config): State<Arc<RwLock<Arc<Config>>>>,
     Json(forward): Json<ForwardConfig>,
 ) -> Result<ApiResponse<ForwardConfig>, ApiError> {
+    let request_id = next_id();
+    info!(
+        "[request: {}] API request started: Create forward service '{}'",
+        request_id, forward.name
+    );
+    let start_time = Instant::now();
+
     // 第一阶段：载荷验证
-    validate_forward_payload(&forward)?;
+    if let Err(e) = validate_forward_payload(&forward) {
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Create forward service '{}', time: {:?}, status: validation error, error: {}",
+            request_id, forward.name, elapsed, e
+        );
+        return Err(e);
+    }
 
     // 获取配置的写锁
     let mut config_guard = config.write().unwrap();
@@ -101,6 +161,11 @@ pub async fn create_forward(
         .iter()
         .any(|f| f.name == forward.name)
     {
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Create forward service '{}', time: {:?}, status: resource conflict",
+            request_id, forward.name, elapsed
+        );
         return Err(ApiError::resource_conflict(format!(
             "Forward service '{}' already exists",
             forward.name
@@ -115,17 +180,26 @@ pub async fn create_forward(
 
     // 第二阶段：集成验证
     if let Err(e) = check_config_integrity(&new_config) {
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Create forward service '{}', time: {:?}, status: integration validation error, error: {}",
+            request_id, forward.name, elapsed, e
+        );
         return Err(e);
     }
 
     // 更新配置
     *config_guard = Arc::new(new_config);
 
-    info!("Forward service '{}' created", forward.name);
+    let elapsed = start_time.elapsed();
+    info!(
+        "[request: {}] API request completed: Create forward service '{}', time: {:?}, status: success",
+        request_id, forward.name, elapsed
+    );
 
     // 返回创建的转发服务
     Ok(ApiResponse::with_code_and_message(
-        201,
+        StatusCode::CREATED.as_u16(),
         Some(forward.clone()),
         format!("Forward service '{}' created successfully", forward.name),
     ))
@@ -153,8 +227,20 @@ pub async fn update_forward(
     Path(name): Path<String>,
     Json(forward): Json<ForwardConfig>,
 ) -> Result<ApiResponse<ForwardConfig>, ApiError> {
+    let request_id = next_id();
+    info!(
+        "[request: {}] API request started: Update forward service '{}'",
+        request_id, name
+    );
+    let start_time = Instant::now();
+
     // 检查路径参数和请求体中的名称是否匹配
     if name != forward.name {
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Update forward service, time: {:?}, status: validation error, path parameter '{}' does not match request body name '{}'",
+            request_id, elapsed, name, forward.name
+        );
         return Err(ApiError::validation_error(format!(
             "Path parameter name '{}' does not match request body name '{}'. The name field cannot be updated. To change the name, please delete the existing forward service and create a new one.",
             name, forward.name
@@ -162,7 +248,14 @@ pub async fn update_forward(
     }
 
     // 第一阶段：载荷验证
-    validate_forward_payload(&forward)?;
+    if let Err(e) = validate_forward_payload(&forward) {
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Update forward service '{}', time: {:?}, status: validation error, error: {}",
+            request_id, name, elapsed, e
+        );
+        return Err(e);
+    }
 
     // 获取配置的写锁
     let mut config_guard = config.write().unwrap();
@@ -175,7 +268,12 @@ pub async fn update_forward(
         .iter()
         .any(|f| f.name == name)
     {
-        return Err(ApiError::resource_not_found("转发服务", name));
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Update forward service '{}', time: {:?}, status: resource not found",
+            request_id, name, elapsed
+        );
+        return Err(ApiError::resource_not_found("Forward service", name));
     }
 
     // 创建新配置的克隆
@@ -192,13 +290,22 @@ pub async fn update_forward(
 
     // 第二阶段：集成验证
     if let Err(e) = check_config_integrity(&new_config) {
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Update forward service '{}', time: {:?}, status: integration validation error, error: {}",
+            request_id, name, elapsed, e
+        );
         return Err(e);
     }
 
     // 更新配置
     *config_guard = Arc::new(new_config);
 
-    info!("Forward service '{}' updated", name);
+    let elapsed = start_time.elapsed();
+    info!(
+        "[request: {}] API request completed: Update forward service '{}', time: {:?}, status: success",
+        request_id, name, elapsed
+    );
 
     // 返回更新后的转发服务
     Ok(ApiResponse::with_message(
@@ -231,6 +338,13 @@ pub async fn delete_forward(
     State(config): State<Arc<RwLock<Arc<Config>>>>,
     Path(name): Path<String>,
 ) -> Result<ApiResponse<()>, ApiError> {
+    let request_id = next_id();
+    info!(
+        "[request: {}] API request started: Delete forward service '{}'",
+        request_id, name
+    );
+    let start_time = Instant::now();
+
     // 获取配置的写锁
     let mut config_guard = config.write().unwrap();
     let current_config = Arc::clone(&config_guard);
@@ -242,24 +356,44 @@ pub async fn delete_forward(
         .iter()
         .any(|f| f.name == name)
     {
-        return Err(ApiError::resource_not_found("转发服务", name));
+        let elapsed = start_time.elapsed();
+        warn!(
+            "[request: {}] API request failed: Delete forward service '{}', time: {:?}, status: resource not found",
+            request_id, name, elapsed
+        );
+        return Err(ApiError::resource_not_found("Forward service", name));
     }
 
     // 创建新配置的克隆
     let mut new_config = (*current_config).clone();
 
-    // 删除转发服务
-    new_config.http_server.forwards.retain(|f| f.name != name);
+    // 查找并删除转发服务
+    let index = new_config
+        .http_server
+        .forwards
+        .iter()
+        .position(|f| f.name == name)
+        .unwrap();
+    new_config.http_server.forwards.remove(index);
 
     // 第二阶段：集成验证
     if let Err(e) = check_config_integrity(&new_config) {
+        let elapsed = start_time.elapsed();
+        error!(
+            "[request: {}] API request failed: Delete forward service '{}', time: {:?}, status: integration validation error, error: {}",
+            request_id, name, elapsed, e
+        );
         return Err(e);
     }
 
     // 更新配置
     *config_guard = Arc::new(new_config);
 
-    info!("Forward service '{}' deleted", name);
+    let elapsed = start_time.elapsed();
+    info!(
+        "[request: {}] API request completed: Delete forward service '{}', time: {:?}, status: success",
+        request_id, name, elapsed
+    );
 
     // 返回成功响应
     Ok(ApiResponse::with_message(

@@ -10,13 +10,13 @@ use llmproxy::{
 use std::fs::File;
 use std::io::Write;
 use tempfile::tempdir;
-use uuid::Uuid;
 
 // 创建有效的测试配置
 fn create_valid_test_config() -> Config {
     let upstream_config = UpstreamConfig {
         name: "test_upstream".to_string(),
         url: "http://localhost:8080".to_string(),
+        id: "test-upstream-id".to_string(),
         auth: Some(AuthConfig {
             r#type: AuthType::Bearer,
             token: Some("test_token".to_string()),
@@ -108,6 +108,7 @@ fn test_config_validation_duplicate_names() {
     let duplicate_upstream = UpstreamConfig {
         name: "test_upstream".to_string(), // 重复的名称
         url: "http://localhost:8081".to_string(),
+        id: "test-upstream-duplicate-id".to_string(),
         auth: None,
         headers: vec![],
         breaker: None,

@@ -10,6 +10,7 @@ pub mod error;
 pub mod metrics;
 pub mod server;
 pub mod upstream;
+pub mod util;
 
 // 重新导出单例指标
 pub use crate::metrics::METRICS;

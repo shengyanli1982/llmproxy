@@ -47,8 +47,8 @@ impl UpstreamManager {
         // 构建上游映射
         for upstream in upstreams {
             debug!(
-                "Loaded upstream: {}, id: {}, url: {:?}",
-                upstream.name, upstream.id, upstream.url
+                "Loaded upstream: {}, url: {:?}",
+                upstream.name, upstream.url
             );
             upstream_map.insert(upstream.name.clone(), upstream);
         }

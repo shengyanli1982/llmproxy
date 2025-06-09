@@ -9,7 +9,6 @@ use llmproxy::{
 use reqwest::Method;
 use std::time::Duration;
 use tokio::time::sleep;
-use uuid::Uuid;
 use wiremock::{
     matchers::{method, path},
     Mock, MockServer, ResponseTemplate,
@@ -25,6 +24,7 @@ fn create_test_configs(
     let mut upstream1 = UpstreamConfig {
         name: "test_upstream1".to_string(),
         url: mock_url1.to_string(),
+        id: "test-upstream1-id".to_string(),
         auth: None,
         headers: vec![HeaderOperation {
             op: HeaderOpType::Insert,
@@ -37,6 +37,7 @@ fn create_test_configs(
     let mut upstream2 = UpstreamConfig {
         name: "test_upstream2".to_string(),
         url: mock_url2.to_string(),
+        id: "test-upstream2-id".to_string(),
         auth: None,
         headers: vec![],
         breaker: None,
