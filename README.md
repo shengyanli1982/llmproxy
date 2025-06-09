@@ -678,6 +678,10 @@ LLMProxy adopts a modular, high-performance asynchronous architecture design. Co
 ![architecture](./images/architecture.png)
 _Figure: LLMProxy core architecture diagram (simplified version)_
 
+### Warm Restarts on Linux
+
+To enhance service availability, LLMProxy leverages the `SO_REUSEPORT` socket option on `Linux` systems for both its forwarding and admin services. This feature allows multiple instances of LLMProxy to listen on the same port, enabling seamless, zero-downtime restarts and upgrades. When a new process starts, it can immediately begin accepting new connections on the shared port, while the old process completes any ongoing requests before gracefully shutting down. This mechanism prevents connection drops during deployments and significantly simplifies high-availability setups. Please note that this feature is specific to `Linux` and is not available on other operating systems like `Windows` or `macOS`.
+
 ### Response-Time Aware Load Balancing Algorithm
 
 LLMProxy's response-time aware (`response_aware`) load balancing algorithm is an intelligent scheduling strategy designed specifically for large language models, which typically have high and variable response times and are computationally intensive. Unlike traditional round-robin or random strategies, this algorithm is specifically designed for services like LLMs with highly variable response times. It dynamically allocates new requests to the best service node by analyzing the comprehensive performance of upstream nodes in real-time (combining average response time, current concurrent load, and request success rate).
