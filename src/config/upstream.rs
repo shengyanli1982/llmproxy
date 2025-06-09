@@ -13,7 +13,7 @@ pub struct UpstreamConfig {
     // 认证配置
     #[serde(default)]
     pub auth: Option<AuthConfig>,
-    #[allow(dead_code)]
+    #[serde(skip)]
     pub id: String,
     // 请求头操作
     #[serde(default)]
