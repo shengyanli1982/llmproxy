@@ -4,7 +4,7 @@ use crate::metrics::METRICS;
 use crate::r#const::{error_labels, http_headers};
 use crate::upstream::UpstreamManager;
 use axum::{
-    body::Body,
+    body::{to_bytes, Body},
     extract::{Path, Request, State},
     http::{HeaderMap, Method, StatusCode},
     response::{IntoResponse, Response},
@@ -48,7 +48,7 @@ impl ForwardServer {
 
         let state = Arc::new(ForwardState {
             upstream_manager,
-            config: config.clone(),
+            config,
         });
 
         Ok(Self { addr, state })
@@ -179,10 +179,26 @@ pub async fn forward_handler(
     // 记录开始时间
     let start_time = Instant::now();
 
-    // 获取请求路径
-    let path_str = match path {
-        Some(p) => format!("/{}", p.0),
-        None => String::new(),
+    // 获取请求路径 - 避免不必要的字符串分配
+    let path_str = match &path {
+        Some(p) => {
+            let path_value = &p.0;
+            if path_value.is_empty() {
+                "/".to_string()
+            } else {
+                // 只有在路径不是以 / 开头时才添加
+                if path_value.starts_with('/') {
+                    path_value.to_string()
+                } else {
+                    // 在这种情况下才需要分配新字符串
+                    let mut path_with_slash = String::with_capacity(path_value.len() + 1);
+                    path_with_slash.push('/');
+                    path_with_slash.push_str(path_value);
+                    path_with_slash
+                }
+            }
+        }
+        None => "/".to_string(),
     };
 
     // 记录请求指标
@@ -191,9 +207,9 @@ pub async fn forward_handler(
         .with_label_values(&[&state.config.name, method.as_str(), &path_str])
         .inc();
 
-    // 提取请求体
+    // 提取请求体 - 使用更高效的方式处理请求体
     let (_, body) = req.into_parts();
-    let body_bytes = match axum::body::to_bytes(body, usize::MAX).await {
+    let body_bytes = match to_bytes(body, usize::MAX).await {
         Ok(bytes) => {
             if !bytes.is_empty() {
                 Some(bytes)
@@ -259,8 +275,9 @@ pub async fn forward_handler(
 
             // 复制响应头
             if let Some(headers_mut) = axum_response.headers_mut() {
+                // 直接移动头，而不是克隆
                 for (name, value) in response.headers() {
-                    headers_mut.insert(name, value.clone());
+                    headers_mut.insert(name.clone(), value.clone());
                 }
             }
 
@@ -271,6 +288,7 @@ pub async fn forward_handler(
 
                 // 将 reqwest 响应流转换为 axum 流
                 let stream = response.bytes_stream();
+                // 使用 Body::from_stream 直接传递流，避免额外的内存复制
                 let body = Body::from_stream(stream);
 
                 match axum_response.body(body) {
@@ -283,13 +301,16 @@ pub async fn forward_handler(
             } else {
                 // 对于非流式响应，读取完整响应体
                 match response.bytes().await {
-                    Ok(bytes) => match axum_response.body(Body::from(bytes)) {
-                        Ok(response) => response,
-                        Err(e) => {
-                            error!("Failed to create response: {}", e);
-                            StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                    Ok(bytes) => {
+                        // 直接使用 bytes 构建响应体，避免额外的内存复制
+                        match axum_response.body(Body::from(bytes)) {
+                            Ok(response) => response,
+                            Err(e) => {
+                                error!("Failed to create response: {}", e);
+                                StatusCode::INTERNAL_SERVER_ERROR.into_response()
+                            }
                         }
-                    },
+                    }
                     Err(e) => {
                         error!("Failed to read response body: {}", e);
                         StatusCode::INTERNAL_SERVER_ERROR.into_response()

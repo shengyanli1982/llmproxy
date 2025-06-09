@@ -283,7 +283,7 @@ impl Metrics {
 
     // 记录上游请求错误
     pub fn record_upstream_request_error(&self, group: &str, upstream: &str, error_type: &str) {
-        self.upstream_errors_total()
+        self.upstream_errors_total
             .with_label_values(&[error_type, group, upstream])
             .inc();
     }

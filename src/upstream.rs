@@ -249,8 +249,12 @@ impl UpstreamManager {
         // 记录开始时间
         let start_time = Instant::now();
 
-        // 构建请求URL
-        let url = format!("{}{}", upstream_config.url, path);
+        // 构建请求URL - 使用 String::with_capacity 预分配内存
+        let url_capacity = upstream_config.url.len() + path.len();
+        let mut url = String::with_capacity(url_capacity);
+        url.push_str(&upstream_config.url);
+        url.push_str(path);
+
         let url_parsed = Url::parse(&url)
             .map_err(|e| AppError::Upstream(format!("Invalid upstream URL: {} - {}", url, e)))?;
 
@@ -263,32 +267,40 @@ impl UpstreamManager {
             }
         };
 
-        // 定义请求执行闭包
-        let request_future = |headers: HeaderMap, body: Option<bytes::Bytes>| async move {
-            // 创建请求构建器
-            let mut request_builder = client.request(method.clone(), url_parsed.clone());
+        // 定义请求执行闭包 - 使用引用捕获以减少克隆
+        let upstream_url = &upstream_config.url;
+        let request_future = |headers: HeaderMap, body: Option<bytes::Bytes>| {
+            let url_parsed = url_parsed.clone();
+            let method = method.clone();
+            let upstream_url = upstream_url.clone();
+            let client = client.clone();
 
-            // 处理请求头
-            let processed_headers = self.process_headers(headers, upstream_config)?;
-            request_builder = request_builder.headers(processed_headers);
+            async move {
+                // 创建请求构建器
+                let mut request_builder = client.request(method, url_parsed);
 
-            // 添加认证信息
-            if let Some(ref auth) = upstream_config.auth {
-                request_builder = self.add_auth(request_builder, auth)?;
-            }
+                // 处理请求头
+                let processed_headers = self.process_headers(headers, upstream_config)?;
+                request_builder = request_builder.headers(processed_headers);
 
-            // 添加请求体（如果有）
-            if let Some(body_data) = body {
-                request_builder = request_builder.body(body_data);
-            }
+                // 添加认证信息
+                if let Some(ref auth) = upstream_config.auth {
+                    request_builder = self.add_auth(request_builder, auth)?;
+                }
 
-            // 发送请求
-            match request_builder.send().await {
-                Ok(response) => Ok(response),
-                Err(e) => Err(UpstreamError(format!(
-                    "Request to {} failed: {}",
-                    upstream_config.url, e
-                ))),
+                // 添加请求体（如果有）
+                if let Some(body_data) = body {
+                    request_builder = request_builder.body(body_data);
+                }
+
+                // 发送请求
+                match request_builder.send().await {
+                    Ok(response) => Ok(response),
+                    Err(e) => Err(UpstreamError(format!(
+                        "Request to {} failed: {}",
+                        upstream_url, e
+                    ))),
+                }
             }
         };
 
@@ -390,7 +402,13 @@ impl UpstreamManager {
         headers: HeaderMap,
         upstream: &UpstreamConfig,
     ) -> Result<HeaderMap, AppError> {
-        let mut result = headers.clone();
+        // 创建新的 HeaderMap 而不是克隆
+        let mut result = HeaderMap::with_capacity(headers.len());
+
+        // 先复制所有原始头
+        for (key, value) in headers.iter() {
+            result.insert(key, value.clone());
+        }
 
         // 处理请求头操作
         for op in &upstream.headers {

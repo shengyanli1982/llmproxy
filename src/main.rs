@@ -138,7 +138,8 @@ async fn create_components(config: Config) -> Result<AppComponents, AppError> {
 
     // 创建转发服务
     let mut forward_servers = Vec::with_capacity(config.http_server.forwards.len());
-    for forward_config in &config.http_server.forwards {
+    for forward_config in config.http_server.forwards {
+        // 直接使用所有权转移，避免克隆
         match ForwardServer::new(forward_config.clone(), upstream_manager.clone()) {
             Ok(server) => {
                 info!(

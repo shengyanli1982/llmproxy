@@ -27,6 +27,14 @@ impl From<AppError> for UpstreamError {
     }
 }
 
+// 创建共享数据结构，避免多次克隆相同的字符串
+#[derive(Clone)]
+struct HookData {
+    name: String,
+    group: String,
+    url: String,
+}
+
 /// 上游服务熔断器
 pub struct UpstreamCircuitBreaker {
     breaker: CircuitBreaker<DefaultPolicy, UpstreamError>,
@@ -103,38 +111,25 @@ impl UpstreamCircuitBreaker {
 
     /// 创建熔断器事件钩子
     fn create_hooks(name: &str, group: &str, url: &str) -> HookRegistry {
+        // 只克隆一次字符串
+        let data = HookData {
+            name: name.to_owned(),
+            group: group.to_owned(),
+            url: url.to_owned(),
+        };
+
         let hooks = HookRegistry::new();
 
-        // 使用引用而不是克隆字符串
-        let name_open = name.to_owned();
-        let group_open = group.to_owned();
-        let url_open = url.to_owned();
-
-        let name_close = name.to_owned();
-        let group_close = group.to_owned();
-        let url_close = url.to_owned();
-
-        let name_half = name.to_owned();
-        let group_half = group.to_owned();
-        let url_half = url.to_owned();
-
-        let name_success = name.to_owned();
-        let group_success = group.to_owned();
-        let url_success = url.to_owned();
-
-        let name_failure = name.to_owned();
-        let group_failure = group.to_owned();
-        let url_failure = url.to_owned();
-
-        // 状态转换钩子
+        // 状态转换钩子 - 开启
+        let data_open = data.clone();
         hooks.set_on_open(move || {
             // 记录状态变化指标：从关闭到开启
             METRICS
                 .circuitbreaker_state_changes_total()
                 .with_label_values(&[
-                    &group_open,
-                    &name_open,
-                    &url_open,
+                    &data_open.group,
+                    &data_open.name,
+                    &data_open.url,
                     breaker_state_labels::CLOSED,
                     breaker_state_labels::OPEN,
                 ])
@@ -142,23 +137,25 @@ impl UpstreamCircuitBreaker {
 
             METRICS
                 .circuitbreaker_opened_total()
-                .with_label_values(&[&group_open, &name_open, &url_open])
+                .with_label_values(&[&data_open.group, &data_open.name, &data_open.url])
                 .inc();
 
             warn!(
                 "Circuit breaker opened for upstream '{}' in group '{}'",
-                name_open, group_open
+                data_open.name, data_open.group
             );
         });
 
+        // 状态转换钩子 - 关闭
+        let data_close = data.clone();
         hooks.set_on_close(move || {
             // 记录状态变化指标：从开启或半开到关闭
             METRICS
                 .circuitbreaker_state_changes_total()
                 .with_label_values(&[
-                    &group_close,
-                    &name_close,
-                    &url_close,
+                    &data_close.group,
+                    &data_close.name,
+                    &data_close.url,
                     breaker_state_labels::OPEN, // 可能是从开启状态
                     breaker_state_labels::CLOSED,
                 ])
@@ -168,9 +165,9 @@ impl UpstreamCircuitBreaker {
             METRICS
                 .circuitbreaker_state_changes_total()
                 .with_label_values(&[
-                    &group_close,
-                    &name_close,
-                    &url_close,
+                    &data_close.group,
+                    &data_close.name,
+                    &data_close.url,
                     breaker_state_labels::HALF_OPEN,
                     breaker_state_labels::CLOSED,
                 ])
@@ -178,23 +175,25 @@ impl UpstreamCircuitBreaker {
 
             METRICS
                 .circuitbreaker_closed_total()
-                .with_label_values(&[&group_close, &name_close, &url_close])
+                .with_label_values(&[&data_close.group, &data_close.name, &data_close.url])
                 .inc();
 
             info!(
                 "Circuit breaker closed for upstream '{}' in group '{}'",
-                name_close, group_close
+                data_close.name, data_close.group
             );
         });
 
+        // 状态转换钩子 - 半开
+        let data_half = data.clone();
         hooks.set_on_half_open(move || {
             // 记录状态变化指标：从开启到半开
             METRICS
                 .circuitbreaker_state_changes_total()
                 .with_label_values(&[
-                    &group_half,
-                    &name_half,
-                    &url_half,
+                    &data_half.group,
+                    &data_half.name,
+                    &data_half.url,
                     breaker_state_labels::OPEN,
                     breaker_state_labels::HALF_OPEN,
                 ])
@@ -202,36 +201,38 @@ impl UpstreamCircuitBreaker {
 
             METRICS
                 .circuitbreaker_half_opened_total()
-                .with_label_values(&[&group_half, &name_half, &url_half])
+                .with_label_values(&[&data_half.group, &data_half.name, &data_half.url])
                 .inc();
 
             info!(
                 "Circuit breaker half-opened for upstream '{}' in group '{}'",
-                name_half, group_half
+                data_half.name, data_half.group
             );
         });
 
         // 成功调用钩子
+        let data_success = data.clone();
         hooks.set_on_success(move || {
             METRICS
                 .circuitbreaker_calls_total()
                 .with_label_values(&[
-                    &group_success,
-                    &name_success,
-                    &url_success,
+                    &data_success.group,
+                    &data_success.name,
+                    &data_success.url,
                     breaker_result_labels::SUCCESS,
                 ])
                 .inc();
         });
 
         // 失败调用钩子
+        let data_failure = data;
         hooks.set_on_failure(move || {
             METRICS
                 .circuitbreaker_calls_total()
                 .with_label_values(&[
-                    &group_failure,
-                    &name_failure,
-                    &url_failure,
+                    &data_failure.group,
+                    &data_failure.name,
+                    &data_failure.url,
                     breaker_result_labels::FAILURE,
                 ])
                 .inc();

@@ -47,17 +47,20 @@ pub trait LoadBalancer: Send + Sync {
 // 上游健康检查帮助函数
 #[inline(always)]
 pub fn is_upstream_healthy(managed_upstream: &ManagedUpstream) -> bool {
-    match &managed_upstream.breaker {
-        Some(breaker) if !breaker.is_call_permitted() => {
+    // 如果没有熔断器，则认为上游健康
+    if let Some(breaker) = &managed_upstream.breaker {
+        if !breaker.is_call_permitted() {
             // 熔断器开启，上游不健康
             debug!(
                 "Skipping upstream: {} (circuit breaker open)",
                 managed_upstream.upstream_ref.name
             );
-            false
+            return false;
         }
-        _ => true,
     }
+
+    // 默认健康
+    true
 }
 
 // 创建负载均衡器
