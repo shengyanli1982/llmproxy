@@ -77,8 +77,12 @@ async fn metrics_handler() -> Response {
     // 收集指标
     let metric_families = METRICS.registry().gather();
 
+    // 预估缓冲区大小，避免多次重新分配
+    // 每个指标家族平均大约需要 200 字节
+    let estimated_size = metric_families.len() * 200;
+    let mut buffer = Vec::with_capacity(estimated_size);
+
     // 编码指标
-    let mut buffer = Vec::new();
     if let Err(e) = encoder.encode(&metric_families, &mut buffer) {
         error!("Failed to encode metrics: {}", e);
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
