@@ -152,7 +152,7 @@ pub async fn update_upstream(
     // 检查路径参数和请求体中的名称是否匹配
     if name != upstream.name {
         return Err(ApiError::validation_error(format!(
-            "Path parameter name '{}' does not match request body name '{}'",
+            "Path parameter name '{}' does not match request body name '{}'. The name field cannot be updated. To change the name, please delete the existing upstream and create a new one.",
             name, upstream.name
         )));
     }

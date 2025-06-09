@@ -10,9 +10,6 @@ pub struct UpstreamConfig {
     pub name: String,
     // 上游URL
     pub url: String,
-    // 唯一标识符 (内部使用)
-    #[serde(skip)]
-    pub id: String,
     // 认证配置
     #[serde(default)]
     pub auth: Option<AuthConfig>,

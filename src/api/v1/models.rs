@@ -24,7 +24,7 @@ impl<T> ApiResponse<T> {
     /// 创建一个新的成功响应
     pub fn new(data: Option<T>) -> Self {
         Self {
-            code: StatusCode::OK.into(),
+            code: StatusCode::OK.as_u16(),
             status: "success".to_string(),
             message: "Request successful".to_string(),
             data,
@@ -34,7 +34,7 @@ impl<T> ApiResponse<T> {
     /// 创建一个带有自定义消息的成功响应
     pub fn with_message(data: Option<T>, message: impl Into<String>) -> Self {
         Self {
-            code: 200,
+            code: StatusCode::OK.as_u16(),
             status: "success".to_string(),
             message: message.into(),
             data,
@@ -118,7 +118,7 @@ impl ApiError {
     /// 创建一个验证错误响应
     pub fn validation_error(message: impl Into<String>) -> Self {
         Self {
-            code: 400,
+            code: StatusCode::BAD_REQUEST.as_u16(),
             status: "error".to_string(),
             error: ErrorInfo {
                 error_type: ErrorType::ValidationError.to_string(),
@@ -134,7 +134,7 @@ impl ApiError {
         details: Vec<ErrorDetail>,
     ) -> Self {
         Self {
-            code: 400,
+            code: StatusCode::BAD_REQUEST.as_u16(),
             status: "error".to_string(),
             error: ErrorInfo {
                 error_type: ErrorType::ValidationError.to_string(),
@@ -147,7 +147,7 @@ impl ApiError {
     /// 创建一个资源未找到错误响应
     pub fn resource_not_found(resource_type: impl Into<String>, name: impl Into<String>) -> Self {
         Self {
-            code: 404,
+            code: StatusCode::NOT_FOUND.as_u16(),
             status: "error".to_string(),
             error: ErrorInfo {
                 error_type: ErrorType::ResourceNotFound.to_string(),
@@ -160,7 +160,7 @@ impl ApiError {
     /// 创建一个资源冲突错误响应
     pub fn resource_conflict(message: impl Into<String>) -> Self {
         Self {
-            code: 409,
+            code: StatusCode::CONFLICT.as_u16(),
             status: "error".to_string(),
             error: ErrorInfo {
                 error_type: ErrorType::ResourceConflict.to_string(),
@@ -173,7 +173,7 @@ impl ApiError {
     /// 创建一个内部服务器错误响应
     pub fn internal_server_error(message: impl Into<String>) -> Self {
         Self {
-            code: 500,
+            code: StatusCode::INTERNAL_SERVER_ERROR.as_u16(),
             status: "error".to_string(),
             error: ErrorInfo {
                 error_type: ErrorType::InternalServerError.to_string(),
@@ -187,9 +187,9 @@ impl ApiError {
 impl IntoResponse for ApiError {
     fn into_response(self) -> Response {
         let status = match self.code {
-            400 => StatusCode::BAD_REQUEST,
-            404 => StatusCode::NOT_FOUND,
-            409 => StatusCode::CONFLICT,
+            code if code == StatusCode::BAD_REQUEST.as_u16() => StatusCode::BAD_REQUEST,
+            code if code == StatusCode::NOT_FOUND.as_u16() => StatusCode::NOT_FOUND,
+            code if code == StatusCode::CONFLICT.as_u16() => StatusCode::CONFLICT,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
 
@@ -201,7 +201,7 @@ impl IntoResponse for ApiError {
 impl<T: Serialize> IntoResponse for ApiResponse<T> {
     fn into_response(self) -> Response {
         let status = match self.code {
-            201 => StatusCode::CREATED,
+            code if code == StatusCode::CREATED.as_u16() => StatusCode::CREATED,
             _ => StatusCode::OK,
         };
 
