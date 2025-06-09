@@ -180,7 +180,7 @@ impl IntoSubsystem<AppError> for ForwardServer {
         let std_listener: std::net::TcpListener = socket.into();
 
         // 将 std::net::TcpListener 转换为 tokio::net::TcpListener
-        let listener = TcpListener::from_std(std_listener).map_err(|e| AppError::Io(e))?;
+        let listener = TcpListener::from_std(std_listener).map_err(AppError::Io)?;
 
         info!(
             "Forwarding service {} listening on {}",
