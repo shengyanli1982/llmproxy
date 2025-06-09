@@ -370,7 +370,7 @@ async fn test_response_aware_balancer_pending_requests() {
     let first_name = first_upstream.upstream_ref.name.clone();
 
     // 为第一个上游设置非常快的响应时间，确保它被优先选择
-    balancer.update_metrics(&first_upstream, 50);
+    balancer.update_metrics(first_upstream, 50);
 
     // 再次选择，应该选择第一个上游
     let selected = balancer.select_upstream().await.unwrap();
