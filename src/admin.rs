@@ -8,6 +8,7 @@ use axum::{
     Router,
 };
 use prometheus::{Encoder, TextEncoder};
+use socket2::{Domain, Protocol, Socket, Type};
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemHandle};
@@ -34,17 +35,52 @@ impl IntoSubsystem<AppError> for AdminServer {
             .route("/health", get(health_handler))
             .route("/metrics", get(metrics_handler));
 
-        // 绑定TCP监听器
-        let listener = match TcpListener::bind(self.addr).await {
-            Ok(listener) => {
-                info!("Admin service listening on {}", self.addr);
-                listener
-            }
-            Err(e) => {
-                error!("Failed to bind admin service: {}", e);
-                return Err(AppError::Io(e));
-            }
+        // 使用 socket2 创建 TCP 监听器
+        // 根据地址类型确定域
+        let domain = if self.addr.is_ipv6() {
+            Domain::IPV6
+        } else {
+            Domain::IPV4
         };
+
+        // 创建 socket
+        let socket = Socket::new(domain, Type::STREAM, Some(Protocol::TCP))
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+
+        // 设置 SO_REUSEADDR 选项 (所有平台)
+        socket
+            .set_reuse_address(true)
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+
+        // 在 Linux 平台上设置 SO_REUSEPORT 选项
+        #[cfg(target_os = "linux")]
+        socket
+            .set_reuse_port(true)
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+
+        // 绑定到地址
+        let addr = self.addr.into();
+        socket
+            .bind(&addr)
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+
+        // 开始监听
+        socket
+            .listen(1024)
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+
+        // 设置为非阻塞模式
+        socket
+            .set_nonblocking(true)
+            .map_err(|e| AppError::Io(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+
+        // 将 socket2::Socket 转换为 std::net::TcpListener
+        let std_listener: std::net::TcpListener = socket.into();
+
+        // 将 std::net::TcpListener 转换为 tokio::net::TcpListener
+        let listener = TcpListener::from_std(std_listener).map_err(|e| AppError::Io(e))?;
+
+        info!("Admin service listening on {}", self.addr);
 
         // 使用tokio::select!监听服务器和关闭信号
         tokio::select! {
