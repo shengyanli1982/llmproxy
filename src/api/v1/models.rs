@@ -26,7 +26,7 @@ impl<T> ApiResponse<T> {
         Self {
             code: StatusCode::OK.into(),
             status: "success".to_string(),
-            message: "请求成功".to_string(),
+            message: "Request successful".to_string(),
             data,
         }
     }
@@ -151,7 +151,7 @@ impl ApiError {
             status: "error".to_string(),
             error: ErrorInfo {
                 error_type: ErrorType::ResourceNotFound.to_string(),
-                message: format!("{}未找到: {}", resource_type.into(), name.into()),
+                message: format!("{} not found: {}", resource_type.into(), name.into()),
                 details: None,
             },
         }

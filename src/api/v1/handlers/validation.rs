@@ -14,11 +14,11 @@ pub fn validate_upstream_payload(upstream: &UpstreamConfig) -> Result<(), ApiErr
     // 检查名称
     if upstream.name.is_empty() {
         return Err(ApiError::validation_error_with_details(
-            "上游配置验证失败",
+            "Upstream configuration validation failed",
             vec![ErrorDetail {
                 resource: Some("Upstream".to_string()),
                 field: Some("name".to_string()),
-                issue: "名称不能为空".to_string(),
+                issue: "Name cannot be empty".to_string(),
             }],
         ));
     }
@@ -26,11 +26,11 @@ pub fn validate_upstream_payload(upstream: &UpstreamConfig) -> Result<(), ApiErr
     // 验证URL格式
     if let Err(e) = Url::parse(&upstream.url) {
         return Err(ApiError::validation_error_with_details(
-            "上游配置验证失败",
+            "Upstream configuration validation failed",
             vec![ErrorDetail {
                 resource: Some("Upstream".to_string()),
                 field: Some("url".to_string()),
-                issue: format!("URL格式无效: {}", e),
+                issue: format!("Invalid URL format: {}", e),
             }],
         ));
     }
@@ -41,11 +41,12 @@ pub fn validate_upstream_payload(upstream: &UpstreamConfig) -> Result<(), ApiErr
             AuthType::Bearer => {
                 if auth.token.as_ref().map_or(true, |s| s.is_empty()) {
                     return Err(ApiError::validation_error_with_details(
-                        "上游配置验证失败",
+                        "Upstream configuration validation failed",
                         vec![ErrorDetail {
                             resource: Some("Upstream".to_string()),
                             field: Some("auth.token".to_string()),
-                            issue: "使用Bearer认证时必须提供有效的token".to_string(),
+                            issue: "Valid token must be provided when using Bearer authentication"
+                                .to_string(),
                         }],
                     ));
                 }
@@ -55,11 +56,11 @@ pub fn validate_upstream_payload(upstream: &UpstreamConfig) -> Result<(), ApiErr
                     || auth.password.as_ref().map_or(true, |s| s.is_empty())
                 {
                     return Err(ApiError::validation_error_with_details(
-                        "上游配置验证失败",
+                        "Upstream configuration validation failed",
                         vec![ErrorDetail {
                             resource: Some("Upstream".to_string()),
                             field: Some("auth.username/auth.password".to_string()),
-                            issue: "使用Basic认证时必须提供有效的用户名和密码".to_string(),
+                            issue: "Valid username and password must be provided when using Basic authentication".to_string(),
                         }],
                     ));
                 }
@@ -74,11 +75,11 @@ pub fn validate_upstream_payload(upstream: &UpstreamConfig) -> Result<(), ApiErr
             HeaderOpType::Insert | HeaderOpType::Replace => {
                 if header_op.value.as_ref().map_or(true, |s| s.is_empty()) {
                     return Err(ApiError::validation_error_with_details(
-                        "上游配置验证失败",
+                        "Upstream configuration validation failed",
                         vec![ErrorDetail {
                             resource: Some("Upstream".to_string()),
                             field: Some(format!("headers[{}].value", header_op.key)),
-                            issue: format!("{}操作需要提供有效的值", header_op.op),
+                            issue: format!("{} operation requires a valid value", header_op.op),
                         }],
                     ));
                 }
@@ -93,12 +94,12 @@ pub fn validate_upstream_payload(upstream: &UpstreamConfig) -> Result<(), ApiErr
             || breaker.threshold > breaker_limits::MAX_THRESHOLD
         {
             return Err(ApiError::validation_error_with_details(
-                "上游配置验证失败",
+                "Upstream configuration validation failed",
                 vec![ErrorDetail {
                     resource: Some("Upstream".to_string()),
                     field: Some("breaker.threshold".to_string()),
                     issue: format!(
-                        "熔断器阈值必须在 {} 和 {} 之间",
+                        "Circuit breaker threshold must be between {} and {}",
                         breaker_limits::MIN_THRESHOLD,
                         breaker_limits::MAX_THRESHOLD
                     ),
@@ -110,12 +111,12 @@ pub fn validate_upstream_payload(upstream: &UpstreamConfig) -> Result<(), ApiErr
             || breaker.cooldown > breaker_limits::MAX_COOLDOWN
         {
             return Err(ApiError::validation_error_with_details(
-                "上游配置验证失败",
+                "Upstream configuration validation failed",
                 vec![ErrorDetail {
                     resource: Some("Upstream".to_string()),
                     field: Some("breaker.cooldown".to_string()),
                     issue: format!(
-                        "熔断器冷却时间必须在 {} 和 {} 之间",
+                        "Circuit breaker cooldown must be between {} and {}",
                         breaker_limits::MIN_COOLDOWN,
                         breaker_limits::MAX_COOLDOWN
                     ),
@@ -132,11 +133,11 @@ pub fn validate_upstream_group_payload(group: &UpstreamGroupConfig) -> Result<()
     // 检查名称
     if group.name.is_empty() {
         return Err(ApiError::validation_error_with_details(
-            "上游组配置验证失败",
+            "Upstream group configuration validation failed",
             vec![ErrorDetail {
                 resource: Some("UpstreamGroup".to_string()),
                 field: Some("name".to_string()),
-                issue: "名称不能为空".to_string(),
+                issue: "Name cannot be empty".to_string(),
             }],
         ));
     }
@@ -144,11 +145,11 @@ pub fn validate_upstream_group_payload(group: &UpstreamGroupConfig) -> Result<()
     // 检查上游列表
     if group.upstreams.is_empty() {
         return Err(ApiError::validation_error_with_details(
-            "上游组配置验证失败",
+            "Upstream group configuration validation failed",
             vec![ErrorDetail {
                 resource: Some("UpstreamGroup".to_string()),
                 field: Some("upstreams".to_string()),
-                issue: "上游组必须至少包含一个上游".to_string(),
+                issue: "Upstream group must contain at least one upstream".to_string(),
             }],
         ));
     }
@@ -159,12 +160,12 @@ pub fn validate_upstream_group_payload(group: &UpstreamGroupConfig) -> Result<()
             || upstream_ref.weight > weight_limits::MAX_WEIGHT
         {
             return Err(ApiError::validation_error_with_details(
-                "上游组配置验证失败",
+                "Upstream group configuration validation failed",
                 vec![ErrorDetail {
                     resource: Some("UpstreamGroup".to_string()),
                     field: Some(format!("upstreams[{}].weight", i)),
                     issue: format!(
-                        "权重值必须在 {} 和 {} 之间",
+                        "Weight must be between {} and {}",
                         weight_limits::MIN_WEIGHT,
                         weight_limits::MAX_WEIGHT
                     ),
@@ -181,11 +182,11 @@ pub fn validate_upstream_group_payload(group: &UpstreamGroupConfig) -> Result<()
             .all(|u| u.weight == weight_limits::MIN_WEIGHT);
         if all_default_weight {
             return Err(ApiError::validation_error_with_details(
-                "上游组配置验证失败",
+                "Upstream group configuration validation failed",
                 vec![ErrorDetail {
                     resource: Some("UpstreamGroup".to_string()),
                     field: Some("balance.strategy".to_string()),
-                    issue: "使用加权轮询策略时，至少一个上游的权重必须大于默认值".to_string(),
+                    issue: "When using weighted round-robin strategy, at least one upstream must have weight greater than the default value".to_string(),
                 }],
             ));
         }
@@ -199,12 +200,12 @@ pub fn validate_upstream_group_payload(group: &UpstreamGroupConfig) -> Result<()
         || http_client.timeout.connect > http_client_limits::MAX_CONNECT_TIMEOUT
     {
         return Err(ApiError::validation_error_with_details(
-            "上游组配置验证失败",
+            "Upstream group configuration validation failed",
             vec![ErrorDetail {
                 resource: Some("UpstreamGroup".to_string()),
                 field: Some("http_client.timeout.connect".to_string()),
                 issue: format!(
-                    "连接超时必须在 {} 和 {} 之间",
+                    "Connection timeout must be between {} and {}",
                     http_client_limits::MIN_CONNECT_TIMEOUT,
                     http_client_limits::MAX_CONNECT_TIMEOUT
                 ),
@@ -216,12 +217,12 @@ pub fn validate_upstream_group_payload(group: &UpstreamGroupConfig) -> Result<()
         || http_client.timeout.request > http_client_limits::MAX_REQUEST_TIMEOUT
     {
         return Err(ApiError::validation_error_with_details(
-            "上游组配置验证失败",
+            "Upstream group configuration validation failed",
             vec![ErrorDetail {
                 resource: Some("UpstreamGroup".to_string()),
                 field: Some("http_client.timeout.request".to_string()),
                 issue: format!(
-                    "请求超时必须在 {} 和 {} 之间",
+                    "Request timeout must be between {} and {}",
                     http_client_limits::MIN_REQUEST_TIMEOUT,
                     http_client_limits::MAX_REQUEST_TIMEOUT
                 ),
@@ -233,12 +234,12 @@ pub fn validate_upstream_group_payload(group: &UpstreamGroupConfig) -> Result<()
         || http_client.timeout.idle > http_client_limits::MAX_IDLE_TIMEOUT
     {
         return Err(ApiError::validation_error_with_details(
-            "上游组配置验证失败",
+            "Upstream group configuration validation failed",
             vec![ErrorDetail {
                 resource: Some("UpstreamGroup".to_string()),
                 field: Some("http_client.timeout.idle".to_string()),
                 issue: format!(
-                    "空闲超时必须在 {} 和 {} 之间",
+                    "Idle timeout must be between {} and {}",
                     http_client_limits::MIN_IDLE_TIMEOUT,
                     http_client_limits::MAX_IDLE_TIMEOUT
                 ),
@@ -252,12 +253,12 @@ pub fn validate_upstream_group_payload(group: &UpstreamGroupConfig) -> Result<()
             || http_client.retry.attempts > retry_limits::MAX_ATTEMPTS
         {
             return Err(ApiError::validation_error_with_details(
-                "上游组配置验证失败",
+                "Upstream group configuration validation failed",
                 vec![ErrorDetail {
                     resource: Some("UpstreamGroup".to_string()),
                     field: Some("http_client.retry.attempts".to_string()),
                     issue: format!(
-                        "重试次数必须在 {} 和 {} 之间",
+                        "Retry attempts must be between {} and {}",
                         retry_limits::MIN_ATTEMPTS,
                         retry_limits::MAX_ATTEMPTS
                     ),
@@ -269,12 +270,12 @@ pub fn validate_upstream_group_payload(group: &UpstreamGroupConfig) -> Result<()
             || http_client.retry.initial > retry_limits::MAX_INITIAL_BACKOFF
         {
             return Err(ApiError::validation_error_with_details(
-                "上游组配置验证失败",
+                "Upstream group configuration validation failed",
                 vec![ErrorDetail {
                     resource: Some("UpstreamGroup".to_string()),
                     field: Some("http_client.retry.initial".to_string()),
                     issue: format!(
-                        "初始重试间隔必须在 {} 和 {} 之间",
+                        "Initial retry interval must be between {} and {}",
                         retry_limits::MIN_INITIAL_BACKOFF,
                         retry_limits::MAX_INITIAL_BACKOFF
                     ),
@@ -291,11 +292,11 @@ pub fn validate_forward_payload(forward: &ForwardConfig) -> Result<(), ApiError>
     // 检查名称
     if forward.name.is_empty() {
         return Err(ApiError::validation_error_with_details(
-            "转发服务配置验证失败",
+            "Forward service configuration validation failed",
             vec![ErrorDetail {
                 resource: Some("Forward".to_string()),
                 field: Some("name".to_string()),
-                issue: "名称不能为空".to_string(),
+                issue: "Name cannot be empty".to_string(),
             }],
         ));
     }
@@ -303,11 +304,11 @@ pub fn validate_forward_payload(forward: &ForwardConfig) -> Result<(), ApiError>
     // 检查上游组
     if forward.upstream_group.is_empty() {
         return Err(ApiError::validation_error_with_details(
-            "转发服务配置验证失败",
+            "Forward service configuration validation failed",
             vec![ErrorDetail {
                 resource: Some("Forward".to_string()),
                 field: Some("upstream_group".to_string()),
-                issue: "上游组名称不能为空".to_string(),
+                issue: "Upstream group name cannot be empty".to_string(),
             }],
         ));
     }
@@ -318,12 +319,12 @@ pub fn validate_forward_payload(forward: &ForwardConfig) -> Result<(), ApiError>
             || forward.ratelimit.per_second > rate_limit_limits::MAX_RATE
         {
             return Err(ApiError::validation_error_with_details(
-                "转发服务配置验证失败",
+                "Forward service configuration validation failed",
                 vec![ErrorDetail {
                     resource: Some("Forward".to_string()),
                     field: Some("ratelimit.per_second".to_string()),
                     issue: format!(
-                        "每秒请求数必须在 {} 和 {} 之间",
+                        "Requests per second must be between {} and {}",
                         rate_limit_limits::MIN_RATE,
                         rate_limit_limits::MAX_RATE
                     ),
@@ -335,12 +336,12 @@ pub fn validate_forward_payload(forward: &ForwardConfig) -> Result<(), ApiError>
             || forward.ratelimit.burst > rate_limit_limits::MAX_BURST
         {
             return Err(ApiError::validation_error_with_details(
-                "转发服务配置验证失败",
+                "Forward service configuration validation failed",
                 vec![ErrorDetail {
                     resource: Some("Forward".to_string()),
                     field: Some("ratelimit.burst".to_string()),
                     issue: format!(
-                        "突发请求数必须大于等于每秒请求数，且不超过 {}",
+                        "Burst size must be greater than or equal to requests per second and not exceed {}",
                         rate_limit_limits::MAX_BURST
                     ),
                 }],
@@ -353,12 +354,12 @@ pub fn validate_forward_payload(forward: &ForwardConfig) -> Result<(), ApiError>
         || forward.timeout.connect > http_client_limits::MAX_CONNECT_TIMEOUT
     {
         return Err(ApiError::validation_error_with_details(
-            "转发服务配置验证失败",
+            "Forward service configuration validation failed",
             vec![ErrorDetail {
                 resource: Some("Forward".to_string()),
                 field: Some("timeout.connect".to_string()),
                 issue: format!(
-                    "连接超时必须在 {} 和 {} 之间",
+                    "Connection timeout must be between {} and {}",
                     http_client_limits::MIN_CONNECT_TIMEOUT,
                     http_client_limits::MAX_CONNECT_TIMEOUT
                 ),
@@ -375,13 +376,13 @@ pub fn check_config_integrity(config: &Config) -> Result<(), ApiError> {
     match config.validate() {
         Ok(_) => Ok(()),
         Err(AppError::Config(msg)) => {
-            debug!("配置验证失败: {}", msg);
+            debug!("Configuration validation failed: {}", msg);
             Err(ApiError::validation_error(msg))
         }
         Err(e) => {
-            debug!("配置验证失败: {}", e);
+            debug!("Configuration validation failed: {}", e);
             Err(ApiError::internal_server_error(format!(
-                "配置验证失败: {}",
+                "Configuration validation failed: {}",
                 e
             )))
         }
@@ -394,7 +395,7 @@ pub fn check_upstream_references(config: &Config, upstream_name: &str) -> Result
         for upstream_ref in &group.upstreams {
             if upstream_ref.name == upstream_name {
                 return Err(ApiError::resource_conflict(format!(
-                    "无法删除上游 '{}': 它正被上游组 '{}' 引用",
+                    "Cannot delete upstream '{}': it is referenced by upstream group '{}'",
                     upstream_name, group.name
                 )));
             }
@@ -408,7 +409,7 @@ pub fn check_upstream_group_references(config: &Config, group_name: &str) -> Res
     for forward in &config.http_server.forwards {
         if forward.upstream_group == group_name {
             return Err(ApiError::resource_conflict(format!(
-                "无法删除上游组 '{}': 它正被转发服务 '{}' 引用",
+                "Cannot delete upstream group '{}': it is referenced by forward service '{}'",
                 group_name, forward.name
             )));
         }

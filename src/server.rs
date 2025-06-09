@@ -19,6 +19,9 @@ use tower_governor::{governor::GovernorConfigBuilder, GovernorError, GovernorLay
 use tower_http::timeout::TimeoutLayer;
 use tracing::{debug, error, info};
 
+// 转发请求路径前缀
+const FORWARD_REQUEST_PREFIX: &str = "/{*path}";
+
 // 转发服务状态
 pub struct ForwardState {
     // 上游管理器
@@ -84,7 +87,7 @@ impl IntoSubsystem<AppError> for ForwardServer {
     async fn run(self, subsys: SubsystemHandle) -> Result<(), AppError> {
         // 创建路由
         let app = Router::new()
-            .route("/{*path}", axum::routing::any(forward_handler))
+            .route(FORWARD_REQUEST_PREFIX, axum::routing::any(forward_handler))
             .with_state(self.state.clone());
 
         // 应用超时配置

@@ -1,4 +1,5 @@
 use crate::api::v1::routes::api_routes;
+use crate::api::v1::schemas::scalar_routes;
 use crate::config::Config;
 use crate::error::AppError;
 use crate::metrics::METRICS;
@@ -14,7 +15,12 @@ use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 use tokio::net::TcpListener;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemHandle};
-use tracing::{debug, error, info};
+use tracing::{error, info};
+
+const HEALTH_PATH: &str = "/health";
+const METRICS_PATH: &str = "/metrics";
+const API_V1_ADMIN_PATH: &str = "/api/v1/admin";
+const API_V1_DOCS_PATH: &str = "/api/v1/docs";
 
 // 管理服务
 pub struct AdminServer {
@@ -41,17 +47,18 @@ impl AdminServer {
 impl IntoSubsystem<AppError> for AdminServer {
     async fn run(self, subsys: SubsystemHandle) -> Result<(), AppError> {
         // 创建路由
-        let app = Router::new()
+        let mut app = Router::new()
             // 基础服务
-            .route("/health", get(health_handler))
-            .route("/metrics", get(metrics_handler))
+            .route(HEALTH_PATH, get(health_handler))
+            .route(METRICS_PATH, get(metrics_handler))
             // API v1路由
-            .nest("/api/v1", api_routes(self.config.clone()));
+            .nest(API_V1_ADMIN_PATH, api_routes(self.config.clone()));
 
         // 如果开启调试模式，则启用OpenAPI文档
         if self.debug {
-            // OpenAPI文档已暂时禁用
-            debug!("API documentation is temporarily disabled");
+            let scalar_path = API_V1_DOCS_PATH;
+            app = app.merge(scalar_routes(scalar_path));
+            info!("Enabling OpenAPI documentation at {:?}", scalar_path);
         }
 
         // 绑定TCP监听器

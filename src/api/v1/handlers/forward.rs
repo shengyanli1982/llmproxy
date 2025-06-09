@@ -9,12 +9,14 @@ use std::sync::{Arc, RwLock};
 use tracing::info;
 
 /// 获取所有转发服务
+///
+/// Get all forward services
 #[utoipa::path(
     get,
     path = "/forwards",
-    tag = "forwards",
+    tag = "Forwards",
     responses(
-        (status = 200, description = "成功获取所有转发服务", body = ApiResponse<Vec<ForwardConfig>>)
+        (status = 200, description = "Successfully retrieved all forward services", body = ApiResponse<Vec<ForwardConfig>>)
     )
 )]
 pub async fn get_all_forwards(
@@ -31,16 +33,18 @@ pub async fn get_all_forwards(
 }
 
 /// 获取单个转发服务
+///
+/// Get a single forward service by name
 #[utoipa::path(
     get,
     path = "/forwards/{name}",
-    tag = "forwards",
+    tag = "Forwards",
     params(
-        ("name" = String, Path, description = "转发服务名称")
+        ("name" = String, Path, description = "Forward service name")
     ),
     responses(
-        (status = 200, description = "成功获取转发服务", body = ApiResponse<ForwardConfig>),
-        (status = 404, description = "资源未找到", body = ApiError)
+        (status = 200, description = "Successfully retrieved forward service", body = ApiResponse<ForwardConfig>),
+        (status = 404, description = "Resource not found", body = ApiError)
     )
 )]
 pub async fn get_forward(
@@ -66,15 +70,17 @@ pub async fn get_forward(
 }
 
 /// 创建转发服务
+///
+/// Create a new forward service
 #[utoipa::path(
     post,
     path = "/forwards",
-    tag = "forwards",
+    tag = "Forwards",
     request_body = ForwardConfig,
     responses(
-        (status = 201, description = "成功创建转发服务", body = ApiResponse<ForwardConfig>),
-        (status = 400, description = "请求无效", body = ApiError),
-        (status = 409, description = "资源冲突", body = ApiError)
+        (status = 201, description = "Successfully created forward service", body = ApiResponse<ForwardConfig>),
+        (status = 400, description = "Invalid request", body = ApiError),
+        (status = 409, description = "Resource conflict", body = ApiError)
     )
 )]
 pub async fn create_forward(
@@ -96,7 +102,7 @@ pub async fn create_forward(
         .any(|f| f.name == forward.name)
     {
         return Err(ApiError::resource_conflict(format!(
-            "转发服务 '{}' 已存在",
+            "Forward service '{}' already exists",
             forward.name
         )));
     }
@@ -115,29 +121,31 @@ pub async fn create_forward(
     // 更新配置
     *config_guard = Arc::new(new_config);
 
-    info!("转发服务 '{}' 已创建", forward.name);
+    info!("Forward service '{}' created", forward.name);
 
     // 返回创建的转发服务
     Ok(ApiResponse::with_code_and_message(
         201,
         Some(forward.clone()),
-        format!("转发服务 '{}' 创建成功", forward.name),
+        format!("Forward service '{}' created successfully", forward.name),
     ))
 }
 
 /// 更新转发服务
+///
+/// Update a forward service by name
 #[utoipa::path(
     put,
     path = "/forwards/{name}",
-    tag = "forwards",
+    tag = "Forwards",
     params(
-        ("name" = String, Path, description = "要更新的转发服务名称")
+        ("name" = String, Path, description = "Name of the forward service to update")
     ),
     request_body = ForwardConfig,
     responses(
-        (status = 200, description = "成功更新转发服务", body = ApiResponse<ForwardConfig>),
-        (status = 400, description = "请求无效", body = ApiError),
-        (status = 404, description = "资源未找到", body = ApiError)
+        (status = 200, description = "Successfully updated forward service", body = ApiResponse<ForwardConfig>),
+        (status = 400, description = "Invalid request", body = ApiError),
+        (status = 404, description = "Resource not found", body = ApiError)
     )
 )]
 pub async fn update_forward(
@@ -148,7 +156,7 @@ pub async fn update_forward(
     // 检查路径参数和请求体中的名称是否匹配
     if name != forward.name {
         return Err(ApiError::validation_error(format!(
-            "路径参数名称 '{}' 与请求体中的名称 '{}' 不匹配",
+            "Path parameter name '{}' does not match request body name '{}'",
             name, forward.name
         )));
     }
@@ -190,31 +198,33 @@ pub async fn update_forward(
     // 更新配置
     *config_guard = Arc::new(new_config);
 
-    info!("转发服务 '{}' 已更新", name);
+    info!("Forward service '{}' updated", name);
 
     // 返回更新后的转发服务
     Ok(ApiResponse::with_message(
         Some(forward),
-        format!("转发服务 '{}' 更新成功", name),
+        format!("Forward service '{}' updated successfully", name),
     ))
 }
 
 /// 删除转发服务
+///
+/// Delete a forward service by name
 #[utoipa::path(
     delete,
     path = "/forwards/{name}",
-    tag = "forwards",
+    tag = "Forwards",
     params(
-        ("name" = String, Path, description = "要删除的转发服务名称")
+        ("name" = String, Path, description = "Name of the forward service to delete")
     ),
     responses(
-        (status = 200, description = "成功删除转发服务", body = serde_json::Value, example = json!({
+        (status = 200, description = "Successfully deleted forward service", body = serde_json::Value, example = json!({
             "code": 200,
             "status": "success",
-            "message": "转发服务 '...' 已成功删除",
+            "message": "Forward service deleted successfully",
             "data": null
         })),
-        (status = 404, description = "资源未找到", body = ApiError)
+        (status = 404, description = "Resource not found", body = ApiError)
     )
 )]
 pub async fn delete_forward(
@@ -249,11 +259,11 @@ pub async fn delete_forward(
     // 更新配置
     *config_guard = Arc::new(new_config);
 
-    info!("转发服务 '{}' 已删除", name);
+    info!("Forward service '{}' deleted", name);
 
     // 返回成功响应
     Ok(ApiResponse::with_message(
         None,
-        format!("转发服务 '{}' 删除成功", name),
+        format!("Forward service '{}' deleted successfully", name),
     ))
 }

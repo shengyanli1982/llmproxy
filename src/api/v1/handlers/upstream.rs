@@ -11,12 +11,14 @@ use std::sync::{Arc, RwLock};
 use tracing::info;
 
 /// 获取所有上游
+///
+/// Get all upstreams
 #[utoipa::path(
     get,
     path = "/upstreams",
-    tag = "upstreams",
+    tag = "Upstreams",
     responses(
-        (status = 200, description = "成功获取所有上游", body = ApiResponse<Vec<UpstreamConfig>>),
+        (status = 200, description = "Successfully retrieved all upstreams", body = ApiResponse<Vec<UpstreamConfig>>),
     )
 )]
 pub async fn get_all_upstreams(
@@ -33,16 +35,18 @@ pub async fn get_all_upstreams(
 }
 
 /// 获取单个上游
+///
+/// Get a single upstream
 #[utoipa::path(
     get,
     path = "/upstreams/{name}",
-    tag = "upstreams",
+    tag = "Upstreams",
     params(
-        ("name" = String, Path, description = "上游名称")
+        ("name" = String, Path, description = "Upstream name")
     ),
     responses(
-        (status = 200, description = "成功获取上游", body = ApiResponse<UpstreamConfig>),
-        (status = 404, description = "资源未找到", body = ApiError)
+        (status = 200, description = "Successfully retrieved upstream", body = ApiResponse<UpstreamConfig>),
+        (status = 404, description = "Resource not found", body = ApiError)
     )
 )]
 pub async fn get_upstream(
@@ -58,20 +62,22 @@ pub async fn get_upstream(
 
     match upstream {
         Some(upstream) => Ok(ApiResponse::new(Some(upstream))),
-        None => Err(ApiError::resource_not_found("上游", name)),
+        None => Err(ApiError::resource_not_found("Upstream", name)),
     }
 }
 
 /// 创建上游
+///
+/// Create an upstream
 #[utoipa::path(
     post,
     path = "/upstreams",
-    tag = "upstreams",
+    tag = "Upstreams",
     request_body = UpstreamConfig,
     responses(
-        (status = 201, description = "成功创建上游", body = ApiResponse<UpstreamConfig>),
-        (status = 400, description = "请求无效", body = ApiError),
-        (status = 409, description = "资源冲突", body = ApiError)
+        (status = 201, description = "Successfully created upstream", body = ApiResponse<UpstreamConfig>),
+        (status = 400, description = "Invalid request", body = ApiError),
+        (status = 409, description = "Resource conflict", body = ApiError)
     )
 )]
 pub async fn create_upstream(
@@ -92,7 +98,7 @@ pub async fn create_upstream(
         .any(|u| u.name == upstream.name)
     {
         return Err(ApiError::resource_conflict(format!(
-            "上游 '{}' 已存在",
+            "Upstream '{}' already exists",
             upstream.name
         )));
     }
@@ -111,29 +117,31 @@ pub async fn create_upstream(
     // 更新配置
     *config_guard = Arc::new(new_config);
 
-    info!("上游 '{}' 已创建", upstream.name);
+    info!("Upstream '{}' created", upstream.name);
 
     // 返回创建的上游
     Ok(ApiResponse::with_code_and_message(
         201,
         Some(upstream.clone()),
-        format!("上游 '{}' 创建成功", upstream.name),
+        format!("Upstream '{}' created successfully", upstream.name),
     ))
 }
 
 /// 更新上游
+///
+/// Update an upstream
 #[utoipa::path(
     put,
     path = "/upstreams/{name}",
-    tag = "upstreams",
+    tag = "Upstreams",
     params(
-        ("name" = String, Path, description = "要更新的上游名称")
+        ("name" = String, Path, description = "Name of the upstream to update")
     ),
     request_body = UpstreamConfig,
     responses(
-        (status = 200, description = "成功更新上游", body = ApiResponse<UpstreamConfig>),
-        (status = 400, description = "请求无效", body = ApiError),
-        (status = 404, description = "资源未找到", body = ApiError)
+        (status = 200, description = "Successfully updated upstream", body = ApiResponse<UpstreamConfig>),
+        (status = 400, description = "Invalid request", body = ApiError),
+        (status = 404, description = "Resource not found", body = ApiError)
     )
 )]
 pub async fn update_upstream(
@@ -144,7 +152,7 @@ pub async fn update_upstream(
     // 检查路径参数和请求体中的名称是否匹配
     if name != upstream.name {
         return Err(ApiError::validation_error(format!(
-            "路径参数名称 '{}' 与请求体中的名称 '{}' 不匹配",
+            "Path parameter name '{}' does not match request body name '{}'",
             name, upstream.name
         )));
     }
@@ -158,7 +166,7 @@ pub async fn update_upstream(
 
     // 检查上游是否存在
     if !current_config.upstreams.iter().any(|u| u.name == name) {
-        return Err(ApiError::resource_not_found("上游", name));
+        return Err(ApiError::resource_not_found("Upstream", name));
     }
 
     // 创建新配置的克隆
@@ -180,32 +188,34 @@ pub async fn update_upstream(
     // 更新配置
     *config_guard = Arc::new(new_config);
 
-    info!("上游 '{}' 已更新", name);
+    info!("Upstream '{}' updated", name);
 
     // 返回更新后的上游
     Ok(ApiResponse::with_message(
         Some(upstream),
-        format!("上游 '{}' 更新成功", name),
+        format!("Upstream '{}' updated successfully", name),
     ))
 }
 
 /// 删除上游
+///
+/// Delete an upstream
 #[utoipa::path(
     delete,
     path = "/upstreams/{name}",
-    tag = "upstreams",
+    tag = "Upstreams",
     params(
-        ("name" = String, Path, description = "要删除的上游名称")
+        ("name" = String, Path, description = "Name of the upstream to delete")
     ),
     responses(
-        (status = 200, description = "成功删除上游", body = serde_json::Value, example = json!({
+        (status = 200, description = "Successfully deleted upstream", body = serde_json::Value, example = json!({
             "code": 200,
             "status": "success",
-            "message": "上游 '...' 已成功删除",
+            "message": "Upstream deleted successfully",
             "data": null
         })),
-        (status = 404, description = "资源未找到", body = ApiError),
-        (status = 409, description = "资源被占用", body = ApiError)
+        (status = 404, description = "Resource not found", body = ApiError),
+        (status = 409, description = "Resource in use", body = ApiError)
     )
 )]
 pub async fn delete_upstream(
@@ -218,7 +228,7 @@ pub async fn delete_upstream(
 
     // 检查上游是否存在
     if !current_config.upstreams.iter().any(|u| u.name == name) {
-        return Err(ApiError::resource_not_found("上游", name));
+        return Err(ApiError::resource_not_found("Upstream", name));
     }
 
     // 检查上游是否被任何上游组引用
@@ -238,11 +248,11 @@ pub async fn delete_upstream(
     // 更新配置
     *config_guard = Arc::new(new_config);
 
-    info!("上游 '{}' 已删除", name);
+    info!("Upstream '{}' deleted", name);
 
     // 返回成功响应
     Ok(ApiResponse::with_message(
         None,
-        format!("上游 '{}' 删除成功", name),
+        format!("Upstream '{}' deleted successfully", name),
     ))
 }
