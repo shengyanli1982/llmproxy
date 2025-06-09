@@ -1,3 +1,5 @@
+use crate::api::v1::routes::api_routes;
+use crate::config::Config;
 use crate::error::AppError;
 use crate::metrics::METRICS;
 use async_trait::async_trait;
@@ -9,20 +11,29 @@ use axum::{
 };
 use prometheus::{Encoder, TextEncoder};
 use std::net::SocketAddr;
+use std::sync::{Arc, RwLock};
 use tokio::net::TcpListener;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemHandle};
-use tracing::{error, info};
+use tracing::{debug, error, info};
 
 // 管理服务
 pub struct AdminServer {
+    // 是否开启调试模式
+    debug: bool,
     // 监听地址
     addr: SocketAddr,
+    // 共享配置
+    config: Arc<RwLock<Arc<Config>>>,
 }
 
 impl AdminServer {
     // 创建新的管理服务
-    pub fn new(addr: SocketAddr) -> Self {
-        Self { addr }
+    pub fn new(debug: bool, addr: SocketAddr, config: Arc<RwLock<Arc<Config>>>) -> Self {
+        Self {
+            debug,
+            addr,
+            config,
+        }
     }
 }
 
@@ -31,8 +42,17 @@ impl IntoSubsystem<AppError> for AdminServer {
     async fn run(self, subsys: SubsystemHandle) -> Result<(), AppError> {
         // 创建路由
         let app = Router::new()
+            // 基础服务
             .route("/health", get(health_handler))
-            .route("/metrics", get(metrics_handler));
+            .route("/metrics", get(metrics_handler))
+            // API v1路由
+            .nest("/api/v1", api_routes(self.config.clone()));
+
+        // 如果开启调试模式，则启用OpenAPI文档
+        if self.debug {
+            // OpenAPI文档已暂时禁用
+            debug!("API documentation is temporarily disabled");
+        }
 
         // 绑定TCP监听器
         let listener = match TcpListener::bind(self.addr).await {

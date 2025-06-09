@@ -6,6 +6,7 @@ use llmproxy::server::ForwardServer;
 use llmproxy::upstream::UpstreamManager;
 use mimalloc::MiMalloc;
 use std::process;
+use std::sync::{Arc, RwLock};
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemBuilder, Toplevel};
 use tracing::{error, info};
 
@@ -62,8 +63,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
+    // 创建共享配置
+    let shared_config = Arc::new(RwLock::new(Arc::new(config)));
+
     // 创建应用组件
-    let components = match create_components(config).await {
+    let components = match create_components(args.debug, Arc::clone(&shared_config)).await {
         Ok(components) => components,
         Err(e) => {
             error!("Failed to create application components: {}", e);
@@ -115,16 +119,29 @@ struct AppComponents {
 }
 
 // 创建应用组件
-async fn create_components(config: Config) -> Result<AppComponents, AppError> {
+async fn create_components(
+    // 是否启用调试模式
+    debug: bool,
+    // 共享配置
+    shared_config: Arc<RwLock<Arc<Config>>>,
+) -> Result<AppComponents, AppError> {
+    // 获取配置的只读锁
+    let config_guard = shared_config.read().unwrap();
+    let config = Arc::clone(&config_guard);
+
     // 创建上游管理器
-    let upstream_manager: std::sync::Arc<UpstreamManager> =
-        match UpstreamManager::new(config.upstreams, config.upstream_groups).await {
-            Ok(manager) => std::sync::Arc::new(manager),
-            Err(e) => {
-                error!("Failed to initialize upstream manager: {}", e);
-                return Err(e);
-            }
-        };
+    let upstream_manager: std::sync::Arc<UpstreamManager> = match UpstreamManager::new(
+        config.upstreams.clone(),
+        config.upstream_groups.clone(),
+    )
+    .await
+    {
+        Ok(manager) => std::sync::Arc::new(manager),
+        Err(e) => {
+            error!("Failed to initialize upstream manager: {}", e);
+            return Err(e);
+        }
+    };
 
     // 创建管理服务
     let admin_addr = format!(
@@ -133,7 +150,7 @@ async fn create_components(config: Config) -> Result<AppComponents, AppError> {
     )
     .parse()
     .map_err(|e| AppError::Config(format!("Invalid admin server address: {}", e)))?;
-    let admin_server = AdminServer::new(admin_addr);
+    let admin_server = AdminServer::new(debug, admin_addr, Arc::clone(&shared_config));
     info!("Admin server initialized successfully: {}", admin_addr);
 
     // 创建转发服务

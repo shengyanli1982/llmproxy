@@ -1,16 +1,17 @@
 use crate::config::common::BreakerConfig;
-use crate::config::defaults::default_uuid_v4_string;
+use crate::r#const::http_headers::header_op_types;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 // 上游配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UpstreamConfig {
     // 上游名称
     pub name: String,
     // 上游URL
     pub url: String,
     // 唯一标识符 (内部使用)
-    #[serde(skip_serializing, default = "default_uuid_v4_string")]
+    #[serde(skip)]
     pub id: String,
     // 认证配置
     #[serde(default)]
@@ -24,7 +25,7 @@ pub struct UpstreamConfig {
 }
 
 // 认证配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct AuthConfig {
     // 认证类型
     #[serde(default)]
@@ -41,7 +42,7 @@ pub struct AuthConfig {
 }
 
 // 认证类型
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum AuthType {
     // Bearer令牌认证
@@ -59,7 +60,7 @@ impl Default for AuthType {
 }
 
 // 请求头操作
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct HeaderOperation {
     // 操作类型
     pub op: HeaderOpType,
@@ -71,7 +72,7 @@ pub struct HeaderOperation {
 }
 
 // 请求头操作类型
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum HeaderOpType {
     // 插入（如果不存在）
@@ -80,4 +81,15 @@ pub enum HeaderOpType {
     Remove,
     // 替换（如果存在）或插入（如果不存在）
     Replace,
+}
+
+// 为 HeaderOpType 实现 Display trait
+impl std::fmt::Display for HeaderOpType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HeaderOpType::Insert => write!(f, "{}", header_op_types::INSERT),
+            HeaderOpType::Remove => write!(f, "{}", header_op_types::REMOVE),
+            HeaderOpType::Replace => write!(f, "{}", header_op_types::REPLACE),
+        }
+    }
 }

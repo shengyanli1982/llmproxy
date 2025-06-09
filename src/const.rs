@@ -60,6 +60,10 @@ pub mod retry_limits {
     pub const MIN_INITIAL_MS: u32 = 100;
     // 最大初始重试延迟（毫秒）
     pub const MAX_INITIAL_MS: u32 = 10000;
+
+    // 为了兼容性，添加别名
+    pub const MIN_INITIAL_BACKOFF: u32 = MIN_INITIAL_MS;
+    pub const MAX_INITIAL_BACKOFF: u32 = MAX_INITIAL_MS;
 }
 
 // 权重配置限制
@@ -84,6 +88,10 @@ pub mod rate_limit_limits {
     pub const DEFAULT_PER_SECOND: u32 = 100;
     // 默认突发请求数
     pub const DEFAULT_BURST: u32 = 200;
+
+    // 为了兼容性，添加别名
+    pub const MIN_RATE: u32 = MIN_PER_SECOND;
+    pub const MAX_RATE: u32 = MAX_PER_SECOND;
 }
 
 // HTTP 头部常量
@@ -103,6 +111,16 @@ pub mod http_headers {
     pub mod transfer_encodings {
         // 分块传输编码
         pub const CHUNKED: &str = "chunked";
+    }
+
+    // 头部操作类型
+    pub mod header_op_types {
+        // 插入
+        pub const INSERT: &str = "insert";
+        // 删除
+        pub const REMOVE: &str = "remove";
+        // 替换
+        pub const REPLACE: &str = "replace";
     }
 }
 
