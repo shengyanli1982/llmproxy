@@ -1,5 +1,5 @@
 use crate::config::common::BreakerConfig;
-use crate::config::defaults::{default_uuid_v4_string, default_weight};
+use crate::config::defaults::default_weight;
 use crate::config::serializer::arc_string;
 use reqwest::header::{HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
@@ -12,9 +12,6 @@ use super::http_client::HttpClientConfig;
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 
 pub struct UpstreamConfig {
-    // 唯一标识符
-    #[serde(skip, default = "default_uuid_v4_string")]
-    pub id: String,
     // 上游服务名称
     pub name: String,
     // 上游服务地址

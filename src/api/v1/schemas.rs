@@ -68,15 +68,15 @@ use utoipa_scalar::{Scalar, Servable};
     ),
     modifiers(&SecurityAddon),
     tags(
-        (name = "Forward", description = "转发规则 API | Forward Rule API"),
-        (name = "UpstreamGroup", description = "上游组 API | Upstream Group API"),
-        (name = "Upstream", description = "上游服务 API | Upstream Service API"),
+        (name = "Forward", description = "转发规则 APIs | Forward Rule APIs"),
+        (name = "UpstreamGroup", description = "上游组 APIs | Upstream Group APIs"),
+        (name = "Upstream", description = "上游服务 APIs | Upstream Service APIs"),
     ),
     info(
-        title = "LLMProxy Admin API",
+        title = "LLMProxy APIs",
         version = "v1",
         description = "LLMProxy 是一款专为大型语言模型（LLM）设计的企业级智能代理与负载均衡器。它统一管理和编排各类 LLM 服务（如公有云 API、私有化部署的 vLLM/Ollama 等），实现高效、稳定、可扩展的 LLM 应用访问。此管理 API 提供了对 LLMProxy 核心配置资源的只读访问能力，便于监控、审计和集成自动化运维体系。
-        <br>
+        <br><br>
         LLMProxy is an enterprise-grade intelligent proxy and load balancer designed for Large Language Models (LLMs). It unifies the management and orchestration of various LLM services (e.g., public cloud APIs, privately deployed vLLM/Ollama) to enable efficient, stable, and scalable LLM application access. This Admin API provides read-only access to LLMProxy's core configuration resources, facilitating monitoring, auditing, and integration with automated operational systems.",
         license(
             name = "MIT",

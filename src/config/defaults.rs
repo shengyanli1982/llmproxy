@@ -1,7 +1,6 @@
 use crate::r#const::{
     breaker_limits, http_client_limits, rate_limit_limits, retry_limits, weight_limits,
 };
-use uuid::Uuid;
 
 // 熔断器默认阈值
 pub fn default_circuitbreaker_threshold() -> f64 {
@@ -67,9 +66,5 @@ pub fn default_burst() -> u32 {
 }
 
 pub fn default_stream_mode() -> bool {
-    true // 默认启用流式响应支持
-}
-
-pub fn default_uuid_v4_string() -> String {
-    Uuid::new_v4().to_string() // 生成默认的 UUID v4 字符串
+    false
 }
