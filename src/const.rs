@@ -124,6 +124,9 @@ pub mod error_labels {
     pub const CONFIG_ERROR: &str = "config_error";
     // 验证错误
     pub const VALIDATION_ERROR: &str = "validation_error";
+    // 未知状态
+    pub const UNKNOWN_ERROR: &str = "unknown_error";
+    // 
 }
 
 // 上游标签
