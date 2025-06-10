@@ -131,11 +131,6 @@ impl UpstreamCircuitBreaker {
                 ])
                 .inc();
 
-            METRICS
-                .circuitbreaker_opened_total()
-                .with_label_values(&[&data_open.group, &data_open.name, &data_open.url])
-                .inc();
-
             warn!(
                 "Circuit breaker opened for upstream '{}' in group '{}'",
                 data_open.name, data_open.group
@@ -145,19 +140,8 @@ impl UpstreamCircuitBreaker {
         // 状态转换钩子 - 关闭
         let data_close = data.clone();
         hooks.set_on_close(move || {
-            // 记录状态变化指标：从开启或半开到关闭
-            METRICS
-                .circuitbreaker_state_changes_total()
-                .with_label_values(&[
-                    &data_close.group,
-                    &data_close.name,
-                    &data_close.url,
-                    breaker_state_labels::OPEN, // 可能是从开启状态
-                    breaker_state_labels::CLOSED,
-                ])
-                .inc();
-
-            // 也可能是从半开状态转为关闭状态
+            // 记录状态变化指标：从半开到关闭
+            // 注意：我们假设关闭是从半开状态发生的，因为这是库的标准行为
             METRICS
                 .circuitbreaker_state_changes_total()
                 .with_label_values(&[
@@ -167,11 +151,6 @@ impl UpstreamCircuitBreaker {
                     breaker_state_labels::HALF_OPEN,
                     breaker_state_labels::CLOSED,
                 ])
-                .inc();
-
-            METRICS
-                .circuitbreaker_closed_total()
-                .with_label_values(&[&data_close.group, &data_close.name, &data_close.url])
                 .inc();
 
             info!(
@@ -193,11 +172,6 @@ impl UpstreamCircuitBreaker {
                     breaker_state_labels::OPEN,
                     breaker_state_labels::HALF_OPEN,
                 ])
-                .inc();
-
-            METRICS
-                .circuitbreaker_half_opened_total()
-                .with_label_values(&[&data_half.group, &data_half.name, &data_half.url])
                 .inc();
 
             info!(
