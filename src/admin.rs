@@ -21,6 +21,8 @@ const METRICS_PATH: &str = "/metrics";
 
 // 管理服务
 pub struct AdminServer {
+    // 是否开启调试模式
+    debug: bool,
     // 监听地址
     addr: SocketAddr,
     // 配置
@@ -29,8 +31,12 @@ pub struct AdminServer {
 
 impl AdminServer {
     // 创建新的管理服务
-    pub fn new(addr: SocketAddr, config: Arc<Config>) -> Self {
-        Self { addr, config }
+    pub fn new(debug: bool, addr: SocketAddr, config: Arc<Config>) -> Self {
+        Self {
+            addr,
+            config,
+            debug,
+        }
     }
 }
 
@@ -38,13 +44,16 @@ impl AdminServer {
 impl IntoSubsystem<AppError> for AdminServer {
     async fn run(self, subsys: SubsystemHandle) -> Result<(), AppError> {
         // 创建路由
-        let app = Router::new()
+        let mut app = Router::new()
             .route(HEALTH_PATH, get(health_handler))
             .route(METRICS_PATH, get(metrics_handler))
             // 添加 API v1 路由
-            .merge(api_routes(self.config.clone()))
-            // 添加 OpenAPI UI
-            .merge(openapi_routes());
+            .merge(api_routes(self.config.clone()));
+
+        // 如果开启调试模式，添加 OpenAPI UI
+        if self.debug {
+            app = app.merge(openapi_routes());
+        }
 
         // 创建 TCP 监听器
         let listener = create_tcp_listener(self.addr, u16::MAX.into())?;

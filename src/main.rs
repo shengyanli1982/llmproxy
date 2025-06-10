@@ -6,7 +6,6 @@ use mimalloc::MiMalloc;
 use std::process;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemBuilder, Toplevel};
 use tracing::{error, info};
-use tracing_subscriber;
 
 // 使用 mimalloc 分配器提高内存效率
 #[global_allocator]
@@ -62,7 +61,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // 创建应用组件
-    let components = match create_components(config).await {
+    let components = match create_components(args.debug, config).await {
         Ok(components) => components,
         Err(e) => {
             error!("Failed to create application components: {}", e);
@@ -114,7 +113,7 @@ struct AppComponents {
 }
 
 // 创建应用组件
-async fn create_components(config: Config) -> Result<AppComponents, AppError> {
+async fn create_components(debug: bool, config: Config) -> Result<AppComponents, AppError> {
     // 创建配置的共享引用
     let config_arc = std::sync::Arc::new(config);
 
@@ -139,7 +138,7 @@ async fn create_components(config: Config) -> Result<AppComponents, AppError> {
     )
     .parse()
     .map_err(|e| AppError::Config(format!("Invalid admin server address: {}", e)))?;
-    let admin_server = AdminServer::new(admin_addr, config_arc.clone());
+    let admin_server = AdminServer::new(debug, admin_addr, config_arc.clone());
     info!("Admin server initialized successfully: {}", admin_addr);
 
     // 创建转发服务

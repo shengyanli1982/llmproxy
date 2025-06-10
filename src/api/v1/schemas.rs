@@ -12,6 +12,7 @@ use crate::{
 };
 use axum::{http::header, Router};
 use std::env;
+use tracing::debug;
 use utoipa::{
     openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
     Modify, OpenApi,
@@ -88,10 +89,12 @@ pub struct ApiDoc;
 const OPENAPI_PATH: &str = "/docs";
 
 pub fn openapi_routes() -> Router {
-    Router::new().merge(Scalar::with_url(
-        format!("{}{}", API_V1_PREFIX, OPENAPI_PATH),
-        ApiDoc::openapi(),
-    ))
+    let openapi_path = format!("{}{}", API_V1_PREFIX, OPENAPI_PATH);
+    debug!(
+        "OpenAPI UI is enabled in debug mode, visit \"{}\"",
+        openapi_path
+    );
+    Router::new().merge(Scalar::with_url(openapi_path, ApiDoc::openapi()))
 }
 
 /// 安全方案修改器
