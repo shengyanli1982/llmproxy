@@ -26,7 +26,7 @@ use utoipa::ToSchema;
 
 // 配置文件结构
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
+
 pub struct Config {
     // HTTP服务器配置
     #[serde(default)]

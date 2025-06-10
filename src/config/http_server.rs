@@ -5,7 +5,7 @@ use utoipa::ToSchema;
 
 // HTTP服务器配置
 #[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
-#[serde(rename_all = "camelCase")]
+
 pub struct HttpServerConfig {
     // 转发服务配置
     #[serde(default)]
@@ -38,7 +38,7 @@ pub struct ForwardConfig {
 
 // 管理服务配置
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
+
 pub struct AdminConfig {
     // 监听端口
     #[serde(default = "default_admin_port")]

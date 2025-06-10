@@ -10,7 +10,7 @@ use super::http_client::HttpClientConfig;
 
 /// 上游服务配置
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
+
 pub struct UpstreamConfig {
     // 唯一标识符
     #[serde(skip, default = "default_uuid_v4_string")]
@@ -40,7 +40,7 @@ pub struct UpstreamConfig {
 
 // 认证配置
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
+
 pub struct AuthConfig {
     // 认证类型
     #[serde(default)]
@@ -87,7 +87,7 @@ pub enum HeaderOpType {
 
 // 请求头操作
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
+
 pub struct HeaderOp {
     pub op: HeaderOpType,
     pub key: String,
