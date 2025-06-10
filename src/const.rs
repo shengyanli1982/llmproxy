@@ -193,6 +193,7 @@ pub mod api {
     pub const ADMIN_AUTH_TOKEN_ENV: &str = "LLMPROXY_ADMIN_AUTH_TOKEN";
 
     // 认证相关常量
+    // Http Header 头部 Authorization：Bearer <token>
     pub mod auth {
         // Bearer 认证方案名称
         pub const BEARER_SCHEME: &str = "Bearer";

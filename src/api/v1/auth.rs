@@ -7,6 +7,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use thiserror::Error;
+use tracing::{info, warn};
 
 #[derive(Debug, Error)]
 pub enum AuthError {
@@ -47,6 +48,9 @@ pub async fn auth_middleware(
         return Ok(next.run(request).await);
     };
 
+    let method = request.method().clone();
+    let uri = request.uri().clone();
+
     // 获取 Authorization 头
     let auth_header = request
         .headers()
@@ -60,13 +64,33 @@ pub async fn auth_middleware(
                 .trim();
             if token == expected_token {
                 // 认证成功，继续处理请求
+                info!(
+                    "Authentication successful for request: \"{}\" \"{}\"",
+                    method, uri
+                );
                 Ok(next.run(request).await)
             } else {
                 // 令牌无效
+                warn!(
+                    "Invalid token provided for request: \"{}\" \"{}\"",
+                    method, uri
+                );
                 Err(AuthError::TokenMismatch)
             }
         }
-        Some(_) => Err(AuthError::InvalidTokenFormat),
-        None => Err(AuthError::MissingAuthHeader),
+        Some(_) => {
+            warn!(
+                "Invalid token format in Authorization header for request: \"{}\" \"{}\"",
+                method, uri
+            );
+            Err(AuthError::InvalidTokenFormat)
+        }
+        None => {
+            warn!(
+                "Missing Authorization header for request: \"{}\" \"{}\"",
+                method, uri
+            );
+            Err(AuthError::MissingAuthHeader)
+        }
     }
 }

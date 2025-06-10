@@ -66,5 +66,5 @@ pub fn default_burst() -> u32 {
 }
 
 pub fn default_stream_mode() -> bool {
-    false
+    true
 }

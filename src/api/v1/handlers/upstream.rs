@@ -22,9 +22,6 @@ use tracing::{info, warn};
     responses(
         (status = 200, description = "成功获取所有上游服务 | Successfully retrieved all upstream services", body = ApiResponse<Vec<UpstreamConfig>>),
         (status = 500, description = "服务器内部错误 | Internal server error", body = ErrorResponse),
-    ),
-    security(
-        ("bearer_auth" = [])
     )
 )]
 pub async fn list_upstreams(
@@ -52,9 +49,6 @@ pub async fn list_upstreams(
         (status = 200, description = "成功获取上游服务 | Successfully retrieved upstream service", body = ApiResponse<UpstreamConfig>),
         (status = 404, description = "上游服务不存在 | Upstream service not found", body = ErrorResponse),
         (status = 500, description = "服务器内部错误 | Internal server error", body = ErrorResponse),
-    ),
-    security(
-        ("bearer_auth" = [])
     )
 )]
 #[axum::debug_handler]

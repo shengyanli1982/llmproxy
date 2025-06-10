@@ -22,9 +22,6 @@ use tracing::{info, warn};
     responses(
         (status = 200, description = "成功获取所有上游组 | Successfully retrieved all upstream groups", body = ApiResponse<Vec<UpstreamGroupDetail>>),
         (status = 500, description = "服务器内部错误 | Internal server error", body = ErrorResponse),
-    ),
-    security(
-        ("bearer_auth" = [])
     )
 )]
 pub async fn list_upstream_groups(
@@ -65,9 +62,6 @@ pub async fn list_upstream_groups(
         (status = 200, description = "成功获取上游组 | Successfully retrieved upstream group", body = ApiResponse<UpstreamGroupDetail>),
         (status = 404, description = "上游组不存在 | Upstream group not found", body = ErrorResponse),
         (status = 500, description = "服务器内部错误 | Internal server error", body = ErrorResponse),
-    ),
-    security(
-        ("bearer_auth" = [])
     )
 )]
 #[axum::debug_handler]

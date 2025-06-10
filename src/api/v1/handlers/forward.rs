@@ -22,9 +22,6 @@ use tracing::{info, warn};
     responses(
         (status = 200, description = "成功获取所有转发规则 | Successfully retrieved all forwarding rules", body = ApiResponse<Vec<ForwardConfig>>),
         (status = 500, description = "服务器内部错误 | Internal server error", body = ErrorResponse),
-    ),
-    security(
-        ("bearer_auth" = [])
     )
 )]
 pub async fn list_forwards(
@@ -52,9 +49,6 @@ pub async fn list_forwards(
         (status = 200, description = "成功获取转发规则 | Successfully retrieved forwarding rule", body = ApiResponse<ForwardConfig>),
         (status = 404, description = "转发规则不存在 | Forwarding rule not found", body = ErrorResponse),
         (status = 500, description = "服务器内部错误 | Internal server error", body = ErrorResponse),
-    ),
-    security(
-        ("bearer_auth" = [])
     )
 )]
 #[axum::debug_handler]
