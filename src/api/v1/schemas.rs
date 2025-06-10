@@ -73,7 +73,9 @@ use utoipa_scalar::Scalar;
     info(
         title = "LLMProxy Admin API",
         version = "v1",
-        description = "LLMProxy 管理 API，提供对配置资源的只读访问 | LLMProxy Admin API, providing read-only access to configuration resources",
+        description = "LLMProxy 是一款专为大型语言模型（LLM）设计的企业级智能代理与负载均衡器。它统一管理和编排各类 LLM 服务（如公有云 API、私有化部署的 vLLM/Ollama 等），实现高效、稳定、可扩展的 LLM 应用访问。此管理 API 提供了对 LLMProxy 核心配置资源的只读访问能力，便于监控、审计和集成自动化运维体系。
+        <br>
+        LLMProxy is an enterprise-grade intelligent proxy and load balancer designed for Large Language Models (LLMs). It unifies the management and orchestration of various LLM services (e.g., public cloud APIs, privately deployed vLLM/Ollama) to enable efficient, stable, and scalable LLM application access. This Admin API provides read-only access to LLMProxy's core configuration resources, facilitating monitoring, auditing, and integration with automated operational systems.",
         license(
             name = "MIT",
             url = "https://opensource.org/licenses/MIT"
@@ -82,9 +84,11 @@ use utoipa_scalar::Scalar;
 )]
 pub struct ApiDoc;
 
+const OPENAPI_PATH: &str = "/docs";
+
 pub fn openapi_routes() -> Router {
     Router::new().merge(Scalar::with_url(
-        format!("{}/docs", API_V1_PREFIX),
+        format!("{}{}", API_V1_PREFIX, OPENAPI_PATH),
         ApiDoc::openapi(),
     ))
 }

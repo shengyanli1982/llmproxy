@@ -17,6 +17,9 @@ use tokio_graceful_shutdown::{IntoSubsystem, SubsystemHandle};
 use tracing::{error, info};
 use utoipa_scalar::{Scalar, Servable};
 
+const HEALTH_PATH: &str = "/health";
+const METRICS_PATH: &str = "/metrics";
+
 // 管理服务
 pub struct AdminServer {
     // 监听地址
@@ -37,8 +40,8 @@ impl IntoSubsystem<AppError> for AdminServer {
     async fn run(self, subsys: SubsystemHandle) -> Result<(), AppError> {
         // 创建路由
         let app = Router::new()
-            .route("/health", get(health_handler))
-            .route("/metrics", get(metrics_handler))
+            .route(HEALTH_PATH, get(health_handler))
+            .route(METRICS_PATH, get(metrics_handler))
             // 添加 API v1 路由
             .merge(api_routes(self.config.clone()))
             // 添加 OpenAPI UI

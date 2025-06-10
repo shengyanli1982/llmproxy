@@ -8,7 +8,7 @@ use crate::{
 use axum::{middleware, routing::get, Router};
 use std::sync::Arc;
 
-const API_V1_PREFIX: &str = "/api/v1";
+pub const API_V1_PREFIX: &str = "/api/v1";
 const FORWARD_PATH: &str = "/forwards";
 const FORWARD_NAME_PATH: &str = "/forwards/{name}";
 const UPSTREAM_GROUP_PATH: &str = "/upstream-groups";
