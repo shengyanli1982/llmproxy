@@ -16,7 +16,7 @@ use std::path::PathBuf;
              - Fine-grained Traffic Control: IP-based rate limiting with configurable per-second requests and burst.\n\
              - Robust Connectivity: Configurable timeouts, keepalive, retries, and outbound proxy support.\n\
              - Easy Configuration & Extensibility: Clear, modular YAML configuration for easy setup and extensibility.\n\n\
-             Author: shengyanli1982\n\
+             Author: ShengYan Li\n\
              Email: shengyanlee36@gmail.com\n\
              GitHub: https://github.com/shengyanli1982"
 )]
