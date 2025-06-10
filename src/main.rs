@@ -1,11 +1,9 @@
-use llmproxy::admin::AdminServer;
-use llmproxy::args::Args;
-use llmproxy::config::Config;
-use llmproxy::error::AppError;
-use llmproxy::server::ForwardServer;
-use llmproxy::upstream::UpstreamManager;
+use llmproxy::{
+    admin::AdminServer, args::Args, config::Config, error::AppError, server::ForwardServer,
+    upstream::UpstreamManager,
+};
 use mimalloc::MiMalloc;
-use std::process;
+use std::{process, sync::Arc};
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemBuilder, Toplevel};
 use tracing::{error, info};
 
@@ -116,30 +114,37 @@ struct AppComponents {
 
 // 创建应用组件
 async fn create_components(config: Config) -> Result<AppComponents, AppError> {
+    // 创建配置的共享引用
+    let config_arc = std::sync::Arc::new(config);
+
     // 创建上游管理器
-    let upstream_manager: std::sync::Arc<UpstreamManager> =
-        match UpstreamManager::new(config.upstreams, config.upstream_groups).await {
-            Ok(manager) => std::sync::Arc::new(manager),
-            Err(e) => {
-                error!("Failed to initialize upstream manager: {}", e);
-                return Err(e);
-            }
-        };
+    let upstream_manager: std::sync::Arc<UpstreamManager> = match UpstreamManager::new(
+        config_arc.upstreams.clone(),
+        config_arc.upstream_groups.clone(),
+    )
+    .await
+    {
+        Ok(manager) => std::sync::Arc::new(manager),
+        Err(e) => {
+            error!("Failed to initialize upstream manager: {}", e);
+            return Err(e);
+        }
+    };
 
     // 创建管理服务
     let admin_addr = format!(
         "{}:{}",
-        config.http_server.admin.address, config.http_server.admin.port
+        config_arc.http_server.admin.address, config_arc.http_server.admin.port
     )
     .parse()
     .map_err(|e| AppError::Config(format!("Invalid admin server address: {}", e)))?;
-    let admin_server = AdminServer::new(admin_addr);
+    let admin_server = AdminServer::new(admin_addr, config_arc.clone());
     info!("Admin server initialized successfully: {}", admin_addr);
 
     // 创建转发服务
-    let mut forward_servers = Vec::with_capacity(config.http_server.forwards.len());
-    for forward_config in config.http_server.forwards {
-        // 直接使用所有权转移，避免克隆
+    let mut forward_servers = Vec::with_capacity(config_arc.http_server.forwards.len());
+    for forward_config in &config_arc.http_server.forwards {
+        // 使用克隆避免所有权转移
         match ForwardServer::new(forward_config.clone(), upstream_manager.clone()) {
             Ok(server) => {
                 info!(

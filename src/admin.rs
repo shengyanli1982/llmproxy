@@ -1,3 +1,5 @@
+use crate::api::v1::{api_routes, openapi_routes, ApiDoc};
+use crate::config::Config;
 use crate::error::AppError;
 use crate::metrics::METRICS;
 use crate::server::create_tcp_listener;
@@ -10,19 +12,23 @@ use axum::{
 };
 use prometheus::{Encoder, TextEncoder};
 use std::net::SocketAddr;
+use std::sync::Arc;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemHandle};
 use tracing::{error, info};
+use utoipa_scalar::{Scalar, Servable};
 
 // 管理服务
 pub struct AdminServer {
     // 监听地址
     addr: SocketAddr,
+    // 配置
+    config: Arc<Config>,
 }
 
 impl AdminServer {
     // 创建新的管理服务
-    pub fn new(addr: SocketAddr) -> Self {
-        Self { addr }
+    pub fn new(addr: SocketAddr, config: Arc<Config>) -> Self {
+        Self { addr, config }
     }
 }
 
@@ -32,7 +38,11 @@ impl IntoSubsystem<AppError> for AdminServer {
         // 创建路由
         let app = Router::new()
             .route("/health", get(health_handler))
-            .route("/metrics", get(metrics_handler));
+            .route("/metrics", get(metrics_handler))
+            // 添加 API v1 路由
+            .merge(api_routes(self.config.clone()))
+            // 添加 OpenAPI UI
+            .merge(openapi_routes());
 
         // 创建 TCP 监听器
         let listener = create_tcp_listener(self.addr, u16::MAX.into())?;
