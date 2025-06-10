@@ -1,6 +1,6 @@
 use crate::{
     api::v1::handlers::{forward, upstream, upstream_group},
-    api::v1::models::{ApiResponse, ErrorDetail, ErrorResponse, UpstreamGroupDetail},
+    api::v1::models::{SuccessResponse, ErrorDetail, ErrorResponse, UpstreamGroupDetail},
     api::v1::routes::API_V1_PREFIX,
     config::{
         AuthConfig, AuthType, BalanceConfig, BalanceStrategy, BreakerConfig, ForwardConfig,
@@ -31,12 +31,12 @@ use utoipa_scalar::{Scalar, Servable};
     components(
         schemas(
             // 响应模型
-            ApiResponse<Vec<ForwardConfig>>,
-            ApiResponse<ForwardConfig>,
-            ApiResponse<Vec<UpstreamGroupDetail>>,
-            ApiResponse<UpstreamGroupDetail>,
-            ApiResponse<Vec<UpstreamConfig>>,
-            ApiResponse<UpstreamConfig>,
+            SuccessResponse<Vec<ForwardConfig>>,
+            SuccessResponse<ForwardConfig>,
+            SuccessResponse<Vec<UpstreamGroupDetail>>,
+            SuccessResponse<UpstreamGroupDetail>,
+            SuccessResponse<Vec<UpstreamConfig>>,
+            SuccessResponse<UpstreamConfig>,
             ErrorResponse,
             ErrorDetail,
             // 配置模型

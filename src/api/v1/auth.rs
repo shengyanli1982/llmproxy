@@ -1,4 +1,4 @@
-use crate::{api::v1::models::ApiResponse, r#const::api};
+use crate::{api::v1::models::ErrorResponse, r#const::api};
 use axum::{
     body::Body,
     extract::State,
@@ -27,7 +27,7 @@ impl IntoResponse for AuthError {
             self.to_string(),
         );
 
-        let body = ApiResponse::<()>::error(status, error_type, &message);
+        let body = ErrorResponse::error(status, error_type, &message);
         let mut response = body.into_response();
         response.headers_mut().insert(
             header::WWW_AUTHENTICATE,

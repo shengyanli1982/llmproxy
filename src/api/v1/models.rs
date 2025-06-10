@@ -6,23 +6,6 @@ use axum::{http::StatusCode, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// API 统一响应结构
-#[derive(Debug, Serialize, Deserialize, ToSchema)]
-pub struct ApiResponse<T> {
-    /// HTTP 状态码
-    pub code: u16,
-    /// 响应状态 ("success" 或 "error")
-    pub status: String,
-    /// 人类可读的消息
-    pub message: String,
-    /// 响应数据
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub data: Option<T>,
-    /// 错误详情 (仅在错误时存在)
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<ErrorDetail>,
-}
-
 /// 错误详情结构
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct ErrorDetail {
@@ -30,6 +13,18 @@ pub struct ErrorDetail {
     pub r#type: String,
     /// 错误消息
     pub message: String,
+}
+
+/// API 统一响应结构
+#[derive(Debug, Serialize, Deserialize, ToSchema)]
+pub struct SuccessResponse<T> {
+    /// HTTP 状态码
+    pub code: u16,
+    /// 响应状态 (始终为 "success")
+    pub status: String,
+    /// 响应数据
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<T>,
 }
 
 /// 错误响应结构
@@ -56,51 +51,55 @@ pub struct UpstreamGroupDetail {
     pub http_client: crate::config::HttpClientConfig,
 }
 
-impl ApiResponse<()> {
+impl SuccessResponse<()> {
     /// 创建一个成功响应，无数据
-    pub fn success(message: impl Into<String>) -> Self {
+    pub fn success() -> Self {
         Self {
-            code: 200,
+            code: StatusCode::OK.as_u16(),
             status: response_status::SUCCESS.to_string(),
-            message: message.into(),
             data: None,
-            error: None,
         }
     }
 }
 
-impl<T> ApiResponse<T> {
+impl<T> SuccessResponse<T> {
     /// 创建一个成功响应，带数据
-    pub fn success_with_data(data: T, message: impl Into<String>) -> Self {
+    pub fn success_with_data(data: T) -> Self {
         Self {
-            code: 200,
+            code: StatusCode::OK.as_u16(),
             status: response_status::SUCCESS.to_string(),
-            message: message.into(),
             data: Some(data),
-            error: None,
         }
     }
+}
 
+impl<T: Serialize> IntoResponse for SuccessResponse<T> {
+    fn into_response(self) -> axum::response::Response {
+        let status_code =
+            StatusCode::from_u16(self.code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+        (status_code, Json(self)).into_response()
+    }
+}
+
+impl ErrorResponse {
     /// 创建一个错误响应
     pub fn error(
         status_code: StatusCode,
         error_type: impl Into<String>,
         message: impl Into<String>,
-    ) -> ApiResponse<()> {
-        ApiResponse {
+    ) -> Self {
+        Self {
             code: status_code.as_u16(),
             status: response_status::ERROR.to_string(),
-            message: "".to_string(),
-            data: None,
-            error: Some(ErrorDetail {
+            error: ErrorDetail {
                 r#type: error_type.into(),
                 message: message.into(),
-            }),
+            },
         }
     }
 }
 
-impl<T: Serialize> IntoResponse for ApiResponse<T> {
+impl IntoResponse for ErrorResponse {
     fn into_response(self) -> axum::response::Response {
         let status_code =
             StatusCode::from_u16(self.code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
