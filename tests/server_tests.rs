@@ -1,7 +1,7 @@
 use llmproxy::{
     config::{
-        BalanceConfig, BalanceStrategy, ForwardConfig, RateLimitConfig, TimeoutConfig,
-        UpstreamConfig, UpstreamGroupConfig, UpstreamRef,
+        BalanceConfig, BalanceStrategy, ForwardConfig, HttpClientConfig, RateLimitConfig,
+        TimeoutConfig, UpstreamConfig, UpstreamGroupConfig, UpstreamRef,
     },
     error::AppError,
     server::ForwardServer,
@@ -30,8 +30,10 @@ async fn create_test_upstream_manager() -> (Arc<UpstreamManager>, MockServer) {
     // 创建上游配置
     let upstream_configs = vec![UpstreamConfig {
         name: "test_upstream".to_string(),
-        url: mock_server.uri(),
+        url: mock_server.uri().into(),
         id: Uuid::new_v4().to_string(),
+        weight: 1,
+        http_client: HttpClientConfig::default(),
         auth: None,
         headers: vec![],
         breaker: None,

@@ -1,8 +1,8 @@
 use llmproxy::{
     config::{
-        BalanceConfig, BalanceStrategy, BreakerConfig, HeaderOpType, HeaderOperation,
-        HttpClientConfig, HttpClientTimeoutConfig, ProxyConfig, RetryConfig, UpstreamConfig,
-        UpstreamGroupConfig, UpstreamRef,
+        BalanceConfig, BalanceStrategy, BreakerConfig, HeaderOp, HeaderOpType, HttpClientConfig,
+        HttpClientTimeoutConfig, ProxyConfig, RetryConfig, UpstreamConfig, UpstreamGroupConfig,
+        UpstreamRef,
     },
     upstream::UpstreamManager,
 };
@@ -24,21 +24,27 @@ fn create_test_configs(
     // 创建上游配置
     let mut upstream1 = UpstreamConfig {
         name: "test_upstream1".to_string(),
-        url: mock_url1.to_string(),
+        url: mock_url1.to_string().into(),
         id: Uuid::new_v4().to_string(),
+        weight: 1,
+        http_client: HttpClientConfig::default(),
         auth: None,
-        headers: vec![HeaderOperation {
+        headers: vec![HeaderOp {
             op: HeaderOpType::Insert,
             key: "X-Test-Header".to_string(),
             value: Some("test-value".to_string()),
+            parsed_name: None,
+            parsed_value: None,
         }],
         breaker: None,
     };
 
     let mut upstream2 = UpstreamConfig {
         name: "test_upstream2".to_string(),
-        url: mock_url2.to_string(),
+        url: mock_url2.to_string().into(),
         id: Uuid::new_v4().to_string(),
+        weight: 1,
+        http_client: HttpClientConfig::default(),
         auth: None,
         headers: vec![],
         breaker: None,

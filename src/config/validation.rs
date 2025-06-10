@@ -19,7 +19,8 @@ impl Config {
         self.validate_name_uniqueness()?;
 
         // 验证上游组
-        let upstream_names: Vec<String> = self.upstreams.iter().map(|u| u.name.clone()).collect();
+        let upstream_names: HashSet<&str> =
+            self.upstreams.iter().map(|u| u.name.as_str()).collect();
 
         // 检查上游组中引用的上游是否存在
         for group in &self.upstream_groups {
@@ -33,7 +34,7 @@ impl Config {
 
             for upstream_ref in &group.upstreams {
                 // 检查引用的上游是否存在
-                if !upstream_names.contains(&upstream_ref.name) {
+                if !upstream_names.contains(upstream_ref.name.as_str()) {
                     return Err(AppError::Config(format!(
                         "Upstream group '{}' references non-existent upstream '{}'",
                         group.name, upstream_ref.name
@@ -102,15 +103,15 @@ impl Config {
         }
 
         // 检查转发服务引用的上游组是否存在
-        let group_names: Vec<String> = self
+        let group_names: HashSet<&str> = self
             .upstream_groups
             .iter()
-            .map(|g| g.name.clone())
+            .map(|g| g.name.as_str())
             .collect();
 
         for forward in &self.http_server.forwards {
             // 检查引用的上游组是否存在
-            if !group_names.contains(&forward.upstream_group) {
+            if !group_names.contains(forward.upstream_group.as_str()) {
                 return Err(AppError::Config(format!(
                     "Forwarding service '{}' references non-existent upstream group '{}'",
                     forward.name, forward.upstream_group
@@ -197,7 +198,7 @@ impl Config {
         // 验证转发服务名称唯一性
         let mut forward_names = HashSet::new();
         for forward in &self.http_server.forwards {
-            if !forward_names.insert(&forward.name) {
+            if !forward_names.insert(forward.name.as_str()) {
                 return Err(AppError::Config(format!(
                     "Forwarding service name '{}' is duplicated",
                     forward.name
@@ -208,7 +209,7 @@ impl Config {
         // 验证上游名称唯一性
         let mut upstream_names = HashSet::new();
         for upstream in &self.upstreams {
-            if !upstream_names.insert(&upstream.name) {
+            if !upstream_names.insert(upstream.name.as_str()) {
                 return Err(AppError::Config(format!(
                     "Upstream name '{}' is duplicated",
                     upstream.name
@@ -219,7 +220,7 @@ impl Config {
         // 验证上游组名称唯一性
         let mut group_names = HashSet::new();
         for group in &self.upstream_groups {
-            if !group_names.insert(&group.name) {
+            if !group_names.insert(group.name.as_str()) {
                 return Err(AppError::Config(format!(
                     "Upstream group name '{}' is duplicated",
                     group.name

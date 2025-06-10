@@ -11,10 +11,11 @@ pub mod validation;
 pub use self::common::{BreakerConfig, ProxyConfig, RateLimitConfig, RetryConfig, TimeoutConfig};
 pub use self::http_client::{HttpClientConfig, HttpClientTimeoutConfig};
 pub use self::http_server::{AdminConfig, ForwardConfig, HttpServerConfig};
-pub use self::upstream::{AuthConfig, AuthType, HeaderOpType, HeaderOperation, UpstreamConfig};
+pub use self::upstream::{AuthConfig, AuthType, HeaderOp, HeaderOpType, UpstreamConfig};
 pub use self::upstream_group::{BalanceConfig, BalanceStrategy, UpstreamGroupConfig, UpstreamRef};
 
 use crate::error::AppError;
+use reqwest::header::{HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::Read;
@@ -58,12 +59,43 @@ impl Config {
         })?;
 
         // 解析YAML
-        let config: Config = serde_yaml::from_str(&content)
+        let mut config: Config = serde_yaml::from_str(&content)
             .map_err(|e| AppError::Config(format!("Configuration file parsing error: {}", e)))?;
+
+        // 预处理配置
+        config.post_process()?;
 
         // 验证配置
         config.validate()?;
 
         Ok(config)
+    }
+
+    // 预处理配置，例如预解析头部
+    fn post_process(&mut self) -> Result<(), AppError> {
+        for upstream in &mut self.upstreams {
+            for op in &mut upstream.headers {
+                // 预解析头部名称
+                let name = HeaderName::from_bytes(op.key.as_bytes()).map_err(|e| {
+                    AppError::InvalidHeader(format!(
+                        "Invalid header name '{}' for upstream '{}': {}",
+                        op.key, upstream.name, e
+                    ))
+                })?;
+                op.parsed_name = Some(name);
+
+                // 预解析头部值
+                if let Some(value_str) = &op.value {
+                    let value = HeaderValue::from_str(value_str).map_err(|e| {
+                        AppError::InvalidHeader(format!(
+                            "Invalid header value for key '{}' in upstream '{}': {}",
+                            op.key, upstream.name, e
+                        ))
+                    })?;
+                    op.parsed_value = Some(value);
+                }
+            }
+        }
+        Ok(())
     }
 }

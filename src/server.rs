@@ -286,8 +286,9 @@ pub async fn forward_handler(
         .await
     {
         Ok(response) => {
-            // 获取响应状态码
+            // 获取响应状态码和头
             let status = response.status();
+            let headers = response.headers().clone();
 
             // 记录请求耗时
             let duration = start_time.elapsed();
@@ -311,17 +312,14 @@ pub async fn forward_handler(
             }
 
             // 检查是否为流式响应
-            let is_stream = is_streaming_response(response.headers());
+            let is_stream = is_streaming_response(&headers);
 
             // 创建响应构建器
             let mut axum_response = Response::builder().status(status);
 
             // 复制响应头
             if let Some(headers_mut) = axum_response.headers_mut() {
-                // 直接移动头，而不是克隆
-                for (name, value) in response.headers() {
-                    headers_mut.insert(name.clone(), value.clone());
-                }
+                *headers_mut = headers;
             }
 
             // 根据响应类型处理
@@ -333,7 +331,6 @@ pub async fn forward_handler(
                 let stream = response.bytes_stream();
                 // 使用 Body::from_stream 直接传递流，避免额外的内存复制
                 let body = Body::from_stream(stream);
-
                 match axum_response.body(body) {
                     Ok(response) => response,
                     Err(e) => {

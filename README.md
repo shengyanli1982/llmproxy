@@ -680,7 +680,7 @@ _Figure: LLMProxy core architecture diagram (simplified version)_
 
 ### Warm Restarts on Linux
 
-To enhance service availability, LLMProxy leverages the `SO_REUSEPORT` socket option on `Linux` systems for both its forwarding and admin services. This feature allows multiple instances of LLMProxy to listen on the same port, enabling seamless, zero-downtime restarts and upgrades. When a new process starts, it can immediately begin accepting new connections on the shared port, while the old process completes any ongoing requests before gracefully shutting down. This mechanism prevents connection drops during deployments and significantly simplifies high-availability setups. Please note that this feature is specific to `Linux` and is not available on other operating systems like `Windows` or `macOS`.
+To enhance service availability, LLMProxy leverages the `SO_REUSEPORT` socket option on `Linux` systems for both its forwarding and admin services. This feature allows multiple instances of LLMProxy to listen on the same port, enabling seamless, zero-downtime restarts and upgrades. When a new process starts, it can immediately begin accepting new connections on the shared port, while the old process completes any ongoing requests before gracefully shutting down(**There will be a very small amount of connection drops, but it can be ignored**). This mechanism prevents connection drops during deployments and significantly simplifies high-availability setups. Please note that this feature is specific to `Linux` and is not available on other operating systems like `Windows` or `macOS`.
 
 ### Response-Time Aware Load Balancing Algorithm
 

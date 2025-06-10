@@ -32,7 +32,7 @@ impl From<AppError> for UpstreamError {
 struct HookData {
     name: String,
     group: String,
-    url: String,
+    url: Arc<String>,
 }
 
 /// 上游服务熔断器
@@ -45,7 +45,7 @@ pub struct UpstreamCircuitBreaker {
     #[allow(dead_code)]
     group: String,
     #[allow(dead_code)]
-    url: String,
+    url: Arc<String>,
 }
 
 impl UpstreamCircuitBreaker {
@@ -54,7 +54,7 @@ impl UpstreamCircuitBreaker {
         id: String,
         name: String,
         group: String,
-        url: String,
+        url: Arc<String>,
         threshold: f64,
         cooldown: u64,
     ) -> Arc<Self> {
@@ -110,12 +110,12 @@ impl UpstreamCircuitBreaker {
     }
 
     /// 创建熔断器事件钩子
-    fn create_hooks(name: &str, group: &str, url: &str) -> HookRegistry {
+    fn create_hooks(name: &str, group: &str, url: &Arc<String>) -> HookRegistry {
         // 只克隆一次字符串
         let data = HookData {
             name: name.to_owned(),
             group: group.to_owned(),
-            url: url.to_owned(),
+            url: url.clone(),
         };
 
         let hooks = HookRegistry::new();
@@ -247,7 +247,7 @@ pub fn create_upstream_circuit_breaker(
     id: String,
     name: String,
     group: String,
-    url: String,
+    url: Arc<String>,
     config: &BreakerConfig,
 ) -> Arc<UpstreamCircuitBreaker> {
     UpstreamCircuitBreaker::new(id, name, group, url, config.threshold, config.cooldown)

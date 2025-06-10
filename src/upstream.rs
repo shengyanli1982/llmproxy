@@ -10,10 +10,7 @@ use crate::{
         balance_strategy_labels, breaker_result_labels, error_labels, retry_limits, upstream_labels,
     },
 };
-use reqwest::{
-    header::{HeaderMap, HeaderName, HeaderValue},
-    Method, Response, Url,
-};
+use reqwest::{header::HeaderMap, Method, Response, Url};
 use reqwest_middleware::ClientWithMiddleware;
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 use retry_policies::Jitter;
@@ -298,7 +295,8 @@ impl UpstreamManager {
                     Ok(response) => Ok(response),
                     Err(e) => Err(UpstreamError(format!(
                         "Request to {} failed: {}",
-                        upstream_url, e
+                        upstream_url.as_str(),
+                        e
                     ))),
                 }
             }
@@ -317,7 +315,7 @@ impl UpstreamManager {
                         // 熔断器开启，拒绝请求
                         error!(
                             "Circuit breaker is open for upstream: {}",
-                            upstream_config.url
+                            upstream_config.url.as_str()
                         );
 
                         // 记录被拒绝的请求
@@ -389,7 +387,8 @@ impl UpstreamManager {
             let status = response.status().as_u16();
             debug!(
                 "Upstream response status: {} from {}",
-                status, upstream_config.url
+                status,
+                upstream_config.url.as_str()
             );
         }
 
@@ -414,20 +413,14 @@ impl UpstreamManager {
         for op in &upstream.headers {
             match op.op {
                 HeaderOpType::Insert | HeaderOpType::Replace => {
-                    let header_name = HeaderName::from_bytes(op.key.as_bytes()).map_err(|e| {
-                        AppError::InvalidHeader(format!("Invalid header name: {}", e))
-                    })?;
-                    let value_str = op.value.as_deref().unwrap_or_default();
-                    let header_value = HeaderValue::from_str(value_str).map_err(|e| {
-                        AppError::InvalidHeader(format!("Invalid header value: {}", e))
-                    })?;
-                    result.insert(header_name, header_value);
+                    if let (Some(name), Some(value)) = (&op.parsed_name, &op.parsed_value) {
+                        result.insert(name.clone(), value.clone());
+                    }
                 }
                 HeaderOpType::Remove => {
-                    let header_name = HeaderName::from_bytes(op.key.as_bytes()).map_err(|e| {
-                        AppError::InvalidHeader(format!("Invalid header name: {}", e))
-                    })?;
-                    result.remove(header_name);
+                    if let Some(name) = &op.parsed_name {
+                        result.remove(name);
+                    }
                 }
             }
         }
