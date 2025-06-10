@@ -18,7 +18,7 @@ use tracing::{info, warn};
 #[utoipa::path(
     get,
     path = "/api/v1/forwards",
-    tag = "Forward",
+    tag = "Forwards",
     responses(
         (status = 200, description = "成功获取所有转发规则 | Successfully retrieved all forwarding rules", body = ApiResponse<Vec<ForwardConfig>>),
         (status = 500, description = "服务器内部错误 | Internal server error", body = ErrorResponse),
@@ -41,7 +41,7 @@ pub async fn list_forwards(
 #[utoipa::path(
     get,
     path = "/api/v1/forwards/{name}",
-    tag = "Forward",
+    tag = "Forwards",
     params(
         ("name" = String, Path, description = "转发规则名称 | Forwarding rule name")
     ),

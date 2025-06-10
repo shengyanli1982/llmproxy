@@ -62,9 +62,9 @@ use utoipa_scalar::{Scalar, Servable};
         ),
     ),
     tags(
-        (name = "Forward", description = "转发规则 APIs | Forward Rule APIs"),
-        (name = "UpstreamGroup", description = "上游组 APIs | Upstream Group APIs"),
-        (name = "Upstream", description = "上游服务 APIs | Upstream Service APIs"),
+        (name = "Forwards", description = "转发规则 APIs | Forward Rule APIs"),
+        (name = "UpstreamGroups", description = "上游组 APIs | Upstream Group APIs"),
+        (name = "Upstreams", description = "上游服务 APIs | Upstream Service APIs"),
     ),
     info(
         title = "LLMProxy APIs",

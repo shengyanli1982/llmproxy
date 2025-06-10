@@ -18,7 +18,7 @@ use tracing::{info, warn};
 #[utoipa::path(
     get,
     path = "/api/v1/upstreams",
-    tag = "Upstream",
+    tag = "Upstreams",
     responses(
         (status = 200, description = "成功获取所有上游服务 | Successfully retrieved all upstream services", body = ApiResponse<Vec<UpstreamConfig>>),
         (status = 500, description = "服务器内部错误 | Internal server error", body = ErrorResponse),
@@ -41,7 +41,7 @@ pub async fn list_upstreams(
 #[utoipa::path(
     get,
     path = "/api/v1/upstreams/{name}",
-    tag = "Upstream",
+    tag = "Upstreams",
     params(
         ("name" = String, Path, description = "上游服务名称 | Upstream service name")
     ),
