@@ -1,4 +1,7 @@
-use crate::config::{UpstreamConfig, UpstreamGroupConfig, UpstreamRef};
+use crate::{
+    config::{UpstreamConfig, UpstreamGroupConfig},
+    r#const::api::response_status,
+};
 use axum::{http::StatusCode, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -58,7 +61,7 @@ impl ApiResponse<()> {
     pub fn success(message: impl Into<String>) -> Self {
         Self {
             code: 200,
-            status: "success".to_string(),
+            status: response_status::SUCCESS.to_string(),
             message: message.into(),
             data: None,
             error: None,
@@ -71,7 +74,7 @@ impl<T> ApiResponse<T> {
     pub fn success_with_data(data: T, message: impl Into<String>) -> Self {
         Self {
             code: 200,
-            status: "success".to_string(),
+            status: response_status::SUCCESS.to_string(),
             message: message.into(),
             data: Some(data),
             error: None,
@@ -86,7 +89,7 @@ impl<T> ApiResponse<T> {
     ) -> ApiResponse<()> {
         ApiResponse {
             code: status_code.as_u16(),
-            status: "error".to_string(),
+            status: response_status::ERROR.to_string(),
             message: "".to_string(),
             data: None,
             error: Some(ErrorDetail {

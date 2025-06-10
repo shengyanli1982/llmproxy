@@ -4,9 +4,10 @@ use crate::config::defaults::{
     default_stream_mode, default_user_agent,
 };
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 // HTTP客户端配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct HttpClientConfig {
     // 用户代理
     #[serde(default = "default_user_agent")]
@@ -42,7 +43,7 @@ impl Default for HttpClientConfig {
 }
 
 // HTTP客户端超时配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct HttpClientTimeoutConfig {
     // 连接超时（秒）
     #[serde(default = "default_connect_timeout")]

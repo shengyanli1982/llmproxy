@@ -1,17 +1,47 @@
-use crate::api::v1::models::ApiResponse;
+use crate::{api::v1::models::ApiResponse, r#const::api};
 use axum::{
+    body::Body,
     extract::State,
-    http::{Request, StatusCode},
+    http::{header, Request, StatusCode},
     middleware::Next,
-    response::Response,
+    response::{IntoResponse, Response},
 };
+use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum AuthError {
+    #[error("Bearer authentication required")]
+    MissingAuthHeader,
+    #[error("Invalid token format")]
+    InvalidTokenFormat,
+    #[error("Invalid token")]
+    TokenMismatch,
+}
+
+impl IntoResponse for AuthError {
+    fn into_response(self) -> Response {
+        let (status, error_type, message) = (
+            StatusCode::UNAUTHORIZED,
+            api::error_types::UNAUTHORIZED,
+            self.to_string(),
+        );
+
+        let body = ApiResponse::<()>::error(status, error_type, &message);
+        let mut response = body.into_response();
+        response.headers_mut().insert(
+            header::WWW_AUTHENTICATE,
+            api::auth::BEARER_SCHEME.parse().unwrap(),
+        );
+        response
+    }
+}
 
 /// Bearer 令牌认证中间件
-pub async fn auth_middleware<B>(
+pub async fn auth_middleware(
     State(auth_token): State<Option<String>>,
-    request: Request<B>,
-    next: Next<B>,
-) -> Result<Response, ApiResponse<()>> {
+    request: Request<Body>,
+    next: Next,
+) -> Result<Response, AuthError> {
     // 如果没有设置认证令牌，则跳过认证
     let Some(expected_token) = auth_token else {
         return Ok(next.run(request).await);
@@ -20,32 +50,23 @@ pub async fn auth_middleware<B>(
     // 获取 Authorization 头
     let auth_header = request
         .headers()
-        .get("Authorization")
+        .get(header::AUTHORIZATION)
         .and_then(|header| header.to_str().ok());
 
-    // 验证 Bearer 令牌
     match auth_header {
-        Some(auth) if auth.starts_with("Bearer ") => {
-            let token = auth.trim_start_matches("Bearer ").trim();
+        Some(header_value) if header_value.starts_with(api::auth::BEARER_PREFIX) => {
+            let token = header_value
+                .trim_start_matches(api::auth::BEARER_PREFIX)
+                .trim();
             if token == expected_token {
                 // 认证成功，继续处理请求
                 Ok(next.run(request).await)
             } else {
                 // 令牌无效
-                Err(ApiResponse::error(
-                    StatusCode::UNAUTHORIZED,
-                    "Unauthorized",
-                    "无效的认证令牌",
-                ))
+                Err(AuthError::TokenMismatch)
             }
         }
-        _ => {
-            // 缺少 Authorization 头或格式不正确
-            Err(ApiResponse::error(
-                StatusCode::UNAUTHORIZED,
-                "Unauthorized",
-                "需要 Bearer 认证",
-            ))
-        }
+        Some(_) => Err(AuthError::InvalidTokenFormat),
+        None => Err(AuthError::MissingAuthHeader),
     }
 }

@@ -22,9 +22,11 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use tracing::debug;
+use utoipa::ToSchema;
 
 // 配置文件结构
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct Config {
     // HTTP服务器配置
     #[serde(default)]

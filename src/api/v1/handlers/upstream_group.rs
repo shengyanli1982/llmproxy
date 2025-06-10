@@ -1,10 +1,13 @@
 use crate::{
-    api::v1::models::{ApiResponse, UpstreamGroupDetail},
+    api::v1::models::{ApiResponse, ErrorResponse, UpstreamGroupDetail},
     config::{Config, UpstreamConfig},
+    r#const::api,
 };
 use axum::{
     extract::{Path, State},
     http::StatusCode,
+    response::{IntoResponse, Response},
+    Json,
 };
 use std::{collections::HashMap, sync::Arc};
 use tracing::{info, warn};
@@ -18,7 +21,7 @@ use tracing::{info, warn};
     tag = "UpstreamGroup",
     responses(
         (status = 200, description = "成功获取所有上游组 | Successfully retrieved all upstream groups", body = ApiResponse<Vec<UpstreamGroupDetail>>),
-        (status = 500, description = "服务器内部错误 | Internal server error", body = ApiResponse<()>),
+        (status = 500, description = "服务器内部错误 | Internal server error", body = ErrorResponse),
     ),
     security(
         ("bearer_auth" = [])
@@ -26,7 +29,7 @@ use tracing::{info, warn};
 )]
 pub async fn list_upstream_groups(
     State(config): State<Arc<Config>>,
-) -> ApiResponse<Vec<UpstreamGroupDetail>> {
+) -> Json<ApiResponse<Vec<UpstreamGroupDetail>>> {
     // 创建上游服务名称到配置的映射
     let upstream_map: HashMap<String, UpstreamConfig> = config
         .upstreams
@@ -42,7 +45,10 @@ pub async fn list_upstream_groups(
         .collect();
 
     info!("API: Retrieved {} upstream groups", groups.len());
-    ApiResponse::success_with_data(groups, "Successfully retrieved upstream groups list")
+    Json(ApiResponse::success_with_data(
+        groups,
+        "Successfully retrieved upstream groups list",
+    ))
 }
 
 /// 获取单个上游组详情
@@ -57,17 +63,18 @@ pub async fn list_upstream_groups(
     ),
     responses(
         (status = 200, description = "成功获取上游组 | Successfully retrieved upstream group", body = ApiResponse<UpstreamGroupDetail>),
-        (status = 404, description = "上游组不存在 | Upstream group not found", body = ApiResponse<()>),
-        (status = 500, description = "服务器内部错误 | Internal server error", body = ApiResponse<()>),
+        (status = 404, description = "上游组不存在 | Upstream group not found", body = ErrorResponse),
+        (status = 500, description = "服务器内部错误 | Internal server error", body = ErrorResponse),
     ),
     security(
         ("bearer_auth" = [])
     )
 )]
+#[axum::debug_handler]
 pub async fn get_upstream_group(
     State(config): State<Arc<Config>>,
     Path(name): Path<String>,
-) -> ApiResponse<UpstreamGroupDetail> {
+) -> Response {
     // 查找指定名称的上游组
     match config
         .upstream_groups
@@ -85,15 +92,20 @@ pub async fn get_upstream_group(
             // 转换为详情模型
             let detail = UpstreamGroupDetail::from_config(group, &upstream_map);
             info!("API: Retrieved upstream group '{}'", name);
-            ApiResponse::success_with_data(detail, "Successfully retrieved upstream group")
+            Json(ApiResponse::success_with_data(
+                detail,
+                "Successfully retrieved upstream group",
+            ))
+            .into_response()
         }
         None => {
             warn!("API: Upstream group '{}' not found", name);
-            ApiResponse::error(
+            Json(ApiResponse::<()>::error(
                 StatusCode::NOT_FOUND,
-                "Not Found",
+                api::error_types::NOT_FOUND,
                 format!("Upstream group '{}' does not exist", name),
-            )
+            ))
+            .into_response()
         }
     }
 }

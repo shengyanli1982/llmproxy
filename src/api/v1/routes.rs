@@ -4,6 +4,7 @@ use crate::{
         handlers::{forward, upstream, upstream_group},
     },
     config::Config,
+    r#const::api,
 };
 use axum::{middleware, routing::get, Router};
 use std::sync::Arc;
@@ -19,7 +20,7 @@ const UPSTREAM_NAME_PATH: &str = "/upstreams/{name}";
 /// 创建 API v1 路由
 pub fn api_routes(config: Arc<Config>) -> Router {
     // 检查是否需要认证
-    let auth_token = std::env::var("LLMPROXY_ADMIN_AUTH_TOKEN").ok();
+    let auth_token = std::env::var(api::ADMIN_AUTH_TOKEN_ENV).ok();
 
     let mut api_router = Router::new()
         // 转发规则路由

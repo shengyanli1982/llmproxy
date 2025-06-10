@@ -3,9 +3,10 @@ use llmproxy::{
     upstream::UpstreamManager,
 };
 use mimalloc::MiMalloc;
-use std::{process, sync::Arc};
+use std::process;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemBuilder, Toplevel};
 use tracing::{error, info};
+use tracing_subscriber;
 
 // 使用 mimalloc 分配器提高内存效率
 #[global_allocator]

@@ -1,10 +1,13 @@
 use crate::{
-    api::v1::models::ApiResponse,
+    api::v1::models::{ApiResponse, ErrorResponse},
     config::{Config, UpstreamConfig},
+    r#const::api,
 };
 use axum::{
     extract::{Path, State},
     http::StatusCode,
+    response::{IntoResponse, Response},
+    Json,
 };
 use std::sync::Arc;
 use tracing::{info, warn};
@@ -18,16 +21,21 @@ use tracing::{info, warn};
     tag = "Upstream",
     responses(
         (status = 200, description = "成功获取所有上游服务 | Successfully retrieved all upstream services", body = ApiResponse<Vec<UpstreamConfig>>),
-        (status = 500, description = "服务器内部错误 | Internal server error", body = ApiResponse<()>),
+        (status = 500, description = "服务器内部错误 | Internal server error", body = ErrorResponse),
     ),
     security(
         ("bearer_auth" = [])
     )
 )]
-pub async fn list_upstreams(State(config): State<Arc<Config>>) -> ApiResponse<Vec<UpstreamConfig>> {
+pub async fn list_upstreams(
+    State(config): State<Arc<Config>>,
+) -> Json<ApiResponse<Vec<UpstreamConfig>>> {
     let upstreams = config.upstreams.clone();
     info!("API: Retrieved {} upstream services", upstreams.len());
-    ApiResponse::success_with_data(upstreams, "Successfully retrieved upstream services list")
+    Json(ApiResponse::success_with_data(
+        upstreams,
+        "Successfully retrieved upstream services list",
+    ))
 }
 
 /// 获取单个上游服务详情
@@ -42,17 +50,15 @@ pub async fn list_upstreams(State(config): State<Arc<Config>>) -> ApiResponse<Ve
     ),
     responses(
         (status = 200, description = "成功获取上游服务 | Successfully retrieved upstream service", body = ApiResponse<UpstreamConfig>),
-        (status = 404, description = "上游服务不存在 | Upstream service not found", body = ApiResponse<()>),
-        (status = 500, description = "服务器内部错误 | Internal server error", body = ApiResponse<()>),
+        (status = 404, description = "上游服务不存在 | Upstream service not found", body = ErrorResponse),
+        (status = 500, description = "服务器内部错误 | Internal server error", body = ErrorResponse),
     ),
     security(
         ("bearer_auth" = [])
     )
 )]
-pub async fn get_upstream(
-    State(config): State<Arc<Config>>,
-    Path(name): Path<String>,
-) -> ApiResponse<UpstreamConfig> {
+#[axum::debug_handler]
+pub async fn get_upstream(State(config): State<Arc<Config>>, Path(name): Path<String>) -> Response {
     // 查找指定名称的上游服务
     match config
         .upstreams
@@ -61,18 +67,20 @@ pub async fn get_upstream(
     {
         Some(upstream) => {
             info!("API: Retrieved upstream service '{}'", name);
-            ApiResponse::success_with_data(
+            Json(ApiResponse::success_with_data(
                 upstream.clone(),
                 "Successfully retrieved upstream service",
-            )
+            ))
+            .into_response()
         }
         None => {
             warn!("API: Upstream service '{}' not found", name);
-            ApiResponse::error(
+            Json(ApiResponse::<()>::error(
                 StatusCode::NOT_FOUND,
-                "Not Found",
+                api::error_types::NOT_FOUND,
                 format!("Upstream service '{}' does not exist", name),
-            )
+            ))
+            .into_response()
         }
     }
 }

@@ -1,4 +1,4 @@
-use crate::api::v1::{api_routes, openapi_routes, ApiDoc};
+use crate::api::v1::{api_routes, openapi_routes};
 use crate::config::Config;
 use crate::error::AppError;
 use crate::metrics::METRICS;
@@ -15,7 +15,6 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemHandle};
 use tracing::{error, info};
-use utoipa_scalar::{Scalar, Servable};
 
 const HEALTH_PATH: &str = "/health";
 const METRICS_PATH: &str = "/metrics";

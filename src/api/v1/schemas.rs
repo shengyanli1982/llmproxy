@@ -8,14 +8,15 @@ use crate::{
         RateLimitConfig, RetryConfig, TimeoutConfig, UpstreamConfig, UpstreamGroupConfig,
         UpstreamRef,
     },
+    r#const::api,
 };
-use axum::Router;
+use axum::{http::header, Router};
 use std::env;
 use utoipa::{
     openapi::security::{ApiKey, ApiKeyValue, SecurityScheme},
     Modify, OpenApi,
 };
-use utoipa_scalar::Scalar;
+use utoipa_scalar::{Scalar, Servable};
 
 /// OpenAPI 文档结构
 #[derive(OpenApi)]
@@ -99,45 +100,45 @@ struct SecurityAddon;
 impl Modify for SecurityAddon {
     fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
         // 检查是否设置了认证令牌环境变量
-        let auth_enabled = env::var("LLMPROXY_ADMIN_AUTH_TOKEN").is_ok();
+        let auth_enabled = env::var(api::ADMIN_AUTH_TOKEN_ENV).is_ok();
 
         if auth_enabled {
             // 如果启用认证，添加安全方案
             if let Some(components) = &mut openapi.components {
                 components.add_security_scheme(
-                    "bearer_auth",
-                    SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new("Authorization"))),
+                    api::auth::BEARER_SECURITY_SCHEME,
+                    SecurityScheme::ApiKey(ApiKey::Header(ApiKeyValue::new(
+                        header::AUTHORIZATION.as_str(),
+                    ))),
                 );
             }
         } else {
             // 如果未启用认证，从所有路径操作中移除安全要求
-            if let Some(paths) = &mut openapi.paths {
-                for (_, path_item) in paths.iter_mut() {
-                    // 检查并清除各种 HTTP 方法的安全要求
-                    if let Some(op) = &mut path_item.get {
-                        op.security = None;
-                    }
-                    if let Some(op) = &mut path_item.post {
-                        op.security = None;
-                    }
-                    if let Some(op) = &mut path_item.put {
-                        op.security = None;
-                    }
-                    if let Some(op) = &mut path_item.delete {
-                        op.security = None;
-                    }
-                    if let Some(op) = &mut path_item.options {
-                        op.security = None;
-                    }
-                    if let Some(op) = &mut path_item.head {
-                        op.security = None;
-                    }
-                    if let Some(op) = &mut path_item.patch {
-                        op.security = None;
-                    }
-                    if let Some(op) = &mut path_item.trace {
-                        op.security = None;
-                    }
+            for (_, path_item) in openapi.paths.paths.iter_mut() {
+                // 检查并清除各种 HTTP 方法的安全要求
+                if let Some(op) = &mut path_item.get {
+                    op.security = None;
+                }
+                if let Some(op) = &mut path_item.post {
+                    op.security = None;
+                }
+                if let Some(op) = &mut path_item.put {
+                    op.security = None;
+                }
+                if let Some(op) = &mut path_item.delete {
+                    op.security = None;
+                }
+                if let Some(op) = &mut path_item.options {
+                    op.security = None;
+                }
+                if let Some(op) = &mut path_item.head {
+                    op.security = None;
+                }
+                if let Some(op) = &mut path_item.patch {
+                    op.security = None;
+                }
+                if let Some(op) = &mut path_item.trace {
+                    op.security = None;
                 }
             }
         }
