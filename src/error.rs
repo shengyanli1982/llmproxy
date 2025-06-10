@@ -1,5 +1,6 @@
 use reqwest_middleware::Error as ReqwestMiddlewareError;
 use std::io;
+use std::sync::Arc;
 use thiserror::Error;
 
 // 应用错误类型
@@ -38,8 +39,8 @@ pub enum AppError {
     NoHealthyUpstreamAvailable,
 
     // 熔断器开启
-    #[error("Circuit breaker is open for upstream: {0}")]
-    CircuitBreakerOpen(String),
+    #[error("Circuit breaker is open for: {0}")]
+    CircuitBreakerOpen(Arc<String>),
 
     // 无效代理配置
     #[error("Invalid proxy configuration: {0}")]

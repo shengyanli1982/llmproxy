@@ -3,6 +3,7 @@ use crate::error::AppError;
 use crate::r#const::balance_strategy_labels;
 use async_trait::async_trait;
 use std::any::Any;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use tracing::debug;
 
@@ -19,6 +20,8 @@ pub struct ResponseAwareBalancer {
     current: AtomicUsize,
     // 节点指标
     metrics: Vec<UpstreamMetrics>,
+    // 名称到索引的映射
+    name_to_index: HashMap<String, usize>,
 }
 
 struct UpstreamMetrics {
@@ -41,18 +44,23 @@ impl ResponseAwareBalancer {
             })
             .collect();
 
+        let name_to_index = upstreams
+            .iter()
+            .enumerate()
+            .map(|(i, u)| (u.upstream_ref.name.clone(), i))
+            .collect();
+
         Self {
             upstreams,
             current: AtomicUsize::new(0),
             metrics,
+            name_to_index,
         }
     }
 
     // 查找上游索引
     fn find_upstream_index(&self, upstream: &ManagedUpstream) -> Option<usize> {
-        self.upstreams
-            .iter()
-            .position(|u| u.upstream_ref.name == upstream.upstream_ref.name)
+        self.name_to_index.get(&upstream.upstream_ref.name).copied()
     }
 
     // 更新响应时间和减少待处理请求

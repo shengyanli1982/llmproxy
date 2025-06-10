@@ -3,7 +3,10 @@ use llmproxy::{
         FailoverBalancer, LoadBalancer, ManagedUpstream, RandomBalancer, ResponseAwareBalancer,
         RoundRobinBalancer, WeightedRoundRobinBalancer,
     },
-    config::{BalanceConfig, BalanceStrategy, UpstreamConfig, UpstreamGroupConfig, UpstreamRef},
+    config::{
+        BalanceConfig, BalanceStrategy, HttpClientConfig, UpstreamConfig, UpstreamGroupConfig,
+        UpstreamRef,
+    },
     upstream::UpstreamManager,
 };
 use std::sync::Arc;
@@ -182,16 +185,20 @@ async fn test_load_balancer_with_upstream_manager() {
     let upstream_configs = vec![
         UpstreamConfig {
             name: "upstream1".to_string(),
-            url: mock_server1.uri(),
+            url: mock_server1.uri().into(),
             id: Uuid::new_v4().to_string(),
+            weight: 1,
+            http_client: HttpClientConfig::default(),
             auth: None,
             headers: vec![],
             breaker: None,
         },
         UpstreamConfig {
             name: "upstream2".to_string(),
-            url: mock_server2.uri(),
+            url: mock_server2.uri().into(),
             id: Uuid::new_v4().to_string(),
+            weight: 1,
+            http_client: HttpClientConfig::default(),
             auth: None,
             headers: vec![],
             breaker: None,
@@ -273,16 +280,20 @@ async fn test_load_balancer_with_unavailable_upstream() {
     let upstream_configs = vec![
         UpstreamConfig {
             name: "available".to_string(),
-            url: mock_server.uri(),
+            url: mock_server.uri().into(),
             id: Uuid::new_v4().to_string(),
+            weight: 1,
+            http_client: HttpClientConfig::default(),
             auth: None,
             headers: vec![],
             breaker: None,
         },
         UpstreamConfig {
             name: "unavailable".to_string(),
-            url: "http://localhost:1".to_string(), // 不可用的上游
+            url: "http://localhost:1".to_string().into(), // 不可用的上游
             id: Uuid::new_v4().to_string(),
+            weight: 1,
+            http_client: HttpClientConfig::default(),
             auth: None,
             headers: vec![],
             breaker: None,
@@ -508,16 +519,20 @@ async fn test_response_aware_with_upstream_manager() {
     let upstream_configs = vec![
         UpstreamConfig {
             name: "fast".to_string(),
-            url: mock_server1.uri(),
+            url: mock_server1.uri().into(),
             id: Uuid::new_v4().to_string(),
+            weight: 1,
+            http_client: HttpClientConfig::default(),
             auth: None,
             headers: vec![],
             breaker: None,
         },
         UpstreamConfig {
             name: "slow".to_string(),
-            url: mock_server2.uri(),
+            url: mock_server2.uri().into(),
             id: Uuid::new_v4().to_string(),
+            weight: 1,
+            http_client: HttpClientConfig::default(),
             auth: None,
             headers: vec![],
             breaker: None,
@@ -762,10 +777,10 @@ async fn test_failover_balancer_with_unavailable_upstream() {
         cooldown: 30,
     };
     let breaker = llmproxy::breaker::create_upstream_circuit_breaker(
-        managed_upstreams[0].id.clone(),
-        managed_upstreams[0].upstream_ref.name.clone(),
+        Uuid::new_v4().to_string(),
+        "test_upstream".to_string(),
         "test_group".to_string(),
-        "http://example.com".to_string(),
+        "http://example.com".to_string().into(),
         &breaker_config,
     );
 

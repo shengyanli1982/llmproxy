@@ -1,7 +1,7 @@
 use llmproxy::{
     config::{
         AuthConfig, AuthType, BalanceConfig, BalanceStrategy, BreakerConfig, Config, ForwardConfig,
-        HeaderOpType, HeaderOperation, HttpClientConfig, HttpClientTimeoutConfig, ProxyConfig,
+        HeaderOp, HeaderOpType, HttpClientConfig, HttpClientTimeoutConfig, ProxyConfig,
         RateLimitConfig, RetryConfig, TimeoutConfig, UpstreamConfig, UpstreamGroupConfig,
         UpstreamRef,
     },
@@ -16,18 +16,22 @@ use uuid::Uuid;
 fn create_valid_test_config() -> Config {
     let upstream_config = UpstreamConfig {
         name: "test_upstream".to_string(),
-        url: "http://localhost:8080".to_string(),
+        url: "http://localhost:8080".to_string().into(),
         id: Uuid::new_v4().to_string(),
+        weight: 1,
+        http_client: HttpClientConfig::default(),
         auth: Some(AuthConfig {
             r#type: AuthType::Bearer,
             token: Some("test_token".to_string()),
             username: None,
             password: None,
         }),
-        headers: vec![HeaderOperation {
+        headers: vec![HeaderOp {
             op: HeaderOpType::Insert,
             key: "X-Test-Header".to_string(),
             value: Some("test-value".to_string()),
+            parsed_name: None,
+            parsed_value: None,
         }],
         breaker: Some(BreakerConfig {
             threshold: 0.5,
@@ -108,8 +112,10 @@ fn test_config_validation_duplicate_names() {
     // 添加重复的上游名称
     let duplicate_upstream = UpstreamConfig {
         name: "test_upstream".to_string(), // 重复的名称
-        url: "http://localhost:8081".to_string(),
+        url: "http://localhost:8081".to_string().into(),
         id: Uuid::new_v4().to_string(),
+        weight: 1,
+        http_client: HttpClientConfig::default(),
         auth: None,
         headers: vec![],
         breaker: None,
@@ -130,7 +136,7 @@ fn test_config_validation_invalid_url() {
     let mut config = create_valid_test_config();
 
     // 设置无效的URL
-    config.upstreams[0].url = "invalid-url".to_string();
+    config.upstreams[0].url = "invalid-url".to_string().into();
 
     let result = config.validate();
     assert!(result.is_err());

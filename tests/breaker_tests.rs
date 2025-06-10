@@ -26,7 +26,7 @@ async fn test_breaker_basic_functionality() {
     // 创建熔断器
     let name = "test_upstream".to_string();
     let group = "test_group".to_string();
-    let url = "http://example.com".to_string();
+    let url = "http://example.com".to_string().into();
     let config = create_test_breaker_config(0.5, 1); // 50% 失败率阈值，1秒冷却时间
 
     let breaker =
@@ -91,7 +91,7 @@ async fn test_breaker_with_mock_server() {
         Uuid::new_v4().to_string(),
         name.clone(),
         group.clone(),
-        mock_url.clone(),
+        mock_url.clone().into(),
         &config,
     );
 
@@ -187,7 +187,7 @@ async fn test_load_balancer_with_circuit_breaker() {
         Uuid::new_v4().to_string(),
         "upstream1".to_string(),
         "test_group".to_string(),
-        mock_url1.clone(),
+        mock_url1.clone().into(),
         &config,
     );
 
@@ -195,7 +195,7 @@ async fn test_load_balancer_with_circuit_breaker() {
         Uuid::new_v4().to_string(),
         "upstream2".to_string(),
         "test_group".to_string(),
-        mock_url2.clone(),
+        mock_url2.clone().into(),
         &config,
     );
 
@@ -304,7 +304,7 @@ async fn test_all_upstreams_circuit_open() {
         Uuid::new_v4().to_string(),
         "upstream1".to_string(),
         "test_group".to_string(),
-        "http://example1.com".to_string(),
+        "http://example1.com".to_string().into(),
         0.5,
         1,
     );
@@ -313,7 +313,7 @@ async fn test_all_upstreams_circuit_open() {
         Uuid::new_v4().to_string(),
         "upstream2".to_string(),
         "test_group".to_string(),
-        "http://example2.com".to_string(),
+        "http://example2.com".to_string().into(),
         0.5,
         1,
     );

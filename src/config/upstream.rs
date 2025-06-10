@@ -1,23 +1,34 @@
 use crate::config::common::BreakerConfig;
 use crate::config::defaults::default_uuid_v4_string;
+use reqwest::header::{HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
-// 上游配置
+use super::http_client::HttpClientConfig;
+
+/// 上游服务配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UpstreamConfig {
-    // 上游名称
-    pub name: String,
-    // 上游URL
-    pub url: String,
-    // 唯一标识符 (内部使用)
-    #[serde(skip_serializing, default = "default_uuid_v4_string")]
+    // 唯一标识符
+    #[serde(skip, default = "default_uuid_v4_string")]
     pub id: String,
+    // 上游服务名称
+    pub name: String,
+    // 上游服务地址
+    #[serde(with = "crate::config::defaults::arc_string")]
+    pub url: Arc<String>,
+    // 权重
+    #[serde(default = "crate::config::defaults::default_weight")]
+    pub weight: u32,
     // 认证配置
     #[serde(default)]
     pub auth: Option<AuthConfig>,
+    // HTTP 客户端配置
+    #[serde(default)]
+    pub http_client: HttpClientConfig,
     // 请求头操作
     #[serde(default)]
-    pub headers: Vec<HeaderOperation>,
+    pub headers: Vec<HeaderOp>,
     // 熔断器配置
     #[serde(default)]
     pub breaker: Option<BreakerConfig>,
@@ -58,26 +69,25 @@ impl Default for AuthType {
     }
 }
 
-// 请求头操作
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct HeaderOperation {
-    // 操作类型
-    pub op: HeaderOpType,
-    // 头部名称
-    pub key: String,
-    // 头部值（对于insert和replace操作）
-    #[serde(default)]
-    pub value: Option<String>,
+/// HTTP 请求头操作类型
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Copy)]
+pub enum HeaderOpType {
+    // 插入
+    Insert,
+    // 替换
+    Replace,
+    // 移除
+    Remove,
 }
 
-// 请求头操作类型
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "lowercase")]
-pub enum HeaderOpType {
-    // 插入（如果不存在）
-    Insert,
-    // 删除
-    Remove,
-    // 替换（如果存在）或插入（如果不存在）
-    Replace,
+// 请求头操作
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HeaderOp {
+    pub op: HeaderOpType,
+    pub key: String,
+    pub value: Option<String>,
+    #[serde(skip)]
+    pub parsed_name: Option<HeaderName>,
+    #[serde(skip)]
+    pub parsed_value: Option<HeaderValue>,
 }
