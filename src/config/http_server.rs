@@ -1,9 +1,11 @@
 use crate::config::common::{RateLimitConfig, TimeoutConfig};
 use crate::config::defaults::{default_admin_port, default_listen_address, default_listen_port};
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 // HTTP服务器配置
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
+
 pub struct HttpServerConfig {
     // 转发服务配置
     #[serde(default)]
@@ -14,7 +16,7 @@ pub struct HttpServerConfig {
 }
 
 // 转发服务配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ForwardConfig {
     // 转发服务名称
     pub name: String,
@@ -35,7 +37,8 @@ pub struct ForwardConfig {
 }
 
 // 管理服务配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+
 pub struct AdminConfig {
     // 监听端口
     #[serde(default = "default_admin_port")]

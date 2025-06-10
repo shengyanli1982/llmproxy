@@ -2,9 +2,10 @@ use crate::config::defaults::default_weight;
 use crate::config::http_client::HttpClientConfig;
 use crate::r#const::balance_strategy_labels;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 // 上游组配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UpstreamGroupConfig {
     // 上游组名称
     pub name: String,
@@ -19,7 +20,7 @@ pub struct UpstreamGroupConfig {
 }
 
 // 上游引用
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct UpstreamRef {
     // 上游名称
     pub name: String,
@@ -29,7 +30,7 @@ pub struct UpstreamRef {
 }
 
 // 负载均衡策略配置
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
 pub struct BalanceConfig {
     // 策略类型
     #[serde(default)]
@@ -37,7 +38,7 @@ pub struct BalanceConfig {
 }
 
 // 负载均衡策略类型
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum BalanceStrategy {
     // 轮询

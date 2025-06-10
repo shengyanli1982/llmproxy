@@ -11,7 +11,7 @@ use llmproxy::{
 };
 use std::sync::Arc;
 use std::time::Duration;
-use uuid::Uuid;
+
 use wiremock::{
     matchers::{method, path},
     Mock, MockServer, ResponseTemplate,
@@ -25,7 +25,6 @@ fn create_test_managed_upstreams() -> Vec<ManagedUpstream> {
                 name: "upstream1".to_string(),
                 weight: 1,
             },
-            id: Uuid::new_v4().to_string(),
             breaker: None,
         },
         ManagedUpstream {
@@ -33,7 +32,6 @@ fn create_test_managed_upstreams() -> Vec<ManagedUpstream> {
                 name: "upstream2".to_string(),
                 weight: 2,
             },
-            id: Uuid::new_v4().to_string(),
             breaker: None,
         },
         ManagedUpstream {
@@ -41,7 +39,6 @@ fn create_test_managed_upstreams() -> Vec<ManagedUpstream> {
                 name: "upstream3".to_string(),
                 weight: 3,
             },
-            id: Uuid::new_v4().to_string(),
             breaker: None,
         },
     ]
@@ -186,7 +183,6 @@ async fn test_load_balancer_with_upstream_manager() {
         UpstreamConfig {
             name: "upstream1".to_string(),
             url: mock_server1.uri().into(),
-            id: Uuid::new_v4().to_string(),
             weight: 1,
             http_client: HttpClientConfig::default(),
             auth: None,
@@ -196,7 +192,6 @@ async fn test_load_balancer_with_upstream_manager() {
         UpstreamConfig {
             name: "upstream2".to_string(),
             url: mock_server2.uri().into(),
-            id: Uuid::new_v4().to_string(),
             weight: 1,
             http_client: HttpClientConfig::default(),
             auth: None,
@@ -281,7 +276,6 @@ async fn test_load_balancer_with_unavailable_upstream() {
         UpstreamConfig {
             name: "available".to_string(),
             url: mock_server.uri().into(),
-            id: Uuid::new_v4().to_string(),
             weight: 1,
             http_client: HttpClientConfig::default(),
             auth: None,
@@ -291,7 +285,6 @@ async fn test_load_balancer_with_unavailable_upstream() {
         UpstreamConfig {
             name: "unavailable".to_string(),
             url: "http://localhost:1".to_string().into(), // 不可用的上游
-            id: Uuid::new_v4().to_string(),
             weight: 1,
             http_client: HttpClientConfig::default(),
             auth: None,
@@ -520,7 +513,6 @@ async fn test_response_aware_with_upstream_manager() {
         UpstreamConfig {
             name: "fast".to_string(),
             url: mock_server1.uri().into(),
-            id: Uuid::new_v4().to_string(),
             weight: 1,
             http_client: HttpClientConfig::default(),
             auth: None,
@@ -530,7 +522,6 @@ async fn test_response_aware_with_upstream_manager() {
         UpstreamConfig {
             name: "slow".to_string(),
             url: mock_server2.uri().into(),
-            id: Uuid::new_v4().to_string(),
             weight: 1,
             http_client: HttpClientConfig::default(),
             auth: None,
@@ -758,7 +749,6 @@ async fn test_failover_balancer_with_unavailable_upstream() {
                 name: "unavailable".to_string(),
                 weight: 1,
             },
-            id: Uuid::new_v4().to_string(),
             breaker: None,
         },
         ManagedUpstream {
@@ -766,7 +756,6 @@ async fn test_failover_balancer_with_unavailable_upstream() {
                 name: "available".to_string(),
                 weight: 1,
             },
-            id: Uuid::new_v4().to_string(),
             breaker: None,
         },
     ];
@@ -777,7 +766,6 @@ async fn test_failover_balancer_with_unavailable_upstream() {
         cooldown: 30,
     };
     let breaker = llmproxy::breaker::create_upstream_circuit_breaker(
-        Uuid::new_v4().to_string(),
         "test_upstream".to_string(),
         "test_group".to_string(),
         "http://example.com".to_string().into(),

@@ -7,7 +7,7 @@ use llmproxy::{
 };
 use std::time::Duration;
 use tokio::time::sleep;
-use uuid::Uuid;
+
 use wiremock::{
     matchers::{method, path},
     Mock, MockServer, ResponseTemplate,
@@ -29,8 +29,7 @@ async fn test_breaker_basic_functionality() {
     let url = "http://example.com".to_string().into();
     let config = create_test_breaker_config(0.5, 1); // 50% 失败率阈值，1秒冷却时间
 
-    let breaker =
-        create_upstream_circuit_breaker(Uuid::new_v4().to_string(), name, group, url, &config);
+    let breaker = create_upstream_circuit_breaker(name, group, url, &config);
 
     // 初始状态应为关闭
     assert_eq!(breaker.current_state(), State::Closed);
@@ -88,7 +87,6 @@ async fn test_breaker_with_mock_server() {
     let config = create_test_breaker_config(0.5, 1); // 50% 失败率阈值，1秒冷却时间
 
     let breaker = create_upstream_circuit_breaker(
-        Uuid::new_v4().to_string(),
         name.clone(),
         group.clone(),
         mock_url.clone().into(),
@@ -184,7 +182,6 @@ async fn test_load_balancer_with_circuit_breaker() {
     let config = create_test_breaker_config(0.5, 1);
 
     let breaker1 = create_upstream_circuit_breaker(
-        Uuid::new_v4().to_string(),
         "upstream1".to_string(),
         "test_group".to_string(),
         mock_url1.clone().into(),
@@ -192,7 +189,6 @@ async fn test_load_balancer_with_circuit_breaker() {
     );
 
     let breaker2 = create_upstream_circuit_breaker(
-        Uuid::new_v4().to_string(),
         "upstream2".to_string(),
         "test_group".to_string(),
         mock_url2.clone().into(),
@@ -205,7 +201,6 @@ async fn test_load_balancer_with_circuit_breaker() {
             name: "upstream1".to_string(),
             weight: 1,
         },
-        id: Uuid::new_v4().to_string(),
         breaker: Some(breaker1),
     };
 
@@ -214,7 +209,6 @@ async fn test_load_balancer_with_circuit_breaker() {
             name: "upstream2".to_string(),
             weight: 1,
         },
-        id: Uuid::new_v4().to_string(),
         breaker: Some(breaker2),
     };
 
@@ -301,7 +295,6 @@ async fn test_load_balancer_with_circuit_breaker() {
 async fn test_all_upstreams_circuit_open() {
     // 创建两个熔断器，都处于打开状态
     let breaker1 = UpstreamCircuitBreaker::new(
-        Uuid::new_v4().to_string(),
         "upstream1".to_string(),
         "test_group".to_string(),
         "http://example1.com".to_string().into(),
@@ -310,7 +303,6 @@ async fn test_all_upstreams_circuit_open() {
     );
 
     let breaker2 = UpstreamCircuitBreaker::new(
-        Uuid::new_v4().to_string(),
         "upstream2".to_string(),
         "test_group".to_string(),
         "http://example2.com".to_string().into(),
@@ -331,13 +323,11 @@ async fn test_all_upstreams_circuit_open() {
 
     let managed_upstream1 = ManagedUpstream {
         upstream_ref: upstream_ref1,
-        id: Uuid::new_v4().to_string(),
         breaker: Some(breaker1.clone()),
     };
 
     let managed_upstream2 = ManagedUpstream {
         upstream_ref: upstream_ref2,
-        id: Uuid::new_v4().to_string(),
         breaker: Some(breaker2.clone()),
     };
 

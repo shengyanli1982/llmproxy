@@ -826,6 +826,8 @@ LLMProxy 对外暴露以下主要类型的 HTTP API 端点：
 
 这些端点由 `http_server.admin` 配置块定义，默认监听在 `0.0.0.0:9000` (建议生产环境修改为 `127.0.0.1:9000`)。
 
+#### 标准端点
+
 -   **GET /health**
 
     -   _描述_：提供基础的健康检查。主要用于自动化系统（如 Kubernetes Liveness/Readiness Probes, 负载均衡器健康检查）判断 LLMProxy 服务进程是否正在运行且能够响应请求。
@@ -835,9 +837,39 @@ LLMProxy 对外暴露以下主要类型的 HTTP API 端点：
     -   _内容类型_：`text/plain` 或 `application/json`
 
 -   **GET /metrics**
+
     -   _描述_：暴露 Prometheus 格式的监控指标。供 Prometheus 服务器抓取，用于监控 LLMProxy 的性能、流量、错误、上游状态等。
     -   _返回_：文本格式的 Prometheus 指标数据。
     -   _内容类型_：`text/plain; version=0.0.4; charset=utf-8`
+
+#### 配置管理 API
+
+![openapi_ui](./images/openapi-ui.png)
+_图：OpenAPI UI 示意图_
+
+为了增强运维过程中的可观测性并简化调试，管理服务提供了一套全面的、只读的配置管理 API(**写入操作将在未来版本中支持**)。这套 RESTful API 允许您随时检查 LLMProxy 在内存中运行的实时配置，这对于配置审计、问题排查以及与自动化运维流程集成而言至关重要。
+
+该 API 统一以 `/api/v1` 作为路径前缀进行版本管理。为确保安全，您可以通过设置 `LLMPROXY_ADMIN_AUTH_TOKEN` 环境变量来启用 `Bearer Token` 认证，从而保护这些 `API 端点` 的访问。
+
+**API 端点**
+
+API 提供了一组结构化的端点，用于获取所有关键配置实体的详细信息：
+
+-   **转发服务 (Forwards)**：
+    -   `GET /api/v1/forwards`: 获取所有已配置的转发服务列表。
+    -   `GET /api/v1/forwards/{name}`: 根据名称获取特定转发服务的详细信息。
+-   **上游组 (Upstream Groups)**：
+    -   `GET /api/v1/upstream-groups`: 列出所有已配置的上游组。
+    -   `GET /api/v1/upstream-groups/{name}`: 获取特定上游组的详细信息。
+-   **上游服务 (Upstreams)**：
+    -   `GET /api/v1/upstreams`: 列出所有已配置的上游服务。
+    -   `GET /api/v1/upstreams/{name}`: 获取特定上游服务的详细信息。
+
+**交互式 OpenAPI UI**
+
+为了尽可能地方便您探索和使用配置管理 API，LLMProxy 内置了 OpenAPI UI。这个交互式界面为所有端点提供了详尽的文档，并允许您直接在浏览器中执行 API 调用。
+
+-   **访问方式**: OpenAPI UI 可通过管理端口的 `/api/v1/docs` 路径访问。出于安全考虑，它**仅在** LLMProxy 以调试模式（例如，使用 `-d` 或 `--debug` 命令行标志）启动时才会启用。
 
 ## Prometheus 指标
 

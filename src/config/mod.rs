@@ -3,6 +3,7 @@ pub mod common;
 pub mod defaults;
 pub mod http_client;
 pub mod http_server;
+pub mod serializer;
 pub mod upstream;
 pub mod upstream_group;
 pub mod validation;
@@ -21,9 +22,11 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use tracing::debug;
+use utoipa::ToSchema;
 
 // 配置文件结构
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+
 pub struct Config {
     // HTTP服务器配置
     #[serde(default)]

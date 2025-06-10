@@ -1,24 +1,25 @@
 use crate::config::common::BreakerConfig;
-use crate::config::defaults::default_uuid_v4_string;
+use crate::config::defaults::default_weight;
+use crate::config::serializer::arc_string;
 use reqwest::header::{HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use utoipa::ToSchema;
 
 use super::http_client::HttpClientConfig;
 
 /// 上游服务配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+
 pub struct UpstreamConfig {
-    // 唯一标识符
-    #[serde(skip, default = "default_uuid_v4_string")]
-    pub id: String,
     // 上游服务名称
     pub name: String,
     // 上游服务地址
-    #[serde(with = "crate::config::defaults::arc_string")]
+    #[serde(with = "arc_string")]
+    #[schema(value_type = String)]
     pub url: Arc<String>,
     // 权重
-    #[serde(default = "crate::config::defaults::default_weight")]
+    #[serde(default = "default_weight")]
     pub weight: u32,
     // 认证配置
     #[serde(default)]
@@ -35,7 +36,8 @@ pub struct UpstreamConfig {
 }
 
 // 认证配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+
 pub struct AuthConfig {
     // 认证类型
     #[serde(default)]
@@ -52,7 +54,7 @@ pub struct AuthConfig {
 }
 
 // 认证类型
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, ToSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum AuthType {
     // Bearer令牌认证
@@ -70,7 +72,7 @@ impl Default for AuthType {
 }
 
 /// HTTP 请求头操作类型
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Copy, ToSchema)]
 pub enum HeaderOpType {
     // 插入
     Insert,
@@ -81,7 +83,8 @@ pub enum HeaderOpType {
 }
 
 // 请求头操作
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+
 pub struct HeaderOp {
     pub op: HeaderOpType,
     pub key: String,

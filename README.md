@@ -830,6 +830,8 @@ LLMProxy exposes the following main types of HTTP API endpoints:
 
 These endpoints are defined by the `http_server.admin` configuration block, by default listening on `0.0.0.0:9000` (recommended to change to `127.0.0.1:9000` in production environments).
 
+#### Standard Endpoints
+
 -   **GET /health**
 
     -   _Description_: Provides basic health checking. Mainly used for automated systems (such as Kubernetes Liveness/Readiness Probes, load balancer health checks) to determine if the LLMProxy service process is running and able to respond to requests.
@@ -839,9 +841,39 @@ These endpoints are defined by the `http_server.admin` configuration block, by d
     -   _Content Type_: `text/plain` or `application/json`
 
 -   **GET /metrics**
+
     -   _Description_: Exposes Prometheus format monitoring metrics. For Prometheus servers to scrape, used to monitor LLMProxy's performance, traffic, errors, upstream status, etc.
     -   _Returns_: Text format Prometheus metrics data.
     -   _Content Type_: `text/plain; version=0.0.4; charset=utf-8`
+
+#### Configuration Management API
+
+![openapi_ui](./images/openapi-ui.png)
+_Figure: OpenAPI UI Example_
+
+For enhanced operational visibility and easier debugging, the admin service provides a comprehensive, read-only Configuration Management API(**Write operations will be supported in future versions**). This RESTful API allows you to inspect the live, in-memory configuration of LLMProxy at any time, which is invaluable for auditing, troubleshooting, and integration with automated operational workflows.
+
+The API is versioned under the `/api/v1` path prefix. For security, access to these `api endpoints` can be protected by setting the `LLMPROXY_ADMIN_AUTH_TOKEN` environment variable, which enforces `Bearer Token` authentication.
+
+**API Endpoints**
+
+The API offers a structured set of endpoints to retrieve detailed information about all key configuration entities:
+
+-   **Forwards**:
+    -   `GET /api/v1/forwards`: Retrieves a list of all configured forward services.
+    -   `GET /api/v1/forwards/{name}`: Fetches the details of a specific forward service.
+-   **Upstream Groups**:
+    -   `GET /api/v1/upstream-groups`: Lists all configured upstream groups.
+    -   `GET /api/v1/upstream-groups/{name}`: Fetches the details of a specific group.
+-   **Upstreams**:
+    -   `GET /api/v1/upstreams`: Lists all configured upstream services.
+    -   `GET /api/v1/upstreams/{name}`: Fetches the details of a specific upstream.
+
+**Interactive OpenAPI UI**
+
+To make exploring and interacting with the Configuration Management API as easy as possible, LLMProxy includes a built-in OpenAPI UI. This interactive interface provides comprehensive documentation for all endpoints and allows you to execute API calls directly from your browser.
+
+-   **Access**: The OpenAPI UI is available at the `/api/v1/docs` path on the admin port. For security reasons, it is **only enabled** when LLMProxy is launched in debug mode (e.g., by using the `-d` or `--debug` command-line flag).
 
 ## Prometheus Metrics
 

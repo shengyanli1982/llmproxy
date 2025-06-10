@@ -184,3 +184,38 @@ pub mod breaker_result_labels {
     // 被拒绝（熔断器开启）
     pub const REJECTED: &str = "rejected";
 }
+
+//
+// API 相关常量
+//
+pub mod api {
+    // Admin API 认证令牌环境变量名
+    pub const ADMIN_AUTH_TOKEN_ENV: &str = "LLMPROXY_ADMIN_AUTH_TOKEN";
+
+    // 认证相关常量
+    // Http Header 头部 Authorization：Bearer <token>
+    pub mod auth {
+        // Bearer 认证方案名称
+        pub const BEARER_SCHEME: &str = "Bearer";
+        // Bearer 认证令牌前缀
+        pub const BEARER_PREFIX: &str = "Bearer ";
+        // Bearer 认证安全方案标识符 (用于 OpenAPI)
+        pub const BEARER_SECURITY_SCHEME: &str = "bearer_auth";
+    }
+
+    // API 响应状态常量
+    pub mod response_status {
+        // 成功状态
+        pub const SUCCESS: &str = "success";
+        // 失败状态
+        pub const ERROR: &str = "error";
+    }
+
+    // API 错误类型常量
+    pub mod error_types {
+        // 未授权
+        pub const UNAUTHORIZED: &str = "Unauthorized";
+        // 未找到
+        pub const NOT_FOUND: &str = "Not Found";
+    }
+}
