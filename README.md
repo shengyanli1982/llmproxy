@@ -916,15 +916,6 @@ Below are the key metric categories and examples:
 -   `llmproxy_circuitbreaker_calls_total` (Counter)
     -   Description: Total number of calls processed through the circuit breaker (including successful, failed, rejected ones).
     -   Labels: `group`, `upstream`, `url`, `result` (result type).
--   `llmproxy_circuitbreaker_opened_total` (Counter)
-    -   Description: Total number of times the circuit breaker has opened.
-    -   Labels: `group`, `upstream`, `url`.
--   `llmproxy_circuitbreaker_closed_total` (Counter)
-    -   Description: Total number of times the circuit breaker has closed.
-    -   Labels: `group`, `upstream`, `url`.
--   `llmproxy_circuitbreaker_half_opened_total` (Counter)
-    -   Description: Total number of times the circuit breaker has half-opened.
-    -   Labels: `group`, `upstream`, `url`.
 
 These metrics can be scraped by Prometheus and then visualized and configured for alerting using tools like Grafana, enabling comprehensive monitoring of the LLMProxy service and the LLM API calls it proxies.
 

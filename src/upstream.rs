@@ -19,7 +19,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 // 上游管理器
 pub struct UpstreamManager {
@@ -369,17 +369,25 @@ impl UpstreamManager {
 
         // 错误处理和指标记录
         if let Err(ref err) = response {
+            warn!(
+                "Upstream request failed, reporting failure. Group: '{}', Upstream: '{}', Error: {}",
+                group_name, &managed_upstream.upstream_ref.name, err
+            );
+
             // 报告上游失败
             load_balancer.report_failure(managed_upstream).await;
 
             // 记录错误指标
             let error_label = match err {
                 AppError::CircuitBreakerOpen(_) => "circuit_open",
-                AppError::Upstream(_) => "upstream_error",
-                _ => "other_error",
+                AppError::Upstream(_) => error_labels::UPSTREAM_ERROR,
+                _ => error_labels::UNKNOWN_ERROR,
             };
 
-            METRICS.record_upstream_request_error(group_name, &upstream_config.url, error_label);
+            METRICS
+                .upstream_errors_total()
+                .with_label_values(&[error_label, group_name, &managed_upstream.upstream_ref.name])
+                .inc();
         } else if let Ok(ref response) = response {
             // 记录响应状态码
             let status = response.status().as_u16();

@@ -18,7 +18,7 @@ use tracing::{info, warn};
 #[utoipa::path(
     get,
     path = "/api/v1/upstream-groups",
-    tag = "UpstreamGroup",
+    tag = "UpstreamGroups",
     responses(
         (status = 200, description = "成功获取所有上游组 | Successfully retrieved all upstream groups", body = ApiResponse<Vec<UpstreamGroupDetail>>),
         (status = 500, description = "服务器内部错误 | Internal server error", body = ErrorResponse),
@@ -54,7 +54,7 @@ pub async fn list_upstream_groups(
 #[utoipa::path(
     get,
     path = "/api/v1/upstream-groups/{name}",
-    tag = "UpstreamGroup",
+    tag = "UpstreamGroups",
     params(
         ("name" = String, Path, description = "上游组名称 | Upstream group name")
     ),

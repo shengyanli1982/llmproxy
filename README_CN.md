@@ -912,15 +912,6 @@ LLMProxy 通过管理端点的 `/metrics` 路径暴露全面的 Prometheus 指�
 -   `llmproxy_circuitbreaker_calls_total` (计数器)
     -   描述：通过断路器处理的调用总数（包括成功、失败、被拒绝的）。
     -   标签：`group`, `upstream`, `url`, `result` (结果类型)。
--   `llmproxy_circuitbreaker_opened_total` (计数器)
-    -   描述：断路器开启的总次数。
-    -   标签：`group`, `upstream`, `url`。
--   `llmproxy_circuitbreaker_closed_total` (计数器)
-    -   描述：断路器关闭的总次数。
-    -   标签：`group`, `upstream`, `url`。
--   `llmproxy_circuitbreaker_half_opened_total` (计数器)
-    -   描述：断路器半开的总次数。
-    -   标签：`group`, `upstream`, `url`。
 
 这些指标可以通过 Prometheus 抓取后，使用 Grafana 等工具进行可视化和告警配置，从而实现对 LLMProxy 服务及其代理的 LLM API 调用的全面监控。
 
