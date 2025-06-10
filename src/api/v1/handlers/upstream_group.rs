@@ -1,5 +1,5 @@
 use crate::{
-    api::v1::models::{ApiResponse, ErrorResponse, UpstreamGroupDetail},
+    api::v1::models::{ErrorResponse, SuccessResponse, UpstreamGroupDetail},
     config::{Config, UpstreamConfig},
     r#const::api,
 };
@@ -20,13 +20,13 @@ use tracing::{info, warn};
     path = "/api/v1/upstream-groups",
     tag = "UpstreamGroups",
     responses(
-        (status = 200, description = "成功获取所有上游组 | Successfully retrieved all upstream groups", body = ApiResponse<Vec<UpstreamGroupDetail>>),
+        (status = 200, description = "成功获取所有上游组 | Successfully retrieved all upstream groups", body = SuccessResponse<Vec<UpstreamGroupDetail>>),
         (status = 500, description = "服务器内部错误 | Internal server error", body = ErrorResponse),
     )
 )]
 pub async fn list_upstream_groups(
     State(config): State<Arc<Config>>,
-) -> Json<ApiResponse<Vec<UpstreamGroupDetail>>> {
+) -> Json<SuccessResponse<Vec<UpstreamGroupDetail>>> {
     // 创建上游服务名称到配置的映射
     let upstream_map: HashMap<String, UpstreamConfig> = config
         .upstreams
@@ -42,10 +42,7 @@ pub async fn list_upstream_groups(
         .collect();
 
     info!("API: Retrieved {} upstream groups", groups.len());
-    Json(ApiResponse::success_with_data(
-        groups,
-        "Successfully retrieved upstream groups list",
-    ))
+    Json(SuccessResponse::success_with_data(groups))
 }
 
 /// 获取单个上游组详情
@@ -59,7 +56,7 @@ pub async fn list_upstream_groups(
         ("name" = String, Path, description = "上游组名称 | Upstream group name")
     ),
     responses(
-        (status = 200, description = "成功获取上游组 | Successfully retrieved upstream group", body = ApiResponse<UpstreamGroupDetail>),
+        (status = 200, description = "成功获取上游组 | Successfully retrieved upstream group", body = SuccessResponse<UpstreamGroupDetail>),
         (status = 404, description = "上游组不存在 | Upstream group not found", body = ErrorResponse),
         (status = 500, description = "服务器内部错误 | Internal server error", body = ErrorResponse),
     )
@@ -86,15 +83,11 @@ pub async fn get_upstream_group(
             // 转换为详情模型
             let detail = UpstreamGroupDetail::from_config(group, &upstream_map);
             info!("API: Retrieved upstream group '{}'", name);
-            Json(ApiResponse::success_with_data(
-                detail,
-                "Successfully retrieved upstream group",
-            ))
-            .into_response()
+            Json(SuccessResponse::success_with_data(detail)).into_response()
         }
         None => {
             warn!("API: Upstream group '{}' not found", name);
-            Json(ApiResponse::<()>::error(
+            Json(ErrorResponse::error(
                 StatusCode::NOT_FOUND,
                 api::error_types::NOT_FOUND,
                 format!("Upstream group '{}' does not exist", name),
