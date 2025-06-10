@@ -835,9 +835,27 @@ LLMProxy 对外暴露以下主要类型的 HTTP API 端点：
     -   _内容类型_：`text/plain` 或 `application/json`
 
 -   **GET /metrics**
+
     -   _描述_：暴露 Prometheus 格式的监控指标。供 Prometheus 服务器抓取，用于监控 LLMProxy 的性能、流量、错误、上游状态等。
     -   _返回_：文本格式的 Prometheus 指标数据。
     -   _内容类型_：`text/plain; version=0.0.4; charset=utf-8`
+
+-   **配置管理 API**
+
+    -   _描述_：除了健康检查和监控指标，管理服务还提供了一套只读的 API 端点，用于查询 LLMProxy 当前的运行配置。这对于调试、审计以及与自动化运维系统集成非常有用。这些端点的路径前缀为 `/api/v1`，并且如果设置了 `LLMPROXY_ADMIN_AUTH_TOKEN` 环境变量，它们将与 OpenAPI UI 一样，受到 Bearer Token 认证的保护。
+    -   _端点列表_：
+        -   `GET /api/v1/forwards`: 获取所有已配置的转发服务列表。
+        -   `GET /api/v1/forwards/{name}`: 根据名称获取特定转发服务的详细信息。
+        -   `GET /api/v1/upstream-groups`: 获取所有已配置的上游组列表。
+        -   `GET /api/v1/upstream-groups/{name}`: 根据名称获取特定上游组的详细信息。
+        -   `GET /api/v1/upstreams`: 获取所有已配置的上游服务列表。
+        -   `GET /api/v1/upstreams/{name}`: 根据名称获取特定上游服务的详细信息。
+
+-   **GET /api/v1/docs**
+
+    -   _描述_：LLMProxy 提供了一个交互式的 OpenAPI UI，用于探索配置管理 API。该用户界面是一个方便的工具，可帮助开发人员和管理员理解和测试可用的端点。
+    -   _可用性_：OpenAPI UI 仅在 LLMProxy 以调试模式（例如，通过使用 `-d` 或 `--debug` 命令行标志）启动时才会启用。启用后，可以通过管理端口上的 `/api/v1/docs` 路径进行访问。
+    -   _认证_：如果设置了 `LLMPROXY_ADMIN_AUTH_TOKEN` 环境变量，UI 界面将包含一个锁形图标，允许您通过提供不记名令牌（Bearer Token）来授权您的会话。如果未设置该环境变量，则 API 端点无需认证即可访问。
 
 ## Prometheus 指标
 

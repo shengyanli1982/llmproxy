@@ -839,9 +839,26 @@ These endpoints are defined by the `http_server.admin` configuration block, by d
     -   _Content Type_: `text/plain` or `application/json`
 
 -   **GET /metrics**
+
     -   _Description_: Exposes Prometheus format monitoring metrics. For Prometheus servers to scrape, used to monitor LLMProxy's performance, traffic, errors, upstream status, etc.
     -   _Returns_: Text format Prometheus metrics data.
     -   _Content Type_: `text/plain; version=0.0.4; charset=utf-8`
+
+-   **Configuration Management APIs**
+
+    -   _Description_: In addition to health checks and metrics, the admin service provides a set of read-only API endpoints to inspect the current running configuration of LLMProxy. This is useful for debugging, auditing, and integrating with automated operational systems. These endpoints are prefixed with `/api/v1` and are protected by the same bearer token authentication as the OpenAPI UI if the `LLMPROXY_ADMIN_AUTH_TOKEN` environment variable is set.
+    -   _Endpoints_:
+        -   `GET /api/v1/forwards`: Retrieves a list of all configured forward services.
+        -   `GET /api/v1/forwards/{name}`: Fetches the details of a specific forward service by its name.
+        -   `GET /api/v1/upstream-groups`: Retrieves a list of all configured upstream groups.
+        -   `GET /api/v1/upstream-groups/{name}`: Fetches the details of a specific upstream group by its name.
+        -   `GET /api/v1/upstreams`: Retrieves a list of all configured upstream services.
+        -   `GET /api/v1/upstreams/{name}`: Fetches the details of a specific upstream service by its name.
+
+-   **GET /api/v1/docs**
+    -   _Description_: LLMProxy provides an interactive OpenAPI UI for exploring the configuration management APIs. This UI is a convenient tool for developers and administrators to understand and test the available endpoints.
+    -   _Availability_: The OpenAPI UI is only enabled when LLMProxy is launched in debug mode (e.g., by using the `-d` or `--debug` command-line flag). When enabled, it can be accessed at the `/api/v1/docs` path on the admin port.
+    -   _Authentication_: If the `LLMPROXY_ADMIN_AUTH_TOKEN` environment variable is set, the UI will include a lock icon, allowing you to authorize your session by providing the bearer token. If the environment variable is not set, the API endpoints will be accessible without authentication.
 
 ## Prometheus Metrics
 
