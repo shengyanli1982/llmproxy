@@ -3,6 +3,7 @@ pub mod common;
 pub mod defaults;
 pub mod http_client;
 pub mod http_server;
+pub mod serializer;
 pub mod upstream;
 pub mod upstream_group;
 pub mod validation;
