@@ -68,7 +68,7 @@ impl Metrics {
                 "llmproxy_http_requests_total",
                 "Total number of incoming HTTP requests received by the proxy.",
             ),
-            &["forward", "method", "path"],
+            &["forward", "method"],
         )
         .unwrap();
 
@@ -81,7 +81,7 @@ impl Metrics {
             .buckets(vec![
                 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 20.0, 30.0, 60.0,
             ]),
-            &["forward", "method", "path"],
+            &["forward", "method"],
         )
         .unwrap();
 
@@ -111,7 +111,7 @@ impl Metrics {
                 "llmproxy_circuitbreaker_state_changes_total",
                 "Total number of state changes for the circuit breaker.",
             ),
-            &["group", "upstream", "url", "from", "to"],
+            &["group", "upstream", "from", "to"],
         )
         .unwrap();
 
@@ -121,7 +121,7 @@ impl Metrics {
                 "llmproxy_circuitbreaker_calls_total",
                 "Total number of calls to the circuit breaker.",
             ),
-            &["group", "upstream", "url", "result"],
+            &["group", "upstream", "result"],
         )
         .unwrap();
 

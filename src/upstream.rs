@@ -77,7 +77,6 @@ impl UpstreamManager {
                         let breaker = create_upstream_circuit_breaker(
                             upstream_ref.name.clone(),
                             group_name.clone(),
-                            upstream_config.url.clone(),
                             breaker_config,
                         );
                         Some(breaker)
@@ -238,7 +237,7 @@ impl UpstreamManager {
         // 记录上游请求指标
         METRICS
             .upstream_requests_total()
-            .with_label_values(&[group_name, &upstream_config.url])
+            .with_label_values(&[group_name, &upstream_config.name])
             .inc();
 
         // 记录开始时间
@@ -322,7 +321,6 @@ impl UpstreamManager {
                             .with_label_values(&[
                                 group_name,
                                 &managed_upstream.upstream_ref.name,
-                                &upstream_config.url,
                                 breaker_result_labels::REJECTED,
                             ])
                             .inc();
@@ -353,7 +351,7 @@ impl UpstreamManager {
         let duration = start_time.elapsed();
         METRICS
             .upstream_duration_seconds()
-            .with_label_values(&[group_name, &upstream_config.url])
+            .with_label_values(&[group_name, &upstream_config.name])
             .observe(duration.as_secs_f64());
 
         // 检查是否为响应时间感知的负载均衡器，更新指标

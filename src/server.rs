@@ -247,7 +247,7 @@ pub async fn forward_handler(
     // 记录请求指标
     METRICS
         .http_requests_total()
-        .with_label_values(&[&state.config.name, method.as_str(), &path_str])
+        .with_label_values(&[&state.config.name, method.as_str()])
         .inc();
 
     // 提取请求体 - 使用更高效的方式处理请求体
@@ -296,7 +296,7 @@ pub async fn forward_handler(
 
             METRICS
                 .http_request_duration_seconds()
-                .with_label_values(&[&state.config.name, method.as_str(), &path_str])
+                .with_label_values(&[&state.config.name, method.as_str()])
                 .observe(duration.as_secs_f64());
 
             // 如果状态码表示错误，记录错误指标
@@ -379,7 +379,7 @@ pub async fn forward_handler(
             let duration = start_time.elapsed();
             METRICS
                 .http_request_duration_seconds()
-                .with_label_values(&[&state.config.name, method.as_str(), &path_str])
+                .with_label_values(&[&state.config.name, method.as_str()])
                 .observe(duration.as_secs_f64());
 
             // 记录请求失败的信息
