@@ -11,6 +11,7 @@ use axum::{
     Router,
 };
 use socket2::{Domain, Protocol, Socket, Type};
+use std::borrow::Cow;
 use std::io::{Error, ErrorKind};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -222,26 +223,16 @@ pub async fn forward_handler(
     // 记录开始时间
     let start_time = Instant::now();
 
-    // 获取请求路径 - 避免不必要的字符串分配
-    let path_str = match &path {
-        Some(p) => {
-            let path_value = &p.0;
-            if path_value.is_empty() {
-                "/".to_string()
+    // 使用 Cow 优化路径处理，避免不必要的字符串分配
+    let path: Cow<str> = match path {
+        Some(p) if !p.0.is_empty() => {
+            if p.0.starts_with('/') {
+                Cow::Owned(p.0)
             } else {
-                // 只有在路径不是以 / 开头时才添加
-                if path_value.starts_with('/') {
-                    path_value.to_string()
-                } else {
-                    // 在这种情况下才需要分配新字符串
-                    let mut path_with_slash = String::with_capacity(path_value.len() + 1);
-                    path_with_slash.push('/');
-                    path_with_slash.push_str(path_value);
-                    path_with_slash
-                }
+                Cow::Owned(format!("/{}", p.0))
             }
         }
-        None => "/".to_string(),
+        _ => Cow::Borrowed("/"),
     };
 
     // 记录请求指标
@@ -279,7 +270,7 @@ pub async fn forward_handler(
         .forward_request(
             &state.config.upstream_group,
             method.clone(),
-            &path_str,
+            &path,
             headers,
             body_bytes,
         )
@@ -361,7 +352,7 @@ pub async fn forward_handler(
             // 记录请求完成的延迟时间（毫秒）
             info!(
                 "Request completed: {} {} to upstream group {}, status: {}, time: {}ms",
-                method, path_str, state.config.upstream_group, status, duration_ms
+                method, path, state.config.upstream_group, status, duration_ms
             );
 
             result
@@ -386,7 +377,7 @@ pub async fn forward_handler(
             info!(
                 "Request failed: {} {} to upstream group {}, time: {}ms",
                 method,
-                path_str,
+                path,
                 state.config.upstream_group,
                 duration.as_millis()
             );
