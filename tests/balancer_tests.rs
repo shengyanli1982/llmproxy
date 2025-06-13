@@ -768,7 +768,6 @@ async fn test_failover_balancer_with_unavailable_upstream() {
     let breaker = llmproxy::breaker::create_upstream_circuit_breaker(
         "test_upstream".to_string(),
         "test_group".to_string(),
-        "http://example.com".to_string().into(),
         &breaker_config,
     );
 

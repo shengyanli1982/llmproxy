@@ -32,7 +32,6 @@ impl From<AppError> for UpstreamError {
 struct HookData {
     name: String,
     group: String,
-    url: Arc<String>,
 }
 
 /// 上游服务熔断器
@@ -42,21 +41,13 @@ pub struct UpstreamCircuitBreaker {
     name: String,
     #[allow(dead_code)]
     group: String,
-    #[allow(dead_code)]
-    url: Arc<String>,
 }
 
 impl UpstreamCircuitBreaker {
     /// 创建一个新的熔断器
-    pub fn new(
-        name: String,
-        group: String,
-        url: Arc<String>,
-        threshold: f64,
-        cooldown: u64,
-    ) -> Arc<Self> {
+    pub fn new(name: String, group: String, threshold: f64, cooldown: u64) -> Arc<Self> {
         // 创建事件钩子
-        let hooks = Self::create_hooks(&name, &group, &url);
+        let hooks = Self::create_hooks(&name, &group);
 
         // 创建熔断器
         let breaker = BreakerBuilder::<DefaultPolicy, UpstreamError>::default()
@@ -74,7 +65,6 @@ impl UpstreamCircuitBreaker {
             breaker,
             name,
             group,
-            url,
         })
     }
 
@@ -106,12 +96,11 @@ impl UpstreamCircuitBreaker {
     }
 
     /// 创建熔断器事件钩子
-    fn create_hooks(name: &str, group: &str, url: &Arc<String>) -> HookRegistry {
+    fn create_hooks(name: &str, group: &str) -> HookRegistry {
         // 只克隆一次字符串
         let data = HookData {
             name: name.to_owned(),
             group: group.to_owned(),
-            url: url.clone(),
         };
 
         let hooks = HookRegistry::new();
@@ -125,7 +114,6 @@ impl UpstreamCircuitBreaker {
                 .with_label_values(&[
                     &data_open.group,
                     &data_open.name,
-                    &data_open.url,
                     breaker_state_labels::CLOSED,
                     breaker_state_labels::OPEN,
                 ])
@@ -147,7 +135,6 @@ impl UpstreamCircuitBreaker {
                 .with_label_values(&[
                     &data_close.group,
                     &data_close.name,
-                    &data_close.url,
                     breaker_state_labels::HALF_OPEN,
                     breaker_state_labels::CLOSED,
                 ])
@@ -168,7 +155,6 @@ impl UpstreamCircuitBreaker {
                 .with_label_values(&[
                     &data_half.group,
                     &data_half.name,
-                    &data_half.url,
                     breaker_state_labels::OPEN,
                     breaker_state_labels::HALF_OPEN,
                 ])
@@ -188,7 +174,6 @@ impl UpstreamCircuitBreaker {
                 .with_label_values(&[
                     &data_success.group,
                     &data_success.name,
-                    &data_success.url,
                     breaker_result_labels::SUCCESS,
                 ])
                 .inc();
@@ -202,7 +187,6 @@ impl UpstreamCircuitBreaker {
                 .with_label_values(&[
                     &data_failure.group,
                     &data_failure.name,
-                    &data_failure.url,
                     breaker_result_labels::FAILURE,
                 ])
                 .inc();
@@ -216,8 +200,7 @@ impl UpstreamCircuitBreaker {
 pub fn create_upstream_circuit_breaker(
     name: String,
     group: String,
-    url: Arc<String>,
     config: &BreakerConfig,
 ) -> Arc<UpstreamCircuitBreaker> {
-    UpstreamCircuitBreaker::new(name, group, url, config.threshold, config.cooldown)
+    UpstreamCircuitBreaker::new(name, group, config.threshold, config.cooldown)
 }

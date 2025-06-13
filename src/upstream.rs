@@ -77,7 +77,6 @@ impl UpstreamManager {
                         let breaker = create_upstream_circuit_breaker(
                             upstream_ref.name.clone(),
                             group_name.clone(),
-                            upstream_config.url.clone(),
                             breaker_config,
                         );
                         Some(breaker)
@@ -337,7 +336,7 @@ impl UpstreamManager {
                     Err(e) => {
                         // 其他熔断器错误
                         error!("Circuit breaker error: {}", e);
-                        Err(AppError::Upstream(format!("Circuit breaker error: {}", e)))
+                        Err(e.into())
                     }
                 }
             }
