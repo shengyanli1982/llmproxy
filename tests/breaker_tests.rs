@@ -26,10 +26,9 @@ async fn test_breaker_basic_functionality() {
     // 创建熔断器
     let name = "test_upstream".to_string();
     let group = "test_group".to_string();
-    let url = "http://example.com".to_string().into();
     let config = create_test_breaker_config(0.5, 1); // 50% 失败率阈值，1秒冷却时间
 
-    let breaker = create_upstream_circuit_breaker(name, group, url, &config);
+    let breaker = create_upstream_circuit_breaker(name, group, &config);
 
     // 初始状态应为关闭
     assert_eq!(breaker.current_state(), State::Closed);
@@ -86,12 +85,7 @@ async fn test_breaker_with_mock_server() {
     let group = "mock_group".to_string();
     let config = create_test_breaker_config(0.5, 1); // 50% 失败率阈值，1秒冷却时间
 
-    let breaker = create_upstream_circuit_breaker(
-        name.clone(),
-        group.clone(),
-        mock_url.clone().into(),
-        &config,
-    );
+    let breaker = create_upstream_circuit_breaker(name.clone(), group.clone(), &config);
 
     // 设置成功响应的模拟
     Mock::given(method("GET"))
@@ -181,19 +175,11 @@ async fn test_load_balancer_with_circuit_breaker() {
     // 创建两个熔断器
     let config = create_test_breaker_config(0.5, 1);
 
-    let breaker1 = create_upstream_circuit_breaker(
-        "upstream1".to_string(),
-        "test_group".to_string(),
-        mock_url1.clone().into(),
-        &config,
-    );
+    let breaker1 =
+        create_upstream_circuit_breaker("upstream1".to_string(), "test_group".to_string(), &config);
 
-    let breaker2 = create_upstream_circuit_breaker(
-        "upstream2".to_string(),
-        "test_group".to_string(),
-        mock_url2.clone().into(),
-        &config,
-    );
+    let breaker2 =
+        create_upstream_circuit_breaker("upstream2".to_string(), "test_group".to_string(), &config);
 
     // 创建托管上游
     let managed_upstream1 = ManagedUpstream {
@@ -293,22 +279,23 @@ async fn test_load_balancer_with_circuit_breaker() {
 
 #[tokio::test]
 async fn test_all_upstreams_circuit_open() {
-    // 创建两个熔断器，都处于打开状态
-    let breaker1 = UpstreamCircuitBreaker::new(
-        "upstream1".to_string(),
-        "test_group".to_string(),
-        "http://example1.com".to_string().into(),
-        0.5,
-        1,
-    );
+    // 创建两个上游，但都将是熔断状态
+    let breaker1 = UpstreamCircuitBreaker::new("test1".to_string(), "group1".to_string(), 0.5, 10);
+    let breaker2 = UpstreamCircuitBreaker::new("test2".to_string(), "group1".to_string(), 0.5, 10);
 
-    let breaker2 = UpstreamCircuitBreaker::new(
-        "upstream2".to_string(),
-        "test_group".to_string(),
-        "http://example2.com".to_string().into(),
-        0.5,
-        1,
-    );
+    // 手动将两个熔断器都设置为开启状态
+    for _ in 0..10 {
+        let _ = breaker1
+            .call_async(|| async { Err::<(), _>(UpstreamError("test failure".to_string())) })
+            .await;
+        let _ = breaker2
+            .call_async(|| async { Err::<(), _>(UpstreamError("test failure".to_string())) })
+            .await;
+    }
+
+    // 确认熔断器状态
+    assert_eq!(breaker1.current_state(), State::Open);
+    assert_eq!(breaker2.current_state(), State::Open);
 
     // 创建托管上游
     let upstream_ref1 = UpstreamRef {
@@ -335,24 +322,6 @@ async fn test_all_upstreams_circuit_open() {
 
     // 创建负载均衡器
     let balancer = create_load_balancer(&BalanceStrategy::RoundRobin, upstreams);
-
-    // 手动触发熔断器1打开
-    for _ in 0..10 {
-        let _ = breaker1
-            .call_async(|| async { Err::<(), _>(UpstreamError("test failure".to_string())) })
-            .await;
-    }
-
-    // 手动触发熔断器2打开
-    for _ in 0..10 {
-        let _ = breaker2
-            .call_async(|| async { Err::<(), _>(UpstreamError("test failure".to_string())) })
-            .await;
-    }
-
-    // 确认熔断器状态
-    assert_eq!(breaker1.current_state(), State::Open);
-    assert_eq!(breaker2.current_state(), State::Open);
 
     // 尝试选择上游，应该失败
     let result = balancer.select_upstream().await;
