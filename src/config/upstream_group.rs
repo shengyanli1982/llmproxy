@@ -1,31 +1,39 @@
-use crate::config::defaults::default_weight;
-use crate::config::http_client::HttpClientConfig;
-use crate::r#const::balance_strategy_labels;
+use crate::{
+    config::{defaults::default_weight, http_client::HttpClientConfig, validation},
+    r#const::balance_strategy_labels,
+};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use validator::Validate;
 
 // 上游组配置
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
+#[validate(schema(function = "validation::validate_weighted_round_robin"))]
 pub struct UpstreamGroupConfig {
     // 上游组名称
+    #[validate(length(min = 1, message = "Upstream group name cannot be empty"))]
     pub name: String,
     // 上游引用列表
+    #[validate(length(min = 1), nested)]
     pub upstreams: Vec<UpstreamRef>,
     // 负载均衡策略
     #[serde(default)]
     pub balance: BalanceConfig,
     // HTTP客户端配置
     #[serde(default)]
+    #[validate(nested)]
     pub http_client: HttpClientConfig,
 }
 
 // 上游引用
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 pub struct UpstreamRef {
     // 上游名称
+    #[validate(length(min = 1, message = "Upstream name in group cannot be empty"))]
     pub name: String,
     // 权重（用于加权轮询策略）
     #[serde(default = "default_weight")]
+    #[validate(range(min = 1, max = 65535, message = "Weight must be between 1 and 65535"))]
     pub weight: u32,
 }
 

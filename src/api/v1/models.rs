@@ -5,6 +5,7 @@ use crate::{
 use axum::{http::StatusCode, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use validator::ValidationErrors;
 
 /// 错误详情结构
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -112,6 +113,30 @@ impl ErrorResponse {
                 message: message.into(),
             },
         }
+    }
+
+    /// 从验证错误创建响应
+    pub fn from_validation_errors(errors: ValidationErrors) -> Self {
+        // 将所有验证错误平铺为一条消息
+        let message = errors
+            .field_errors()
+            .into_iter()
+            .map(|(field, errors)| {
+                let messages: Vec<String> = errors
+                    .iter()
+                    .map(|e| {
+                        e.message
+                            .as_ref()
+                            .map(|m| m.to_string())
+                            .unwrap_or_default()
+                    })
+                    .collect();
+                format!("{}: {}", field, messages.join(", "))
+            })
+            .collect::<Vec<String>>()
+            .join("; ");
+
+        Self::error(StatusCode::BAD_REQUEST, "validation_error", message)
     }
 }
 

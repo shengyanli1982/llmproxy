@@ -28,8 +28,14 @@ use tracing::{info, warn};
 pub async fn list_forwards(
     State(config): State<Arc<RwLock<Config>>>,
 ) -> Json<SuccessResponse<Vec<ForwardConfig>>> {
-    let forwards = config.read().await.http_server.forwards.clone();
-    info!("API: Retrieved {} forwarding rules", forwards.len());
+    let forwards = config
+        .read()
+        .await
+        .http_server
+        .as_ref()
+        .map(|s| s.forwards.clone())
+        .unwrap_or_default();
+    info!("API: Retrieved {} forward services", forwards.len());
     Json(SuccessResponse::success_with_data(forwards))
 }
 
@@ -54,16 +60,13 @@ pub async fn get_forward(
     State(config): State<Arc<RwLock<Config>>>,
     Path(name): Path<String>,
 ) -> Response {
-    // 获取读锁
     let config_read = config.read().await;
-
-    // 查找指定名称的转发规则
-    match config_read
+    let forward = config_read
         .http_server
-        .forwards
-        .iter()
-        .find(|forward| forward.name == name)
-    {
+        .as_ref()
+        .and_then(|s| s.forwards.iter().find(|f| f.name == name));
+
+    match forward {
         Some(forward) => {
             info!("API: Retrieved forwarding rule '{}'", name);
             Json(SuccessResponse::success_with_data(forward.clone())).into_response()

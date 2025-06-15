@@ -118,6 +118,14 @@ async fn create_components(debug: bool, config: Config) -> Result<AppComponents,
     // 创建配置的共享引用，使用RwLock包装以支持动态更新
     let config_arc = std::sync::Arc::new(RwLock::new(config));
 
+    // 获取 http_server 配置，如果不存在则返回错误
+    let http_server_config = config_arc
+        .read()
+        .await
+        .http_server
+        .clone()
+        .ok_or_else(|| AppError::Config("http_server configuration is missing".to_string()))?;
+
     // 创建上游管理器
     let upstream_manager: std::sync::Arc<UpstreamManager> = match UpstreamManager::new(
         config_arc.read().await.upstreams.clone(),
@@ -135,8 +143,7 @@ async fn create_components(debug: bool, config: Config) -> Result<AppComponents,
     // 创建管理服务
     let admin_addr = format!(
         "{}:{}",
-        config_arc.read().await.http_server.admin.address,
-        config_arc.read().await.http_server.admin.port
+        http_server_config.admin.address, http_server_config.admin.port
     )
     .parse()
     .map_err(|e| AppError::Config(format!("Invalid admin server address: {}", e)))?;
@@ -144,9 +151,8 @@ async fn create_components(debug: bool, config: Config) -> Result<AppComponents,
     info!("Admin server initialized successfully: {}", admin_addr);
 
     // 创建转发服务
-    let mut forward_servers =
-        Vec::with_capacity(config_arc.read().await.http_server.forwards.len());
-    for forward_config in &config_arc.read().await.http_server.forwards {
+    let mut forward_servers = Vec::with_capacity(http_server_config.forwards.len());
+    for forward_config in &http_server_config.forwards {
         // 使用克隆避免所有权转移
         match ForwardServer::new(forward_config.clone(), upstream_manager.clone()) {
             Ok(server) => {

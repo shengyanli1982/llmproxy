@@ -12,6 +12,7 @@ use axum::{
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
+use validator::Validate;
 
 /// 获取所有上游服务列表
 ///
@@ -99,12 +100,7 @@ pub async fn create_upstream(
     // 验证上游服务配置
     if let Err(e) = new_upstream.validate() {
         warn!("API: Upstream validation failed: {}", e);
-        return Json(ErrorResponse::error(
-            StatusCode::BAD_REQUEST,
-            "validation_error",
-            format!("Validation error: {}", e),
-        ))
-        .into_response();
+        return Json(ErrorResponse::from_validation_errors(e)).into_response();
     }
 
     // 获取写锁
@@ -177,12 +173,7 @@ pub async fn update_upstream(
     // 验证上游服务配置
     if let Err(e) = updated_upstream.validate() {
         warn!("API: Upstream validation failed: {}", e);
-        return Json(ErrorResponse::error(
-            StatusCode::BAD_REQUEST,
-            "validation_error",
-            format!("Validation error: {}", e),
-        ))
-        .into_response();
+        return Json(ErrorResponse::from_validation_errors(e)).into_response();
     }
 
     // 获取写锁

@@ -1,7 +1,5 @@
 use crate::{
-    api::v1::models::{
-        ErrorResponse, SuccessResponse, UpstreamGroupDetail,
-    },
+    api::v1::models::{ErrorResponse, SuccessResponse, UpstreamGroupDetail},
     config::{Config, UpstreamConfig, UpstreamRef},
     r#const::api,
 };
@@ -16,6 +14,7 @@ use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 use utoipa::ToSchema;
+use validator::Validate;
 
 /// 获取所有上游组列表
 ///
@@ -109,9 +108,10 @@ pub async fn get_upstream_group(
 }
 
 /// 上游组PATCH操作的请求体
-#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema, Validate)]
 pub struct RequestPatchUpstreamGroupPayload {
     /// 上游服务引用列表
+    #[validate(length(min = 1), nested)]
     pub upstreams: Vec<UpstreamRef>,
 }
 
@@ -138,37 +138,10 @@ pub async fn patch_upstream_group(
     Path(name): Path<String>,
     Json(payload): Json<RequestPatchUpstreamGroupPayload>,
 ) -> Response {
-    // 验证上游列表不为空
-    if payload.upstreams.is_empty() {
-        warn!(
-            "API: Empty upstreams list in PATCH request for group '{}'",
-            name
-        );
-        return Json(ErrorResponse::error(
-            StatusCode::BAD_REQUEST,
-            "validation_error",
-            "Upstreams list cannot be empty",
-        ))
-        .into_response();
-    }
-
-    // 验证权重范围
-    for upstream_ref in &payload.upstreams {
-        if !(1..=65535).contains(&upstream_ref.weight) {
-            warn!(
-                "API: Invalid weight {} for upstream '{}' in group '{}'",
-                upstream_ref.weight, upstream_ref.name, name
-            );
-            return Json(ErrorResponse::error(
-                StatusCode::BAD_REQUEST,
-                "validation_error",
-                format!(
-                    "Weight for upstream '{}' must be between 1 and 65535",
-                    upstream_ref.name
-                ),
-            ))
-            .into_response();
-        }
+    // 验证请求体
+    if let Err(e) = payload.validate() {
+        warn!("API: Invalid PATCH request for group '{}': {}", name, e);
+        return Json(ErrorResponse::from_validation_errors(e)).into_response();
     }
 
     // 获取写锁

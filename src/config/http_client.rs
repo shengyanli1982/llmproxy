@@ -1,58 +1,81 @@
-use crate::config::common::{ProxyConfig, RetryConfig};
-use crate::config::defaults::{
-    default_connect_timeout, default_idle_timeout, default_keepalive, default_request_timeout,
-    default_stream_mode, default_user_agent,
+use crate::{
+    config::{
+        common::{ProxyConfig, RetryConfig},
+        defaults::{
+            default_connect_timeout, default_idle_timeout, default_keepalive,
+            default_request_timeout,
+        },
+        validation,
+    },
+    r#const::http_client_limits,
 };
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use validator::Validate;
 
-// HTTP客户端配置
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+/// HTTP客户端配置
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
+#[validate(schema(function = "validation::validate_http_client_config"))]
 pub struct HttpClientConfig {
-    // 用户代理
-    #[serde(default = "default_user_agent")]
-    pub agent: String,
-    // TCP Keepalive（秒）
-    #[serde(default = "default_keepalive")]
-    pub keepalive: u32,
-    // 超时配置
+    /// 超时配置
     #[serde(default)]
+    #[validate(nested)]
     pub timeout: HttpClientTimeoutConfig,
-    // 重试配置
+    /// TCP Keepalive
+    #[serde(default = "default_keepalive")]
+    #[validate(range(
+        min = "http_client_limits::MIN_KEEPALIVE",
+        max = "http_client_limits::MAX_KEEPALIVE"
+    ))]
+    pub keepalive: u32,
+    /// 重试配置
     #[serde(default)]
+    #[validate(nested)]
     pub retry: RetryConfig,
-    // 代理配置
+    /// 代理配置
     #[serde(default)]
+    #[validate(nested)]
     pub proxy: ProxyConfig,
-    // 是否支持流式响应（如果为true，则不设置请求超时）
-    #[serde(default = "default_stream_mode", rename = "stream")]
+    /// 是否启用流式模式
+    #[serde(default)]
     pub stream_mode: bool,
 }
 
 impl Default for HttpClientConfig {
     fn default() -> Self {
         Self {
-            agent: default_user_agent(),
-            keepalive: default_keepalive(),
             timeout: HttpClientTimeoutConfig::default(),
+            keepalive: default_keepalive(),
             retry: RetryConfig::default(),
             proxy: ProxyConfig::default(),
-            stream_mode: default_stream_mode(),
+            stream_mode: false,
         }
     }
 }
 
-// HTTP客户端超时配置
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+/// HTTP客户端超时配置
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 pub struct HttpClientTimeoutConfig {
-    // 连接超时（秒）
+    /// 连接超时（秒）
     #[serde(default = "default_connect_timeout")]
+    #[validate(range(
+        min = "http_client_limits::MIN_CONNECT_TIMEOUT",
+        max = "http_client_limits::MAX_CONNECT_TIMEOUT"
+    ))]
     pub connect: u64,
-    // 请求超时（秒）
+    /// 请求超时（秒）
     #[serde(default = "default_request_timeout")]
+    #[validate(range(
+        min = "http_client_limits::MIN_REQUEST_TIMEOUT",
+        max = "http_client_limits::MAX_REQUEST_TIMEOUT"
+    ))]
     pub request: u64,
-    // 空闲超时（秒）
+    /// 空闲连接超时（秒）
     #[serde(default = "default_idle_timeout")]
+    #[validate(range(
+        min = "http_client_limits::MIN_IDLE_TIMEOUT",
+        max = "http_client_limits::MAX_IDLE_TIMEOUT"
+    ))]
     pub idle: u64,
 }
 

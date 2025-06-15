@@ -116,43 +116,31 @@ impl UpstreamManager {
     fn create_http_client(config: &HttpClientConfig) -> Result<ClientWithMiddleware, AppError> {
         debug!("Creating HTTP client, config: {:?}", config);
 
-        // 创建客户端构建器
-        let mut client_builder = reqwest::ClientBuilder::new()
-            .danger_accept_invalid_certs(true) // 允许无效证书，用于内部自签名证书
+        // 创建 reqwest 客户端
+        let mut client_builder = reqwest::Client::builder()
+            .tcp_keepalive(Some(Duration::from_secs(config.keepalive.into())))
             .connect_timeout(Duration::from_secs(config.timeout.connect));
 
-        // 仅为非流式响应设置请求超时
+        // 如果未启用流式模式，则设置请求超时
         if !config.stream_mode {
             client_builder = client_builder.timeout(Duration::from_secs(config.timeout.request));
         }
 
-        // 配置TCP keepalive（如果启用）
-        if config.keepalive > 0 {
-            client_builder =
-                client_builder.tcp_keepalive(Duration::from_secs(config.keepalive as u64));
-        }
-
-        // 配置空闲连接超时（如果设置）
+        // 设置空闲超时
         if config.timeout.idle > 0 {
             client_builder =
-                client_builder.pool_idle_timeout(Duration::from_secs(config.timeout.idle));
+                client_builder.pool_idle_timeout(Some(Duration::from_secs(config.timeout.idle)));
         }
 
-        // 配置用户代理（如果有）
-        if !config.agent.is_empty() {
-            client_builder = client_builder.user_agent(&config.agent);
-        }
-
-        // 配置代理（如果启用）
-        if config.proxy.enabled && !config.proxy.url.is_empty() {
-            client_builder =
-                client_builder.proxy(reqwest::Proxy::all(&config.proxy.url).map_err(|e| {
-                    AppError::InvalidProxy(format!("Proxy configuration error: {}", e))
-                })?);
+        // 设置代理
+        if config.proxy.enabled {
+            if let Ok(proxy) = reqwest::Proxy::all(&config.proxy.url) {
+                client_builder = client_builder.proxy(proxy);
+            }
         }
 
         // 创建基础HTTP客户端
-        let client = client_builder.build().map_err(AppError::HttpError)?;
+        let client = client_builder.build()?;
 
         // 配置重试策略（根据组的重试配置）
         let middleware_client = if config.retry.enabled {

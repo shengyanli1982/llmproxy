@@ -1,44 +1,52 @@
 use crate::config::common::BreakerConfig;
 use crate::config::defaults::default_weight;
 use crate::config::serializer::arc_string;
+use crate::config::validation;
 use reqwest::header::{HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use url;
 use utoipa::ToSchema;
+use validator::Validate;
 
 use super::http_client::HttpClientConfig;
 
 /// 上游服务配置
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 pub struct UpstreamConfig {
     // 上游服务名称
+    #[validate(length(min = 1, message = "Upstream name cannot be empty"))]
     pub name: String,
     // 上游服务地址
     #[serde(with = "arc_string")]
     #[schema(value_type = String)]
+    #[validate(url(message = "Upstream URL is invalid"))]
+    #[validate(skip)]
     pub url: Arc<String>,
     // 权重
+    #[validate(range(min = 1, max = 65535, message = "Weight must be between 1 and 65535"))]
     #[serde(default = "default_weight")]
     pub weight: u32,
     // 认证配置
     #[serde(default)]
+    #[validate(nested)]
     pub auth: Option<AuthConfig>,
     // HTTP 客户端配置
     #[serde(default)]
+    #[validate(nested)]
     pub http_client: HttpClientConfig,
     // 请求头操作
     #[serde(default)]
+    #[validate(nested)]
     pub headers: Vec<HeaderOp>,
     // 熔断器配置
     #[serde(default)]
+    #[validate(nested)]
     pub breaker: Option<BreakerConfig>,
 }
 
 // 认证配置
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
+#[validate(schema(function = "validation::validate_auth_config"))]
 pub struct AuthConfig {
     // 认证类型
     #[serde(default)]
@@ -84,36 +92,15 @@ pub enum HeaderOpType {
 }
 
 // 请求头操作
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
+#[validate(schema(function = "validation::validate_header_op"))]
 pub struct HeaderOp {
     pub op: HeaderOpType,
+    #[validate(length(min = 1, message = "Header key cannot be empty"))]
     pub key: String,
     pub value: Option<String>,
     #[serde(skip)]
     pub parsed_name: Option<HeaderName>,
     #[serde(skip)]
     pub parsed_value: Option<HeaderValue>,
-}
-
-impl UpstreamConfig {
-    /// 验证上游服务配置
-    pub fn validate(&self) -> Result<(), crate::error::AppError> {
-        // 验证 URL 格式
-        if let Err(e) = url::Url::parse(&self.url) {
-            return Err(crate::error::AppError::Config(format!(
-                "URL '{}' for upstream '{}' is invalid: {}",
-                self.url, self.name, e
-            )));
-        }
-
-        // 检查名称不为空
-        if self.name.is_empty() {
-            return Err(crate::error::AppError::Config(
-                "Upstream name cannot be empty".to_string(),
-            ));
-        }
-
-        Ok(())
-    }
 }
