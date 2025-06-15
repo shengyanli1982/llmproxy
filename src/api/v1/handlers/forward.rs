@@ -10,6 +10,7 @@ use axum::{
     Json,
 };
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use tracing::{info, warn};
 
 /// 获取所有转发规则列表
@@ -25,9 +26,9 @@ use tracing::{info, warn};
     )
 )]
 pub async fn list_forwards(
-    State(config): State<Arc<Config>>,
+    State(config): State<Arc<RwLock<Config>>>,
 ) -> Json<SuccessResponse<Vec<ForwardConfig>>> {
-    let forwards = config.http_server.forwards.clone();
+    let forwards = config.read().await.http_server.forwards.clone();
     info!("API: Retrieved {} forwarding rules", forwards.len());
     Json(SuccessResponse::success_with_data(forwards))
 }
@@ -49,9 +50,15 @@ pub async fn list_forwards(
     )
 )]
 #[axum::debug_handler]
-pub async fn get_forward(State(config): State<Arc<Config>>, Path(name): Path<String>) -> Response {
+pub async fn get_forward(
+    State(config): State<Arc<RwLock<Config>>>,
+    Path(name): Path<String>,
+) -> Response {
+    // 获取读锁
+    let config_read = config.read().await;
+
     // 查找指定名称的转发规则
-    match config
+    match config_read
         .http_server
         .forwards
         .iter()

@@ -6,8 +6,13 @@ use crate::{
     config::Config,
     r#const::api,
 };
-use axum::{middleware, routing::get, Router};
+use axum::{
+    middleware,
+    routing::{delete, get, patch, post, put},
+    Router,
+};
 use std::sync::Arc;
+use tokio::sync::RwLock;
 
 pub const API_V1_PREFIX: &str = "/api/v1";
 const FORWARD_PATH: &str = "/forwards";
@@ -18,7 +23,7 @@ const UPSTREAM_PATH: &str = "/upstreams";
 const UPSTREAM_NAME_PATH: &str = "/upstreams/{name}";
 
 /// 创建 API v1 路由
-pub fn api_routes(config: Arc<Config>) -> Router {
+pub fn api_routes(config: Arc<RwLock<Config>>) -> Router {
     // 检查是否需要认证
     let auth_token = std::env::var(api::ADMIN_AUTH_TOKEN_ENV).ok();
 
@@ -35,9 +40,18 @@ pub fn api_routes(config: Arc<Config>) -> Router {
             UPSTREAM_GROUP_NAME_PATH,
             get(upstream_group::get_upstream_group),
         )
+        // 上游组修改路由
+        .route(
+            UPSTREAM_GROUP_NAME_PATH,
+            patch(upstream_group::patch_upstream_group),
+        )
         // 上游服务路由
         .route(UPSTREAM_PATH, get(upstream::list_upstreams))
         .route(UPSTREAM_NAME_PATH, get(upstream::get_upstream))
+        // 上游服务修改路由
+        .route(UPSTREAM_PATH, post(upstream::create_upstream))
+        .route(UPSTREAM_NAME_PATH, put(upstream::update_upstream))
+        .route(UPSTREAM_NAME_PATH, delete(upstream::delete_upstream))
         .with_state(config);
 
     // 如果设置了认证令牌，添加认证中间件

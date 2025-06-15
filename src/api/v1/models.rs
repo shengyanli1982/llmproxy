@@ -51,6 +51,22 @@ pub struct UpstreamGroupDetail {
     pub http_client: crate::config::HttpClientConfig,
 }
 
+/// 上游组PATCH操作的请求体
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+pub struct PatchUpstreamGroupPayload {
+    /// 上游服务引用列表
+    pub upstreams: Vec<UpstreamRef>,
+}
+
+/// 上游服务引用
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+pub struct UpstreamRef {
+    /// 上游服务名称
+    pub name: String,
+    /// 权重
+    pub weight: u32,
+}
+
 impl SuccessResponse<()> {
     /// 创建一个成功响应，无数据
     pub fn success() -> Self {

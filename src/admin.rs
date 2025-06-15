@@ -13,6 +13,7 @@ use axum::{
 use prometheus::{Encoder, TextEncoder};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemHandle};
 use tracing::{error, info};
 
@@ -26,12 +27,12 @@ pub struct AdminServer {
     // 监听地址
     addr: SocketAddr,
     // 配置
-    config: Arc<Config>,
+    config: Arc<RwLock<Config>>,
 }
 
 impl AdminServer {
     // 创建新的管理服务
-    pub fn new(debug: bool, addr: SocketAddr, config: Arc<Config>) -> Self {
+    pub fn new(debug: bool, addr: SocketAddr, config: Arc<RwLock<Config>>) -> Self {
         Self {
             addr,
             config,

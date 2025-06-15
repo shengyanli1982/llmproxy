@@ -75,7 +75,7 @@ impl Config {
     }
 
     // 预处理配置，例如预解析头部
-    fn post_process(&mut self) -> Result<(), AppError> {
+    pub fn post_process(&mut self) -> Result<(), AppError> {
         for upstream in &mut self.upstreams {
             for op in &mut upstream.headers {
                 // 预解析头部名称

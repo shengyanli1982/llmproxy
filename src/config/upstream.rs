@@ -4,6 +4,7 @@ use crate::config::serializer::arc_string;
 use reqwest::header::{HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use url;
 use utoipa::ToSchema;
 
 use super::http_client::HttpClientConfig;
@@ -93,4 +94,26 @@ pub struct HeaderOp {
     pub parsed_name: Option<HeaderName>,
     #[serde(skip)]
     pub parsed_value: Option<HeaderValue>,
+}
+
+impl UpstreamConfig {
+    /// 验证上游服务配置
+    pub fn validate(&self) -> Result<(), crate::error::AppError> {
+        // 验证 URL 格式
+        if let Err(e) = url::Url::parse(&self.url) {
+            return Err(crate::error::AppError::Config(format!(
+                "URL '{}' for upstream '{}' is invalid: {}",
+                self.url, self.name, e
+            )));
+        }
+
+        // 检查名称不为空
+        if self.name.is_empty() {
+            return Err(crate::error::AppError::Config(
+                "Upstream name cannot be empty".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
 }
