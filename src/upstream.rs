@@ -314,7 +314,7 @@ impl UpstreamManager {
                             ])
                             .inc();
 
-                        Err(AppError::CircuitBreakerOpen(upstream_config.url.clone()))
+                        Err(AppError::CircuitBreakerOpen(upstream_config.url.0.clone()))
                     }
                     Err(circuitbreaker_rs::BreakerError::Operation(op_err)) => {
                         // 请求执行失败

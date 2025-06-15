@@ -1,12 +1,11 @@
 use crate::config::common::BreakerConfig;
 use crate::config::defaults::default_weight;
-use crate::config::serializer::arc_string;
+use crate::config::serializer::SerializableArcString;
 use crate::config::validation;
 use reqwest::header::{HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use utoipa::ToSchema;
-use validator::Validate;
+use validator::{Validate, ValidationError};
 
 use super::http_client::HttpClientConfig;
 
@@ -17,11 +16,9 @@ pub struct UpstreamConfig {
     #[validate(length(min = 1, message = "Upstream name cannot be empty"))]
     pub name: String,
     // 上游服务地址
-    #[serde(with = "arc_string")]
     #[schema(value_type = String)]
-    #[validate(url(message = "Upstream URL is invalid"))]
-    #[validate(skip)]
-    pub url: Arc<String>,
+    #[validate(custom(function = "validate_url"))]
+    pub url: SerializableArcString,
     // 权重
     #[validate(range(min = 1, max = 65535, message = "Weight must be between 1 and 65535"))]
     #[serde(default = "default_weight")]
@@ -42,6 +39,16 @@ pub struct UpstreamConfig {
     #[serde(default)]
     #[validate(nested)]
     pub breaker: Option<BreakerConfig>,
+}
+
+// URL 自定义验证函数
+fn validate_url(url: &SerializableArcString) -> Result<(), ValidationError> {
+    if url::Url::parse(url.as_ref()).is_err() {
+        let mut err = ValidationError::new("invalid_url");
+        err.message = Some("Upstream URL is invalid".into());
+        return Err(err);
+    }
+    Ok(())
 }
 
 // 认证配置

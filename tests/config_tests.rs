@@ -6,7 +6,6 @@ use llmproxy::config::{
 use std::fs::File;
 use std::io::Write;
 use tempfile::tempdir;
-use url;
 use validator::Validate;
 
 // 创建有效的测试配置
@@ -101,15 +100,14 @@ fn test_config_validation_invalid_url() {
     // 设置无效的URL
     config.upstreams[0].url = "invalid-url".to_string().into();
 
-    // 由于 UpstreamConfig 中的 url 字段有 #[validate(skip)] 注解，
-    // 我们需要手动验证 URL 格式，而不是依赖 validator
-    let url_str = config.upstreams[0].url.as_ref();
-    let url_result = url::Url::parse(url_str);
-    assert!(url_result.is_err());
-
-    // 我们不再期望 config.validate() 捕获 URL 错误
+    // 现在我们期望 config.validate() 能够捕获 URL 错误
     let result = config.validate();
-    assert!(result.is_ok());
+    assert!(result.is_err());
+    if let Err(e) = result {
+        assert!(e.to_string().contains("URL"));
+    } else {
+        panic!("Expected Config error for invalid URL");
+    }
 }
 
 #[test]
