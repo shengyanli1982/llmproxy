@@ -153,12 +153,16 @@ impl UpstreamGroupDetail {
     /// 创建一个新的上游组详情，需要提供上游组配置和所有上游配置的映射
     pub fn from_config(
         group: &UpstreamGroupConfig,
-        upstream_map: &std::collections::HashMap<String, UpstreamConfig>,
+        upstream_map: &std::collections::HashMap<&str, &UpstreamConfig>,
     ) -> Self {
         let upstreams = group
             .upstreams
             .iter()
-            .filter_map(|upstream_ref| upstream_map.get(&upstream_ref.name).cloned())
+            .filter_map(|upstream_ref| {
+                upstream_map
+                    .get(&upstream_ref.name.as_str())
+                    .map(|&u| u.clone())
+            })
             .collect();
 
         Self {

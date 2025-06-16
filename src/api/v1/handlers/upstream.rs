@@ -1,4 +1,5 @@
 use crate::{
+    api::v1::handlers::utils::{find_by_name, not_found_error, success_response},
     api::v1::models::{ErrorResponse, SuccessResponse},
     config::{Config, UpstreamConfig},
     r#const::api,
@@ -57,24 +58,14 @@ pub async fn get_upstream(
 ) -> Response {
     // 查找指定名称的上游服务
     let config_read = config.read().await;
-    match config_read
-        .upstreams
-        .iter()
-        .find(|upstream| upstream.name == name)
-    {
+    let upstream = find_by_name(&config_read.upstreams, &name, |u| &u.name);
+
+    match upstream {
         Some(upstream) => {
             info!("API: Retrieved upstream service '{}'", name);
-            Json(SuccessResponse::success_with_data(upstream.clone())).into_response()
+            success_response(upstream)
         }
-        None => {
-            warn!("API: Upstream service '{}' not found", name);
-            Json(ErrorResponse::error(
-                StatusCode::NOT_FOUND,
-                api::error_types::NOT_FOUND,
-                format!("Upstream service '{}' does not exist", name),
-            ))
-            .into_response()
-        }
+        None => not_found_error("Upstream service", &name),
     }
 }
 

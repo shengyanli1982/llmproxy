@@ -1,17 +1,16 @@
 use crate::{
+    api::v1::handlers::utils::{not_found_error, success_response},
     api::v1::models::{ErrorResponse, SuccessResponse},
     config::{Config, ForwardConfig},
-    r#const::api,
 };
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
-    response::{IntoResponse, Response},
+    response::Response,
     Json,
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, warn};
+use tracing::info;
 
 /// 获取所有转发规则列表
 ///
@@ -69,16 +68,8 @@ pub async fn get_forward(
     match forward {
         Some(forward) => {
             info!("API: Retrieved forwarding rule '{}'", name);
-            Json(SuccessResponse::success_with_data(forward.clone())).into_response()
+            success_response(forward)
         }
-        None => {
-            warn!("API: Forwarding rule '{}' not found", name);
-            Json(ErrorResponse::error(
-                StatusCode::NOT_FOUND,
-                api::error_types::NOT_FOUND,
-                format!("Forwarding rule '{}' does not exist", name),
-            ))
-            .into_response()
-        }
+        None => not_found_error("Forwarding rule", &name),
     }
 }

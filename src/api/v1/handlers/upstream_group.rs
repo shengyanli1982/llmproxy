@@ -1,7 +1,9 @@
 use crate::{
+    api::v1::handlers::utils::{
+        create_upstream_map, find_by_name, not_found_error, success_response,
+    },
     api::v1::models::{ErrorResponse, SuccessResponse, UpstreamGroupDetail},
-    config::{Config, UpstreamConfig, UpstreamRef},
-    r#const::api,
+    config::{Config, UpstreamRef},
 };
 use axum::{
     extract::{Path, State},
@@ -10,7 +12,7 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
 use utoipa::ToSchema;
@@ -34,12 +36,8 @@ pub async fn list_upstream_groups(
     // 获取读锁
     let config_read = config.read().await;
 
-    // 创建上游服务名称到配置的映射
-    let upstream_map: HashMap<String, UpstreamConfig> = config_read
-        .upstreams
-        .iter()
-        .map(|upstream| (upstream.name.clone(), upstream.clone()))
-        .collect();
+    // 创建上游服务名称到配置的映射 (使用引用)
+    let upstream_map = create_upstream_map(&config_read.upstreams);
 
     // 将每个上游组转换为详情模型
     let groups: Vec<UpstreamGroupDetail> = config_read
@@ -77,33 +75,19 @@ pub async fn get_upstream_group(
     let config_read = config.read().await;
 
     // 查找指定名称的上游组
-    match config_read
-        .upstream_groups
-        .iter()
-        .find(|group| group.name == name)
-    {
+    let group = find_by_name(&config_read.upstream_groups, &name, |g| &g.name);
+
+    match group {
         Some(group) => {
             // 创建上游服务名称到配置的映射
-            let upstream_map: HashMap<String, UpstreamConfig> = config_read
-                .upstreams
-                .iter()
-                .map(|upstream| (upstream.name.clone(), upstream.clone()))
-                .collect();
+            let upstream_map = create_upstream_map(&config_read.upstreams);
 
             // 转换为详情模型
             let detail = UpstreamGroupDetail::from_config(group, &upstream_map);
             info!("API: Retrieved upstream group '{}'", name);
-            Json(SuccessResponse::success_with_data(detail)).into_response()
+            success_response(&detail)
         }
-        None => {
-            warn!("API: Upstream group '{}' not found", name);
-            Json(ErrorResponse::error(
-                StatusCode::NOT_FOUND,
-                api::error_types::NOT_FOUND,
-                format!("Upstream group '{}' does not exist", name),
-            ))
-            .into_response()
-        }
+        None => not_found_error("Upstream group", &name),
     }
 }
 
@@ -156,14 +140,14 @@ pub async fn patch_upstream_group(
     match group_index {
         Some(index) => {
             // 验证所有引用的上游服务是否存在
-            let upstream_names: Vec<String> = config_write
+            let upstream_names: Vec<&str> = config_write
                 .upstreams
                 .iter()
-                .map(|u| u.name.clone())
+                .map(|u| u.name.as_str())
                 .collect();
 
             for upstream_ref in &payload.upstreams {
-                if !upstream_names.contains(&upstream_ref.name) {
+                if !upstream_names.contains(&upstream_ref.name.as_str()) {
                     warn!(
                         "API: Referenced upstream '{}' not found for group '{}'",
                         upstream_ref.name, name
@@ -181,11 +165,7 @@ pub async fn patch_upstream_group(
             config_write.upstream_groups[index].upstreams = payload.upstreams.clone();
 
             // 创建上游服务名称到配置的映射
-            let upstream_map: HashMap<String, UpstreamConfig> = config_write
-                .upstreams
-                .iter()
-                .map(|upstream| (upstream.name.clone(), upstream.clone()))
-                .collect();
+            let upstream_map = create_upstream_map(&config_write.upstreams);
 
             // 创建响应详情
             let detail = UpstreamGroupDetail::from_config(
@@ -194,16 +174,8 @@ pub async fn patch_upstream_group(
             );
 
             info!("API: Updated upstream group '{}'", name);
-            Json(SuccessResponse::success_with_data(detail)).into_response()
+            success_response(&detail)
         }
-        None => {
-            warn!("API: Upstream group '{}' not found for update", name);
-            Json(ErrorResponse::error(
-                StatusCode::NOT_FOUND,
-                api::error_types::NOT_FOUND,
-                format!("Upstream group '{}' does not exist", name),
-            ))
-            .into_response()
-        }
+        None => not_found_error("Upstream group", &name),
     }
 }

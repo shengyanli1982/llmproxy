@@ -48,8 +48,8 @@ pub async fn auth_middleware(
         return Ok(next.run(request).await);
     };
 
-    let method = request.method().clone();
-    let uri = request.uri().clone();
+    let method = request.method();
+    let uri = request.uri();
 
     // 获取 Authorization 头
     let auth_header = request
