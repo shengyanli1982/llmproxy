@@ -3,6 +3,7 @@ use crate::{
     breaker::{create_upstream_circuit_breaker, UpstreamError},
     config::{
         AuthConfig, AuthType, HeaderOpType, HttpClientConfig, UpstreamConfig, UpstreamGroupConfig,
+        UpstreamRef,
     },
     error::AppError,
     metrics::METRICS,
@@ -14,6 +15,7 @@ use reqwest::{header::HeaderMap, Method, Response, Url};
 use reqwest_middleware::ClientWithMiddleware;
 use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
 use retry_policies::Jitter;
+use std::future::Future;
 use std::{
     collections::HashMap,
     sync::Arc,
@@ -31,24 +33,108 @@ pub struct UpstreamManager {
     group_clients: HashMap<String, ClientWithMiddleware>,
 }
 
+/// 构建上游配置映射
+fn build_upstream_map(upstreams: &[UpstreamConfig]) -> HashMap<String, UpstreamConfig> {
+    let mut upstream_map = HashMap::with_capacity(upstreams.len());
+
+    for upstream in upstreams {
+        debug!(
+            "Loaded upstream: {}, url: {:?}",
+            upstream.name, upstream.url
+        );
+        upstream_map.insert(upstream.name.clone(), upstream.clone());
+    }
+
+    upstream_map
+}
+
+/// 创建托管上游
+fn create_managed_upstream(
+    upstream_ref: &UpstreamRef,
+    upstream_config: &UpstreamConfig,
+    group_name: &str,
+) -> Result<ManagedUpstream, AppError> {
+    // 创建熔断器（如果上游配置了熔断器）
+    let breaker = match &upstream_config.breaker {
+        Some(breaker_config) => {
+            let breaker = create_upstream_circuit_breaker(
+                upstream_ref.name.clone(),
+                group_name.to_string(),
+                breaker_config,
+            );
+            Some(breaker)
+        }
+        None => None,
+    };
+
+    // 创建托管上游
+    let managed_upstream = ManagedUpstream {
+        upstream_ref: upstream_ref.clone(),
+        breaker,
+    };
+
+    Ok(managed_upstream)
+}
+
+/// 为单个上游组构建托管上游列表和负载均衡器
+fn build_group_balancer(
+    group_name: &str,
+    group_config: &UpstreamGroupConfig,
+    upstream_map: &HashMap<String, UpstreamConfig>,
+) -> Result<Arc<dyn LoadBalancer>, AppError> {
+    // 获取组内所有上游的引用
+    let upstream_refs = &group_config.upstreams;
+
+    // 创建托管上游列表
+    let mut managed_upstreams = Vec::with_capacity(upstream_refs.len());
+
+    for upstream_ref in upstream_refs {
+        // 获取完整的上游配置
+        let upstream_config = match upstream_map.get(&upstream_ref.name) {
+            Some(config) => config,
+            None => {
+                return Err(AppError::Config(format!(
+                    "Referenced upstream '{}' not found in upstreams configuration",
+                    upstream_ref.name
+                )));
+            }
+        };
+
+        // 创建托管上游
+        let managed_upstream = create_managed_upstream(upstream_ref, upstream_config, group_name)?;
+        managed_upstreams.push(managed_upstream);
+    }
+
+    // 创建负载均衡器
+    let lb = create_load_balancer(&group_config.balance.strategy, managed_upstreams);
+
+    Ok(lb)
+}
+
+/// 为多个上游组创建HTTP客户端映射
+fn create_group_clients(
+    groups: &[UpstreamGroupConfig],
+) -> Result<HashMap<String, ClientWithMiddleware>, AppError> {
+    let mut group_clients = HashMap::with_capacity(groups.len());
+
+    for group in groups {
+        // 创建该组的HTTP客户端
+        let client = UpstreamManager::create_http_client(&group.http_client)?;
+        group_clients.insert(group.name.clone(), client);
+    }
+
+    Ok(group_clients)
+}
+
 impl UpstreamManager {
     // 创建新的上游管理器
     pub async fn new(
         upstreams: Vec<UpstreamConfig>,
         groups: Vec<UpstreamGroupConfig>,
     ) -> Result<Self, AppError> {
-        let mut upstream_map = HashMap::with_capacity(upstreams.len());
+        let mut upstream_map = build_upstream_map(&upstreams);
         let mut group_map = HashMap::with_capacity(groups.len());
-        let mut group_clients = HashMap::with_capacity(groups.len());
-
-        // 构建上游映射
-        for upstream in upstreams {
-            debug!(
-                "Loaded upstream: {}, url: {:?}",
-                upstream.name, upstream.url
-            );
-            upstream_map.insert(upstream.name.clone(), upstream);
-        }
+        let group_clients = create_group_clients(&groups)?;
 
         // 为每个组创建负载均衡器和HTTP客户端
         for group in groups {
@@ -71,34 +157,15 @@ impl UpstreamManager {
                     }
                 };
 
-                // 创建熔断器（如果上游配置了熔断器）
-                let breaker = match &upstream_config.breaker {
-                    Some(breaker_config) => {
-                        let breaker = create_upstream_circuit_breaker(
-                            upstream_ref.name.clone(),
-                            group_name.clone(),
-                            breaker_config,
-                        );
-                        Some(breaker)
-                    }
-                    None => None,
-                };
-
                 // 创建托管上游
-                let managed_upstream = ManagedUpstream {
-                    upstream_ref: upstream_ref.clone(),
-                    breaker,
-                };
+                let managed_upstream =
+                    create_managed_upstream(upstream_ref, upstream_config, group_name)?;
 
                 managed_upstreams.push(managed_upstream);
             }
 
             // 创建负载均衡器
             let lb = create_load_balancer(&group.balance.strategy, managed_upstreams);
-
-            // 创建该组的HTTP客户端
-            let client = Self::create_http_client(&group.http_client)?;
-            group_clients.insert(group.name.clone(), client);
 
             group_map.insert(group.name.clone(), lb);
         }
@@ -165,17 +232,23 @@ impl UpstreamManager {
         Ok(middleware_client)
     }
 
-    // 转发请求到指定上游组
-    pub async fn forward_request(
+    /// 构建请求URL
+    fn build_request_url(&self, upstream_url: &str, path: &str) -> Result<Url, AppError> {
+        // 构建请求URL - 使用 String::with_capacity 预分配内存
+        let url_capacity = upstream_url.len() + path.len();
+        let mut url = String::with_capacity(url_capacity);
+        url.push_str(upstream_url);
+        url.push_str(path);
+
+        Url::parse(&url)
+            .map_err(|e| AppError::Upstream(format!("Invalid upstream URL: {} - {}", url, e)))
+    }
+
+    /// 从上游组中选择上游服务器并获取其配置
+    async fn select_upstream_server(
         &self,
         group_name: &str,
-        method: &Method,
-        path: &str,
-        headers: HeaderMap,
-        body: Option<bytes::Bytes>,
-    ) -> Result<Response, AppError> {
-        debug!("Forwarding request to upstream group: {}", group_name);
-
+    ) -> Result<(ManagedUpstream, &UpstreamConfig), AppError> {
         // 获取上游组的负载均衡器
         let load_balancer = match self.groups.get(group_name) {
             Some(lb) => lb,
@@ -228,17 +301,101 @@ impl UpstreamManager {
             .with_label_values(&[group_name, &upstream_config.url])
             .inc();
 
+        Ok((managed_upstream.clone(), upstream_config))
+    }
+
+    /// 执行HTTP请求
+    async fn execute_request(
+        &self,
+        managed_upstream: &ManagedUpstream,
+        upstream_url: &str,
+        request_future: impl Future<Output = Result<Response, UpstreamError>> + Send,
+        group_name: &str,
+    ) -> Result<Response, AppError> {
+        // 执行请求（根据是否有熔断器决定执行方式）
+        match &managed_upstream.breaker {
+            Some(breaker) => {
+                // 使用熔断器执行请求
+                match breaker.call_async(|| request_future).await {
+                    Ok(resp) => Ok(resp),
+                    Err(circuitbreaker_rs::BreakerError::Open) => {
+                        // 熔断器开启，拒绝请求
+                        error!("Circuit breaker is open for upstream: {}", upstream_url);
+
+                        // 记录被拒绝的请求
+                        METRICS
+                            .circuitbreaker_calls_total()
+                            .with_label_values(&[
+                                group_name,
+                                &managed_upstream.upstream_ref.name,
+                                upstream_url,
+                                breaker_result_labels::REJECTED,
+                            ])
+                            .inc();
+
+                        Err(AppError::CircuitBreakerOpen(
+                            upstream_url.to_string().into(),
+                        ))
+                    }
+                    Err(circuitbreaker_rs::BreakerError::Operation(op_err)) => {
+                        // 请求执行失败
+                        error!("Operation error: {}", op_err);
+                        Err(AppError::Upstream(op_err.0))
+                    }
+                    Err(e) => {
+                        // 其他熔断器错误
+                        error!("Circuit breaker error: {}", e);
+                        Err(e.into())
+                    }
+                }
+            }
+            None => {
+                // 直接执行请求（无熔断器保护）
+                request_future
+                    .await
+                    .map_err(|err| AppError::Upstream(err.0))
+            }
+        }
+    }
+
+    /// 更新响应时间感知的负载均衡器的指标
+    fn update_balancer_metrics(
+        &self,
+        load_balancer: &Arc<dyn LoadBalancer>,
+        managed_upstream: &ManagedUpstream,
+        duration: Duration,
+    ) {
+        // 检查是否为响应时间感知的负载均衡器，更新指标
+        if load_balancer.as_str() == balance_strategy_labels::RESPONSE_AWARE {
+            let duration_ms = duration.as_millis() as usize;
+            if let Some(response_aware) = load_balancer
+                .as_any()
+                .downcast_ref::<crate::balancer::ResponseAwareBalancer>()
+            {
+                response_aware.update_metrics(managed_upstream, duration_ms);
+            }
+        }
+    }
+
+    // 转发请求到指定上游组
+    pub async fn forward_request(
+        &self,
+        group_name: &str,
+        method: &Method,
+        path: &str,
+        headers: HeaderMap,
+        body: Option<bytes::Bytes>,
+    ) -> Result<Response, AppError> {
+        debug!("Forwarding request to upstream group: {}", group_name);
+
+        // 选择一个上游服务器
+        let (managed_upstream, upstream_config) = self.select_upstream_server(group_name).await?;
+
         // 记录开始时间
         let start_time = Instant::now();
 
-        // 构建请求URL - 使用 String::with_capacity 预分配内存
-        let url_capacity = upstream_config.url.len() + path.len();
-        let mut url = String::with_capacity(url_capacity);
-        url.push_str(&upstream_config.url);
-        url.push_str(path);
-
-        let url_parsed = Url::parse(&url)
-            .map_err(|e| AppError::Upstream(format!("Invalid upstream URL: {} - {}", url, e)))?;
+        // 构建请求URL
+        let url = self.build_request_url(&upstream_config.url, path)?;
 
         // 获取组的HTTP客户端
         let client = match self.group_clients.get(group_name) {
@@ -252,13 +409,13 @@ impl UpstreamManager {
         // 定义请求执行闭包 - 使用引用捕获以减少克隆
         let upstream_url = &upstream_config.url;
         let request_future = |headers: HeaderMap, body: Option<bytes::Bytes>| {
-            let url_parsed = url_parsed.clone();
+            let url = url.clone();
             let method = method.clone(); // 使用引用的方法，克隆更轻量
             let client = client.clone();
 
             async move {
                 // 创建请求构建器
-                let mut request_builder = client.request(method, url_parsed);
+                let mut request_builder = client.request(method, url);
 
                 // 处理请求头
                 let processed_headers = self.process_headers(headers, upstream_config)?;
@@ -286,72 +443,28 @@ impl UpstreamManager {
             }
         };
 
-        // 执行请求（根据是否有熔断器决定执行方式）
-        let response = match &managed_upstream.breaker {
-            Some(breaker) => {
-                // 使用熔断器执行请求
-                match breaker
-                    .call_async(move || request_future(headers, body))
-                    .await
-                {
-                    Ok(resp) => Ok(resp),
-                    Err(circuitbreaker_rs::BreakerError::Open) => {
-                        // 熔断器开启，拒绝请求
-                        error!(
-                            "Circuit breaker is open for upstream: {}",
-                            upstream_config.url.as_str()
-                        );
-
-                        // 记录被拒绝的请求
-                        METRICS
-                            .circuitbreaker_calls_total()
-                            .with_label_values(&[
-                                group_name,
-                                &managed_upstream.upstream_ref.name,
-                                &upstream_config.url,
-                                breaker_result_labels::REJECTED,
-                            ])
-                            .inc();
-
-                        Err(AppError::CircuitBreakerOpen(upstream_config.url.0.clone()))
-                    }
-                    Err(circuitbreaker_rs::BreakerError::Operation(op_err)) => {
-                        // 请求执行失败
-                        error!("Operation error: {}", op_err);
-                        Err(AppError::Upstream(op_err.0))
-                    }
-                    Err(e) => {
-                        // 其他熔断器错误
-                        error!("Circuit breaker error: {}", e);
-                        Err(e.into())
-                    }
-                }
-            }
-            None => {
-                // 直接执行请求（无熔断器保护）
-                request_future(headers, body)
-                    .await
-                    .map_err(|err| AppError::Upstream(err.0))
-            }
-        };
+        // 执行请求
+        let response = self
+            .execute_request(
+                &managed_upstream,
+                upstream_url.as_str(),
+                request_future(headers, body),
+                group_name,
+            )
+            .await;
 
         // 记录上游请求耗时
         let duration = start_time.elapsed();
         METRICS
             .upstream_duration_seconds()
-            .with_label_values(&[group_name, &upstream_config.url])
+            .with_label_values(&[group_name, upstream_url.as_str()])
             .observe(duration.as_secs_f64());
 
-        // 检查是否为响应时间感知的负载均衡器，更新指标
-        if load_balancer.as_str() == balance_strategy_labels::RESPONSE_AWARE {
-            let duration_ms = duration.as_millis() as usize;
-            if let Some(response_aware) = load_balancer
-                .as_any()
-                .downcast_ref::<crate::balancer::ResponseAwareBalancer>()
-            {
-                response_aware.update_metrics(managed_upstream, duration_ms);
-            }
-        }
+        // 获取上游组的负载均衡器
+        let load_balancer = self.groups.get(group_name).unwrap();
+
+        // 更新响应时间感知的负载均衡器指标
+        self.update_balancer_metrics(load_balancer, &managed_upstream, duration);
 
         // 错误处理和指标记录
         if let Err(ref err) = response {
@@ -361,7 +474,7 @@ impl UpstreamManager {
             );
 
             // 报告上游失败
-            load_balancer.report_failure(managed_upstream).await;
+            load_balancer.report_failure(&managed_upstream).await;
 
             // 记录错误指标
             let error_label = match err {
@@ -380,7 +493,7 @@ impl UpstreamManager {
             debug!(
                 "Upstream response status: {} from {}",
                 status,
-                upstream_config.url.as_str()
+                upstream_url.as_str()
             );
         }
 
