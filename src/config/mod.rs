@@ -1,4 +1,3 @@
-// 导出子模块
 pub mod common;
 pub mod defaults;
 pub mod http_client;
@@ -8,20 +7,18 @@ pub mod upstream;
 pub mod upstream_group;
 pub mod validation;
 
-// 重新导出常用类型
-pub use self::common::{BreakerConfig, ProxyConfig, RateLimitConfig, RetryConfig, TimeoutConfig};
-pub use self::http_client::{HttpClientConfig, HttpClientTimeoutConfig};
-pub use self::http_server::{AdminConfig, ForwardConfig, HttpServerConfig};
-pub use self::upstream::{AuthConfig, AuthType, HeaderOp, HeaderOpType, UpstreamConfig};
-pub use self::upstream_group::{BalanceConfig, BalanceStrategy, UpstreamGroupConfig, UpstreamRef};
-
 use crate::error::AppError;
+pub use common::{BreakerConfig, ProxyConfig, RateLimitConfig, RetryConfig, TimeoutConfig};
+pub use http_client::{HttpClientConfig, HttpClientTimeoutConfig};
+pub use http_server::{AdminConfig, ForwardConfig, HttpServerConfig};
 use reqwest::header::{HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use tracing::debug;
+pub use upstream::{AuthConfig, AuthType, HeaderOp, HeaderOpType, UpstreamConfig};
+pub use upstream_group::{BalanceConfig, BalanceStrategy, UpstreamGroupConfig, UpstreamRef};
 use utoipa::ToSchema;
 use validator::Validate;
 

@@ -1,3 +1,10 @@
+pub mod response_aware;
+pub mod simple;
+pub use response_aware::ResponseAwareBalancer;
+pub use simple::{
+    FailoverBalancer, RandomBalancer, RoundRobinBalancer, WeightedRoundRobinBalancer,
+};
+
 use crate::breaker::UpstreamCircuitBreaker;
 use crate::config::{BalanceStrategy, UpstreamRef};
 use crate::error::AppError;
@@ -5,16 +12,6 @@ use async_trait::async_trait;
 use std::any::Any;
 use std::sync::Arc;
 use tracing::debug;
-
-// 子模块
-pub mod response_aware;
-pub mod simple;
-
-// 重导出
-pub use response_aware::ResponseAwareBalancer;
-pub use simple::{
-    FailoverBalancer, RandomBalancer, RoundRobinBalancer, WeightedRoundRobinBalancer,
-};
 
 /// 托管上游结构体，封装上游引用及其关联的熔断器
 #[derive(Clone)]
