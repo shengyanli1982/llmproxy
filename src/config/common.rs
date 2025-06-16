@@ -15,6 +15,7 @@ use validator::Validate;
 
 // 超时配置
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
+#[serde(rename_all = "lowercase")]
 pub struct TimeoutConfig {
     // 连接超时（秒）
     #[serde(default = "default_connect_timeout")]
@@ -35,6 +36,7 @@ impl Default for TimeoutConfig {
 
 // 限流配置
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
+#[serde(rename_all = "lowercase")]
 pub struct RateLimitConfig {
     // 是否启用限流
     #[serde(default)]
@@ -67,6 +69,7 @@ impl Default for RateLimitConfig {
 
 // 重试配置
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
+#[serde(rename_all = "lowercase")]
 pub struct RetryConfig {
     // 是否启用重试
     #[serde(default)]
@@ -97,6 +100,7 @@ impl Default for RetryConfig {
 // 代理配置
 #[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema, Validate)]
 #[validate(schema(function = "validation::validate_proxy_config"))]
+#[serde(rename_all = "lowercase")]
 pub struct ProxyConfig {
     // 是否启用代理
     #[serde(default)]
@@ -108,6 +112,7 @@ pub struct ProxyConfig {
 
 // 熔断器配置
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
+#[serde(rename_all = "lowercase")]
 pub struct BreakerConfig {
     // 触发熔断的失败率阈值 (0.01-1.0, 例如0.5表示50%的调用失败)
     #[serde(default = "default_circuitbreaker_threshold")]
