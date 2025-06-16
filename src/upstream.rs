@@ -169,7 +169,7 @@ impl UpstreamManager {
     pub async fn forward_request(
         &self,
         group_name: &str,
-        method: Method,
+        method: &Method,
         path: &str,
         headers: HeaderMap,
         body: Option<bytes::Bytes>,
@@ -253,8 +253,7 @@ impl UpstreamManager {
         let upstream_url = &upstream_config.url;
         let request_future = |headers: HeaderMap, body: Option<bytes::Bytes>| {
             let url_parsed = url_parsed.clone();
-            let method = method.clone();
-            let upstream_url = upstream_url.clone();
+            let method = method.clone(); // 使用引用的方法，克隆更轻量
             let client = client.clone();
 
             async move {
@@ -394,6 +393,11 @@ impl UpstreamManager {
         headers: HeaderMap,
         upstream: &UpstreamConfig,
     ) -> Result<HeaderMap, AppError> {
+        // 如果没有头部操作需要执行，直接返回原始headers
+        if upstream.headers.is_empty() {
+            return Ok(headers);
+        }
+
         // 创建新的 HeaderMap 而不是克隆
         let mut result = HeaderMap::with_capacity(headers.len());
 

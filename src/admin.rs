@@ -5,7 +5,7 @@ use crate::metrics::METRICS;
 use crate::server::create_tcp_listener;
 use async_trait::async_trait;
 use axum::{
-    http::StatusCode,
+    http::{header, StatusCode},
     response::{IntoResponse, Response},
     routing::get,
     Router,
@@ -103,12 +103,11 @@ async fn metrics_handler() -> Response {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
 
-    // 返回指标
-    match String::from_utf8(buffer) {
-        Ok(metrics_text) => (StatusCode::OK, metrics_text).into_response(),
-        Err(e) => {
-            error!("Metrics UTF-8 conversion failed: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR.into_response()
-        }
-    }
+    // Prometheus指标数据总是有效的UTF-8，所以可以直接返回字节
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        buffer,
+    )
+        .into_response()
 }

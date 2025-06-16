@@ -269,7 +269,7 @@ pub async fn forward_handler(
         .upstream_manager
         .forward_request(
             &state.config.upstream_group,
-            method.clone(),
+            &method,
             &path,
             headers,
             body_bytes,

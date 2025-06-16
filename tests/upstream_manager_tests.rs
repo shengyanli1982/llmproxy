@@ -110,7 +110,7 @@ async fn test_upstream_manager_with_circuit_breaker() {
         let result = upstream_manager
             .forward_request(
                 "test_group",
-                Method::GET,
+                &Method::GET,
                 "/test",
                 reqwest::header::HeaderMap::new(),
                 None,
@@ -131,7 +131,7 @@ async fn test_upstream_manager_with_circuit_breaker() {
     let _result = upstream_manager
         .forward_request(
             "test_group",
-            Method::GET,
+            &Method::GET,
             "/test",
             reqwest::header::HeaderMap::new(),
             None,
@@ -148,7 +148,7 @@ async fn test_upstream_manager_with_circuit_breaker() {
         let result = upstream_manager
             .forward_request(
                 "test_group",
-                Method::GET,
+                &Method::GET,
                 "/test",
                 reqwest::header::HeaderMap::new(),
                 None,
@@ -170,7 +170,7 @@ async fn test_upstream_manager_with_circuit_breaker() {
         let _ = upstream_manager
             .forward_request(
                 "test_group",
-                Method::GET,
+                &Method::GET,
                 "/test",
                 reqwest::header::HeaderMap::new(),
                 None,
@@ -185,7 +185,7 @@ async fn test_upstream_manager_with_circuit_breaker() {
     let _result = upstream_manager
         .forward_request(
             "test_group",
-            Method::GET,
+            &Method::GET,
             "/test",
             reqwest::header::HeaderMap::new(),
             None,
@@ -208,7 +208,7 @@ async fn test_upstream_manager_with_circuit_breaker() {
     let result = upstream_manager
         .forward_request(
             "test_group",
-            Method::GET,
+            &Method::GET,
             "/test",
             reqwest::header::HeaderMap::new(),
             None,
@@ -253,7 +253,7 @@ async fn test_upstream_manager_without_circuit_breaker() {
         let result = upstream_manager
             .forward_request(
                 "test_group",
-                Method::GET,
+                &Method::GET,
                 "/test",
                 reqwest::header::HeaderMap::new(),
                 None,

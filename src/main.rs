@@ -118,27 +118,30 @@ async fn create_components(debug: bool, config: Config) -> Result<AppComponents,
     // 创建配置的共享引用，使用RwLock包装以支持动态更新
     let config_arc = std::sync::Arc::new(RwLock::new(config));
 
-    // 获取 http_server 配置，如果不存在则返回错误
-    let http_server_config = config_arc
-        .read()
-        .await
-        .http_server
-        .clone()
-        .ok_or_else(|| AppError::Config("http_server configuration is missing".to_string()))?;
+    // 在一个读锁范围内获取所有配置，避免多次获取锁
+    let (upstreams, upstream_groups, http_server_config) = {
+        let config_guard = config_arc.read().await;
+        let http_server = config_guard
+            .http_server
+            .clone()
+            .ok_or_else(|| AppError::Config("http_server configuration is missing".to_string()))?;
+
+        (
+            config_guard.upstreams.clone(),
+            config_guard.upstream_groups.clone(),
+            http_server,
+        )
+    };
 
     // 创建上游管理器
-    let upstream_manager: std::sync::Arc<UpstreamManager> = match UpstreamManager::new(
-        config_arc.read().await.upstreams.clone(),
-        config_arc.read().await.upstream_groups.clone(),
-    )
-    .await
-    {
-        Ok(manager) => std::sync::Arc::new(manager),
-        Err(e) => {
-            error!("Failed to initialize upstream manager: {}", e);
-            return Err(e);
-        }
-    };
+    let upstream_manager: std::sync::Arc<UpstreamManager> =
+        match UpstreamManager::new(upstreams, upstream_groups).await {
+            Ok(manager) => std::sync::Arc::new(manager),
+            Err(e) => {
+                error!("Failed to initialize upstream manager: {}", e);
+                return Err(e);
+            }
+        };
 
     // 创建管理服务
     let admin_addr = format!(
