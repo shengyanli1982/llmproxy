@@ -1,9 +1,11 @@
 use crate::{
     api::v1::handlers::utils::{
-        create_upstream_map, find_by_name, not_found_error, success_response,
+        create_upstream_map, find_by_name, log_request_body, log_response_body, not_found_error,
+        success_response,
     },
     api::v1::models::{ErrorResponse, SuccessResponse, UpstreamGroupDetail},
     config::{Config, UpstreamRef},
+    r#const::api::error_types,
 };
 use axum::{
     extract::{Path, State},
@@ -47,7 +49,14 @@ pub async fn list_upstream_groups(
         .collect();
 
     info!("API: Retrieved {} upstream groups", groups.len());
-    Json(SuccessResponse::success_with_data(groups))
+
+    // 构建响应
+    let response = SuccessResponse::success_with_data(groups);
+
+    // 记录响应体
+    log_response_body(&response);
+
+    Json(response)
 }
 
 /// 获取单个上游组详情
@@ -85,9 +94,22 @@ pub async fn get_upstream_group(
             // 转换为详情模型
             let detail = UpstreamGroupDetail::from_config(group, &upstream_map);
             info!("API: Retrieved upstream group '{}'", name);
+
+            // 记录响应体
+            let response = SuccessResponse::success_with_data(&detail);
+            log_response_body(&response);
+
             success_response(&detail)
         }
-        None => not_found_error("Upstream group", &name),
+        None => {
+            let error = ErrorResponse::error(
+                StatusCode::NOT_FOUND,
+                error_types::NOT_FOUND,
+                format!("Upstream group '{}' does not exist", name),
+            );
+            log_response_body(&error);
+            not_found_error("Upstream group", &name)
+        }
     }
 }
 
@@ -122,10 +144,15 @@ pub async fn patch_upstream_group(
     Path(name): Path<String>,
     Json(payload): Json<RequestPatchUpstreamGroupPayload>,
 ) -> Response {
+    // 记录请求体
+    log_request_body(&payload);
+
     // 验证请求体
     if let Err(e) = payload.validate() {
         warn!("API: Invalid PATCH request for group '{}': {}", name, e);
-        return Json(ErrorResponse::from_validation_errors(e)).into_response();
+        let error = ErrorResponse::from_validation_errors(e);
+        log_response_body(&error);
+        return Json(error).into_response();
     }
 
     // 获取写锁
@@ -152,12 +179,13 @@ pub async fn patch_upstream_group(
                         "API: Referenced upstream '{}' not found for group '{}'",
                         upstream_ref.name, name
                     );
-                    return Json(ErrorResponse::error(
+                    let error = ErrorResponse::error(
                         StatusCode::BAD_REQUEST,
-                        "validation_error",
+                        error_types::BAD_REQUEST,
                         format!("Upstream '{}' not found", upstream_ref.name),
-                    ))
-                    .into_response();
+                    );
+                    log_response_body(&error);
+                    return Json(error).into_response();
                 }
             }
 
@@ -174,8 +202,20 @@ pub async fn patch_upstream_group(
             );
 
             info!("API: Updated upstream group '{}'", name);
+
+            // 记录响应体
+            log_response_body(&detail);
+
             success_response(&detail)
         }
-        None => not_found_error("Upstream group", &name),
+        None => {
+            let error = ErrorResponse::error(
+                StatusCode::NOT_FOUND,
+                error_types::NOT_FOUND,
+                format!("Upstream group '{}' does not exist", name),
+            );
+            log_response_body(&error);
+            not_found_error("Upstream group", &name)
+        }
     }
 }

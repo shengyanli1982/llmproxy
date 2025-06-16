@@ -219,6 +219,12 @@ pub mod api {
         // 未授权
         pub const UNAUTHORIZED: &str = "Unauthorized";
         // 未找到
-        pub const NOT_FOUND: &str = "Not Found";
+        pub const NOT_FOUND: &str = "NotFound";
+        // 冲突
+        pub const CONFLICT: &str = "Conflict";
+        // 服务器错误
+        pub const INTERNAL_SERVER_ERROR: &str = "InternalServerError";
+        // 请求错误
+        pub const BAD_REQUEST: &str = "BadRequest";
     }
 }
