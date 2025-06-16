@@ -29,7 +29,7 @@ http_server:
       ratelimit:
         enabled: true # [可选] 是否启用速率限制。默认值: false
         per_second: 100 # [可选] 每秒允许来自单个 IP 的最大请求数。默认值: 100
-        burst: 200 # [可选] 允许来自单个 IP 的突发请求数。默认值: 200。必须 >= per_second。
+        burst: 200 # [可选] 允许来自单个 IP 的突发请求数。默认值: 200。
       # [可选] 连接超时配置。如果省略，将使用全局默认值。
       timeout:
         connect: 10 # [可选] 客户端连接到 LLMProxy 的超时时间 (秒)。默认值: 10

@@ -281,19 +281,19 @@ LLMProxy 采用结构化 YAML 文件进行配置，提供灵活且强大的配�
 
 #### HTTP 服务器配置选项
 
-| 配置项                                        | 类型   | 默认值    | 说明                                   |
-| --------------------------------------------- | ------ | --------- | -------------------------------------- |
-| `http_server.forwards[].name`                 | 字符串 | -         | **[必填]** 转发服务的唯一标识名称      |
-| `http_server.forwards[].port`                 | 整数   | 3000      | **[必填]** 转发服务的监听端口          |
-| `http_server.forwards[].address`              | 字符串 | "0.0.0.0" | 转发服务的绑定网络地址                 |
-| `http_server.forwards[].upstream_group`       | 字符串 | -         | **[必填]** 此转发服务关联的上游组名称  |
-| `http_server.forwards[].ratelimit.enabled`    | 布尔值 | false     | 是否启用速率限制功能                   |
-| `http_server.forwards[].ratelimit.per_second` | 整数   | 100       | 单个 IP 每秒允许的最大请求数           |
-| `http_server.forwards[].ratelimit.burst`      | 整数   | 200       | 单个 IP 允许的突发请求数（缓冲区大小） |
-| `http_server.forwards[].timeout.connect`      | 整数   | 10        | 客户端连接到 LLMProxy 的超时时间（秒） |
-| `http_server.admin.port`                      | 整数   | 9000      | 管理服务的监听端口                     |
-| `http_server.admin.address`                   | 字符串 | "0.0.0.0" | 管理服务的绑定网络地址                 |
-| `http_server.admin.timeout.connect`           | 整数   | 10        | 连接到管理接口的超时时间（秒）         |
+| 配置项                                        | 类型   | 默认值    | 说明                                                        |
+| --------------------------------------------- | ------ | --------- | ----------------------------------------------------------- |
+| `http_server.forwards[].name`                 | 字符串 | -         | **[必填]** 转发服务的唯一标识名称                           |
+| `http_server.forwards[].port`                 | 整数   | 3000      | **[必填]** 转发服务的监听端口                               |
+| `http_server.forwards[].address`              | 字符串 | "0.0.0.0" | 转发服务的绑定网络地址                                      |
+| `http_server.forwards[].upstream_group`       | 字符串 | -         | **[必填]** 此转发服务关联的上游组名称                       |
+| `http_server.forwards[].ratelimit.enabled`    | 布尔值 | false     | 是否启用速率限制功能                                        |
+| `http_server.forwards[].ratelimit.per_second` | 整数   | 100       | 单个 IP 每秒允许的最大请求数（取值范围：1-10000）           |
+| `http_server.forwards[].ratelimit.burst`      | 整数   | 200       | 单个 IP 允许的突发请求数（缓冲区大小）（取值范围：1-20000） |
+| `http_server.forwards[].timeout.connect`      | 整数   | 10        | 客户端连接到 LLMProxy 的超时时间（秒）                      |
+| `http_server.admin.port`                      | 整数   | 9000      | 可选的管理服务监听端口                                      |
+| `http_server.admin.address`                   | 字符串 | "0.0.0.0" | 管理服务的绑定网络地址                                      |
+| `http_server.admin.timeout.connect`           | 整数   | 10        | 连接到管理接口的超时时间（秒）                              |
 
 #### 上游服务配置选项 (Upstream LLM Services)
 
@@ -321,17 +321,17 @@ LLMProxy 采用结构化 YAML 文件进行配置，提供灵活且强大的配�
 | ----------------------------------------------- | ------ | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `upstream_groups[].name`                        | 字符串 | -              | **[必填]** 上游组的唯一标识名称                                                                                                                                            |
 | `upstream_groups[].upstreams[].name`            | 字符串 | -              | **[必填]** 引用的上游 LLM 服务名称，必须在`upstreams`部分已定义                                                                                                            |
-| `upstream_groups[].upstreams[].weight`          | 整数   | 1              | 仅在`balance.strategy`为`weighted_roundrobin`时有效的权重值，用于按比例分配请求                                                                                            |
+| `upstream_groups[].upstreams[].weight`          | 整数   | 1              | 仅在`balance.strategy`为`weighted_roundrobin`时有效的权重值，用于按比例分配请求（取值范围：1-65535）                                                                       |
 | `upstream_groups[].balance.strategy`            | 字符串 | "roundrobin"   | 负载均衡策略：`roundrobin`、`weighted_roundrobin`、`random`、`response_aware`或`failover`                                                                                  |
 | `upstream_groups[].http_client.agent`           | 字符串 | "LLMProxy/1.0" | 发送到上游 LLM 服务的 User-Agent 头部值                                                                                                                                    |
-| `upstream_groups[].http_client.keepalive`       | 整数   | 60             | TCP Keepalive 时间（秒），范围 0-600，0 表示禁用。有助于保持与上游 LLM 服务的连接活跃，减少延迟                                                                            |
+| `upstream_groups[].http_client.keepalive`       | 整数   | 30             | TCP Keepalive 时间（秒），取值范围 5-600，不允许为 0。有助于保持与上游 LLM 服务的连接活跃，减少延迟                                                                        |
 | `upstream_groups[].http_client.stream`          | 布尔值 | true           | 控制请求超时行为。若为 `true` (默认值)，则禁用请求超时，这对于 LLM 流式响应 (Server-Sent Events) **至关重要**。若为 `false`，则 `timeout.request` 生效，适用于非流式调用。 |
-| `upstream_groups[].http_client.timeout.connect` | 整数   | 10             | 连接到上游 LLM 服务的超时时间（秒）                                                                                                                                        |
-| `upstream_groups[].http_client.timeout.request` | 整数   | 300            | 非流式请求的请求超时时间（秒）。仅在 `http_client.stream` 为 `false` 时生效。定义了等待上游完整响应的最长时间。                                                            |
-| `upstream_groups[].http_client.timeout.idle`    | 整数   | 60             | 与上游 LLM 服务的连接在无活动后被视为空闲并关闭的超时时间（秒）                                                                                                            |
+| `upstream_groups[].http_client.timeout.connect` | 整数   | 10             | 连接到上游 LLM 服务的超时时间（秒）（取值范围：1-120）                                                                                                                     |
+| `upstream_groups[].http_client.timeout.request` | 整数   | 300            | 非流式请求的请求超时时间（秒）。仅在 `http_client.stream` 为 `false` 时生效。定义了等待上游完整响应的最长时间。（取值范围：1-1200）                                        |
+| `upstream_groups[].http_client.timeout.idle`    | 整数   | 60             | 与上游 LLM 服务的连接在无活动后被视为空闲并关闭的超时时间（秒）（取值范围：5-1800）                                                                                        |
 | `upstream_groups[].http_client.retry.enabled`   | 布尔值 | false          | 是否启用向上游 LLM 服务的请求重试功能（适用于幂等请求或可安全重试的场景）                                                                                                  |
-| `upstream_groups[].http_client.retry.attempts`  | 整数   | 3              | 最大重试次数（不包括首次尝试）                                                                                                                                             |
-| `upstream_groups[].http_client.retry.initial`   | 整数   | 500            | 首次重试前的初始等待时间（毫秒），后续重试间隔可能采用指数退避策略                                                                                                         |
+| `upstream_groups[].http_client.retry.attempts`  | 整数   | 3              | 最大重试次数（不包括首次尝试）（取值范围：1-100）                                                                                                                          |
+| `upstream_groups[].http_client.retry.initial`   | 整数   | 500            | 首次重试前的初始等待时间（毫秒），后续重试间隔可能采用指数退避策略（取值范围：100-10000）                                                                                  |
 | `upstream_groups[].http_client.proxy.enabled`   | 布尔值 | false          | 是否启用出站代理（LLMProxy 通过此代理连接到上游 LLM 服务）                                                                                                                 |
 | `upstream_groups[].http_client.proxy.url`       | 字符串 | -              | 出站代理服务器 URL (例如 `http://user:pass@proxy.example.com:8080`)                                                                                                        |
 
@@ -348,13 +348,13 @@ http_server:
           ratelimit: # [可选] IP 速率限制
               enabled: true # 是否启用速率限制（默认：false）
               per_second: 100 # 单个IP每秒最大请求数
-              burst: 200 # 单个IP的突发请求容量（必须 >= per_second）
+              burst: 200 # 单个IP的突发请求容量
           timeout: # [可选] 客户端连接超时
               connect: 10 # 客户端连接到 LLMProxy 的超时时间（秒）
 
     # 管理界面配置
     admin:
-        port: 9000 # [必需] 管理界面端口 (用于 /metrics, /health)
+        port: 9000 # [可选] 管理界面端口 (用于 /metrics, /health)
         address: "127.0.0.1" # [可选] 绑定的网络地址（默认："0.0.0.0", 建议生产环境设为 "127.0.0.1"）
         timeout:
             connect: 10 # 连接到管理接口的超时时间（秒）
