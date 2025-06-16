@@ -29,9 +29,9 @@ pub fn success_response<T: Clone + Serialize>(item: &T) -> Response {
 }
 
 /// 创建上游服务名称到配置的引用映射
-pub fn create_upstream_map<'a>(
-    upstreams: &'a [UpstreamConfig],
-) -> HashMap<&'a str, &'a UpstreamConfig> {
+pub fn create_upstream_map(
+    upstreams: &[UpstreamConfig],
+) -> HashMap<&str, &UpstreamConfig> {
     upstreams
         .iter()
         .map(|upstream| (upstream.name.as_str(), upstream))

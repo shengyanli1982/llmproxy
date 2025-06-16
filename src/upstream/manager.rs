@@ -1,27 +1,26 @@
 use crate::{
-    balancer::{create_load_balancer, LoadBalancer, ManagedUpstream},
-    breaker::{create_upstream_circuit_breaker, UpstreamError},
-    config::{
-        AuthConfig, AuthType, HeaderOpType, HttpClientConfig, UpstreamConfig, UpstreamGroupConfig,
-        UpstreamRef,
-    },
+    balancer::LoadBalancer,
+    breaker::UpstreamError,
+    config::{HeaderOpType, UpstreamConfig, UpstreamGroupConfig},
     error::AppError,
     metrics::METRICS,
-    r#const::{
-        balance_strategy_labels, breaker_result_labels, error_labels, retry_limits, upstream_labels,
-    },
+    r#const::{balance_strategy_labels, breaker_result_labels, error_labels, upstream_labels},
 };
+use bytes::Bytes;
 use reqwest::{header::HeaderMap, Method, Response, Url};
 use reqwest_middleware::ClientWithMiddleware;
-use reqwest_retry::{policies::ExponentialBackoff, RetryTransientMiddleware};
-use retry_policies::Jitter;
-use std::future::Future;
 use std::{
     collections::HashMap,
+    future::Future,
     sync::Arc,
     time::{Duration, Instant},
 };
 use tracing::{debug, error, info, warn};
+
+use super::{
+    builder::{build_upstream_map, create_managed_upstream},
+    http_client::{add_auth, create_group_clients},
+};
 
 // 上游管理器
 pub struct UpstreamManager {
@@ -33,106 +32,13 @@ pub struct UpstreamManager {
     group_clients: HashMap<String, ClientWithMiddleware>,
 }
 
-/// 构建上游配置映射
-fn build_upstream_map(upstreams: &[UpstreamConfig]) -> HashMap<String, UpstreamConfig> {
-    let mut upstream_map = HashMap::with_capacity(upstreams.len());
-
-    for upstream in upstreams {
-        debug!(
-            "Loaded upstream: {}, url: {:?}",
-            upstream.name, upstream.url
-        );
-        upstream_map.insert(upstream.name.clone(), upstream.clone());
-    }
-
-    upstream_map
-}
-
-/// 创建托管上游
-fn create_managed_upstream(
-    upstream_ref: &UpstreamRef,
-    upstream_config: &UpstreamConfig,
-    group_name: &str,
-) -> Result<ManagedUpstream, AppError> {
-    // 创建熔断器（如果上游配置了熔断器）
-    let breaker = match &upstream_config.breaker {
-        Some(breaker_config) => {
-            let breaker = create_upstream_circuit_breaker(
-                upstream_ref.name.clone(),
-                group_name.to_string(),
-                breaker_config,
-            );
-            Some(breaker)
-        }
-        None => None,
-    };
-
-    // 创建托管上游
-    let managed_upstream = ManagedUpstream {
-        upstream_ref: upstream_ref.clone(),
-        breaker,
-    };
-
-    Ok(managed_upstream)
-}
-
-/// 为单个上游组构建托管上游列表和负载均衡器
-fn build_group_balancer(
-    group_name: &str,
-    group_config: &UpstreamGroupConfig,
-    upstream_map: &HashMap<String, UpstreamConfig>,
-) -> Result<Arc<dyn LoadBalancer>, AppError> {
-    // 获取组内所有上游的引用
-    let upstream_refs = &group_config.upstreams;
-
-    // 创建托管上游列表
-    let mut managed_upstreams = Vec::with_capacity(upstream_refs.len());
-
-    for upstream_ref in upstream_refs {
-        // 获取完整的上游配置
-        let upstream_config = match upstream_map.get(&upstream_ref.name) {
-            Some(config) => config,
-            None => {
-                return Err(AppError::Config(format!(
-                    "Referenced upstream '{}' not found in upstreams configuration",
-                    upstream_ref.name
-                )));
-            }
-        };
-
-        // 创建托管上游
-        let managed_upstream = create_managed_upstream(upstream_ref, upstream_config, group_name)?;
-        managed_upstreams.push(managed_upstream);
-    }
-
-    // 创建负载均衡器
-    let lb = create_load_balancer(&group_config.balance.strategy, managed_upstreams);
-
-    Ok(lb)
-}
-
-/// 为多个上游组创建HTTP客户端映射
-fn create_group_clients(
-    groups: &[UpstreamGroupConfig],
-) -> Result<HashMap<String, ClientWithMiddleware>, AppError> {
-    let mut group_clients = HashMap::with_capacity(groups.len());
-
-    for group in groups {
-        // 创建该组的HTTP客户端
-        let client = UpstreamManager::create_http_client(&group.http_client)?;
-        group_clients.insert(group.name.clone(), client);
-    }
-
-    Ok(group_clients)
-}
-
 impl UpstreamManager {
     // 创建新的上游管理器
     pub async fn new(
         upstreams: Vec<UpstreamConfig>,
         groups: Vec<UpstreamGroupConfig>,
     ) -> Result<Self, AppError> {
-        let mut upstream_map = build_upstream_map(&upstreams);
+        let upstream_map = build_upstream_map(&upstreams);
         let mut group_map = HashMap::with_capacity(groups.len());
         let group_clients = create_group_clients(&groups)?;
 
@@ -165,7 +71,8 @@ impl UpstreamManager {
             }
 
             // 创建负载均衡器
-            let lb = create_load_balancer(&group.balance.strategy, managed_upstreams);
+            let lb =
+                crate::balancer::create_load_balancer(&group.balance.strategy, managed_upstreams);
 
             group_map.insert(group.name.clone(), lb);
         }
@@ -177,59 +84,6 @@ impl UpstreamManager {
             groups: group_map,
             group_clients,
         })
-    }
-
-    // 创建HTTP客户端
-    fn create_http_client(config: &HttpClientConfig) -> Result<ClientWithMiddleware, AppError> {
-        debug!("Creating HTTP client, config: {:?}", config);
-
-        // 创建 reqwest 客户端
-        let mut client_builder = reqwest::Client::builder()
-            .tcp_keepalive(Some(Duration::from_secs(config.keepalive.into())))
-            .connect_timeout(Duration::from_secs(config.timeout.connect));
-
-        // 如果未启用流式模式，则设置请求超时
-        if !config.stream_mode {
-            client_builder = client_builder.timeout(Duration::from_secs(config.timeout.request));
-        }
-
-        // 设置空闲超时
-        if config.timeout.idle > 0 {
-            client_builder =
-                client_builder.pool_idle_timeout(Some(Duration::from_secs(config.timeout.idle)));
-        }
-
-        // 设置代理
-        if config.proxy.enabled {
-            if let Ok(proxy) = reqwest::Proxy::all(&config.proxy.url) {
-                client_builder = client_builder.proxy(proxy);
-            }
-        }
-
-        // 创建基础HTTP客户端
-        let client = client_builder.build()?;
-
-        // 配置重试策略（根据组的重试配置）
-        let middleware_client = if config.retry.enabled {
-            // 使用指数退避策略，基于组的重试配置
-            let retry_policy = ExponentialBackoff::builder()
-                .retry_bounds(
-                    Duration::from_millis(config.retry.initial.into()),
-                    Duration::from_secs(retry_limits::MAX_DELAY.into()),
-                )
-                .base(2)
-                .jitter(Jitter::Bounded)
-                .build_with_max_retries(config.retry.attempts);
-
-            reqwest_middleware::ClientBuilder::new(client)
-                .with(RetryTransientMiddleware::new_with_policy(retry_policy))
-                .build()
-        } else {
-            // 不进行重试
-            reqwest_middleware::ClientBuilder::new(client).build()
-        };
-
-        Ok(middleware_client)
     }
 
     /// 构建请求URL
@@ -248,7 +102,7 @@ impl UpstreamManager {
     async fn select_upstream_server(
         &self,
         group_name: &str,
-    ) -> Result<(ManagedUpstream, &UpstreamConfig), AppError> {
+    ) -> Result<(crate::balancer::ManagedUpstream, &UpstreamConfig), AppError> {
         // 获取上游组的负载均衡器
         let load_balancer = match self.groups.get(group_name) {
             Some(lb) => lb,
@@ -307,7 +161,7 @@ impl UpstreamManager {
     /// 执行HTTP请求
     async fn execute_request(
         &self,
-        managed_upstream: &ManagedUpstream,
+        managed_upstream: &crate::balancer::ManagedUpstream,
         upstream_url: &str,
         request_future: impl Future<Output = Result<Response, UpstreamError>> + Send,
         group_name: &str,
@@ -362,7 +216,7 @@ impl UpstreamManager {
     fn update_balancer_metrics(
         &self,
         load_balancer: &Arc<dyn LoadBalancer>,
-        managed_upstream: &ManagedUpstream,
+        managed_upstream: &crate::balancer::ManagedUpstream,
         duration: Duration,
     ) {
         // 检查是否为响应时间感知的负载均衡器，更新指标
@@ -384,7 +238,7 @@ impl UpstreamManager {
         method: &Method,
         path: &str,
         headers: HeaderMap,
-        body: Option<bytes::Bytes>,
+        body: Option<Bytes>,
     ) -> Result<Response, AppError> {
         debug!("Forwarding request to upstream group: {}", group_name);
 
@@ -408,7 +262,7 @@ impl UpstreamManager {
 
         // 定义请求执行闭包 - 使用引用捕获以减少克隆
         let upstream_url = &upstream_config.url;
-        let request_future = |headers: HeaderMap, body: Option<bytes::Bytes>| {
+        let request_future = |headers: HeaderMap, body: Option<Bytes>| {
             let url = url.clone();
             let method = method.clone(); // 使用引用的方法，克隆更轻量
             let client = client.clone();
@@ -423,7 +277,7 @@ impl UpstreamManager {
 
                 // 添加认证信息
                 if let Some(ref auth) = upstream_config.auth {
-                    request_builder = self.add_auth(request_builder, auth)?;
+                    request_builder = add_auth(request_builder, auth)?;
                 }
 
                 // 添加请求体（如果有）
@@ -536,30 +390,5 @@ impl UpstreamManager {
         }
 
         Ok(result)
-    }
-
-    // 添加认证信息到请求
-    fn add_auth(
-        &self,
-        request: reqwest_middleware::RequestBuilder,
-        auth: &AuthConfig,
-    ) -> Result<reqwest_middleware::RequestBuilder, AppError> {
-        match auth.r#type {
-            AuthType::Basic => {
-                if let (Some(username), Some(password)) = (&auth.username, &auth.password) {
-                    Ok(request.basic_auth(username, Some(password)))
-                } else {
-                    Err(AppError::AuthError("Basic auth config missing".to_string()))
-                }
-            }
-            AuthType::Bearer => {
-                if let Some(token) = &auth.token {
-                    Ok(request.bearer_auth(token))
-                } else {
-                    Err(AppError::AuthError("Bearer auth token missing".to_string()))
-                }
-            }
-            AuthType::None => Ok(request),
-        }
     }
 }
