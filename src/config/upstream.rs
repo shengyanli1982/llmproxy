@@ -11,6 +11,7 @@ use super::http_client::HttpClientConfig;
 
 /// 上游服务配置
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
+#[serde(rename_all = "lowercase")]
 pub struct UpstreamConfig {
     // 上游服务名称
     #[validate(length(min = 1, message = "Upstream name cannot be empty"))]

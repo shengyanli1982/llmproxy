@@ -1,4 +1,3 @@
-// 导出所有公共模块
 pub mod admin;
 pub mod api;
 pub mod args;
@@ -11,5 +10,4 @@ pub mod metrics;
 pub mod server;
 pub mod upstream;
 
-// 重新导出单例指标
 pub use crate::metrics::METRICS;
