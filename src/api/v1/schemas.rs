@@ -1,12 +1,15 @@
 use crate::{
     api::v1::handlers::{forward, upstream, upstream_group},
-    api::v1::models::{SuccessResponse, ErrorDetail, ErrorResponse, UpstreamGroupDetail},
+    api::v1::models::{
+        ErrorDetail, ErrorResponse, PatchUpstreamGroupPayload, SuccessResponse,
+        UpstreamGroupDetail, UpstreamRef,
+    },
     api::v1::routes::API_V1_PREFIX,
     config::{
         AuthConfig, AuthType, BalanceConfig, BalanceStrategy, BreakerConfig, ForwardConfig,
         HeaderOp, HeaderOpType, HttpClientConfig, HttpClientTimeoutConfig, ProxyConfig,
         RateLimitConfig, RetryConfig, TimeoutConfig, UpstreamConfig, UpstreamGroupConfig,
-        UpstreamRef,
+        UpstreamRef as ConfigUpstreamRef,
     },
 };
 use axum::Router;
@@ -24,9 +27,13 @@ use utoipa_scalar::{Scalar, Servable};
         // 上游组
         upstream_group::list_upstream_groups,
         upstream_group::get_upstream_group,
+        upstream_group::patch_upstream_group,
         // 上游服务
         upstream::list_upstreams,
         upstream::get_upstream,
+        upstream::create_upstream,
+        upstream::update_upstream,
+        upstream::delete_upstream,
     ),
     components(
         schemas(
@@ -58,6 +65,9 @@ use utoipa_scalar::{Scalar, Servable};
             RateLimitConfig,
             RetryConfig,
             TimeoutConfig,
+            ConfigUpstreamRef,
+            // 新增API模型
+            PatchUpstreamGroupPayload,
             UpstreamRef,
         ),
     ),

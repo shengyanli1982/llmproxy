@@ -1,20 +1,47 @@
-// 自定义 Arc<String> 的序列化和反序列化
-pub mod arc_string {
-    use serde::{self, Deserialize, Deserializer, Serializer};
-    use std::sync::Arc;
+use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
+use std::fmt;
+use std::ops::Deref;
+use std::sync::Arc;
 
-    pub fn serialize<S>(value: &Arc<String>, serializer: S) -> Result<S::Ok, S::Error>
+#[derive(Debug, Clone)]
+pub struct SerializableArcString(pub Arc<String>);
+
+impl Deref for SerializableArcString {
+    type Target = String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl fmt::Display for SerializableArcString {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Serialize for SerializableArcString {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        serializer.serialize_str(value.as_ref())
+        self.0.serialize(serializer)
     }
+}
 
-    pub fn deserialize<'de, D>(deserializer: D) -> Result<Arc<String>, D::Error>
+impl<'de> Deserialize<'de> for SerializableArcString {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        let s = String::deserialize(deserializer)?;
-        Ok(Arc::new(s))
+        Ok(SerializableArcString(Arc::new(String::deserialize(
+            deserializer,
+        )?)))
+    }
+}
+
+impl From<String> for SerializableArcString {
+    fn from(s: String) -> Self {
+        Self(Arc::new(s))
     }
 }

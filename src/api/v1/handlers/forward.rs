@@ -1,16 +1,16 @@
 use crate::{
+    api::v1::handlers::utils::{not_found_error, success_response},
     api::v1::models::{ErrorResponse, SuccessResponse},
     config::{Config, ForwardConfig},
-    r#const::api,
 };
 use axum::{
     extract::{Path, State},
-    http::StatusCode,
-    response::{IntoResponse, Response},
+    response::Response,
     Json,
 };
 use std::sync::Arc;
-use tracing::{info, warn};
+use tokio::sync::RwLock;
+use tracing::info;
 
 /// 获取所有转发规则列表
 ///
@@ -25,10 +25,16 @@ use tracing::{info, warn};
     )
 )]
 pub async fn list_forwards(
-    State(config): State<Arc<Config>>,
+    State(config): State<Arc<RwLock<Config>>>,
 ) -> Json<SuccessResponse<Vec<ForwardConfig>>> {
-    let forwards = config.http_server.forwards.clone();
-    info!("API: Retrieved {} forwarding rules", forwards.len());
+    let forwards = config
+        .read()
+        .await
+        .http_server
+        .as_ref()
+        .map(|s| s.forwards.clone())
+        .unwrap_or_default();
+    info!("API: Retrieved {} forward services", forwards.len());
     Json(SuccessResponse::success_with_data(forwards))
 }
 
@@ -49,26 +55,21 @@ pub async fn list_forwards(
     )
 )]
 #[axum::debug_handler]
-pub async fn get_forward(State(config): State<Arc<Config>>, Path(name): Path<String>) -> Response {
-    // 查找指定名称的转发规则
-    match config
+pub async fn get_forward(
+    State(config): State<Arc<RwLock<Config>>>,
+    Path(name): Path<String>,
+) -> Response {
+    let config_read = config.read().await;
+    let forward = config_read
         .http_server
-        .forwards
-        .iter()
-        .find(|forward| forward.name == name)
-    {
+        .as_ref()
+        .and_then(|s| s.forwards.iter().find(|f| f.name == name));
+
+    match forward {
         Some(forward) => {
             info!("API: Retrieved forwarding rule '{}'", name);
-            Json(SuccessResponse::success_with_data(forward.clone())).into_response()
+            success_response(forward)
         }
-        None => {
-            warn!("API: Forwarding rule '{}' not found", name);
-            Json(ErrorResponse::error(
-                StatusCode::NOT_FOUND,
-                api::error_types::NOT_FOUND,
-                format!("Forwarding rule '{}' does not exist", name),
-            ))
-            .into_response()
-        }
+        None => not_found_error("Forwarding rule", &name),
     }
 }

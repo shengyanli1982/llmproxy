@@ -4,6 +4,7 @@ use llmproxy::{
 };
 use mimalloc::MiMalloc;
 use std::process;
+use tokio::sync::RwLock;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemBuilder, Toplevel};
 use tracing::{error, info};
 
@@ -114,27 +115,38 @@ struct AppComponents {
 
 // 创建应用组件
 async fn create_components(debug: bool, config: Config) -> Result<AppComponents, AppError> {
-    // 创建配置的共享引用
-    let config_arc = std::sync::Arc::new(config);
+    // 创建配置的共享引用，使用RwLock包装以支持动态更新
+    let config_arc = std::sync::Arc::new(RwLock::new(config));
+
+    // 在一个读锁范围内获取所有配置，避免多次获取锁
+    let (upstreams, upstream_groups, http_server_config) = {
+        let config_guard = config_arc.read().await;
+        let http_server = config_guard
+            .http_server
+            .clone()
+            .ok_or_else(|| AppError::Config("http_server configuration is missing".to_string()))?;
+
+        (
+            config_guard.upstreams.clone(),
+            config_guard.upstream_groups.clone(),
+            http_server,
+        )
+    };
 
     // 创建上游管理器
-    let upstream_manager: std::sync::Arc<UpstreamManager> = match UpstreamManager::new(
-        config_arc.upstreams.clone(),
-        config_arc.upstream_groups.clone(),
-    )
-    .await
-    {
-        Ok(manager) => std::sync::Arc::new(manager),
-        Err(e) => {
-            error!("Failed to initialize upstream manager: {}", e);
-            return Err(e);
-        }
-    };
+    let upstream_manager: std::sync::Arc<UpstreamManager> =
+        match UpstreamManager::new(upstreams, upstream_groups).await {
+            Ok(manager) => std::sync::Arc::new(manager),
+            Err(e) => {
+                error!("Failed to initialize upstream manager: {}", e);
+                return Err(e);
+            }
+        };
 
     // 创建管理服务
     let admin_addr = format!(
         "{}:{}",
-        config_arc.http_server.admin.address, config_arc.http_server.admin.port
+        http_server_config.admin.address, http_server_config.admin.port
     )
     .parse()
     .map_err(|e| AppError::Config(format!("Invalid admin server address: {}", e)))?;
@@ -142,8 +154,8 @@ async fn create_components(debug: bool, config: Config) -> Result<AppComponents,
     info!("Admin server initialized successfully: {}", admin_addr);
 
     // 创建转发服务
-    let mut forward_servers = Vec::with_capacity(config_arc.http_server.forwards.len());
-    for forward_config in &config_arc.http_server.forwards {
+    let mut forward_servers = Vec::with_capacity(http_server_config.forwards.len());
+    for forward_config in &http_server_config.forwards {
         // 使用克隆避免所有权转移
         match ForwardServer::new(forward_config.clone(), upstream_manager.clone()) {
             Ok(server) => {

@@ -1,15 +1,12 @@
-use llmproxy::{
-    config::{
-        AuthConfig, AuthType, BalanceConfig, BalanceStrategy, BreakerConfig, Config, ForwardConfig,
-        HeaderOp, HeaderOpType, HttpClientConfig, HttpClientTimeoutConfig, ProxyConfig,
-        RateLimitConfig, RetryConfig, TimeoutConfig, UpstreamConfig, UpstreamGroupConfig,
-        UpstreamRef,
-    },
-    error::AppError,
+use llmproxy::config::{
+    AdminConfig, AuthConfig, AuthType, BalanceConfig, BalanceStrategy, Config, ForwardConfig,
+    HttpClientConfig, HttpServerConfig, RateLimitConfig, TimeoutConfig, UpstreamConfig,
+    UpstreamGroupConfig, UpstreamRef,
 };
 use std::fs::File;
 use std::io::Write;
 use tempfile::tempdir;
+use validator::Validate;
 
 // 创建有效的测试配置
 fn create_valid_test_config() -> Config {
@@ -18,23 +15,9 @@ fn create_valid_test_config() -> Config {
         url: "http://localhost:8080".to_string().into(),
         weight: 1,
         http_client: HttpClientConfig::default(),
-        auth: Some(AuthConfig {
-            r#type: AuthType::Bearer,
-            token: Some("test_token".to_string()),
-            username: None,
-            password: None,
-        }),
-        headers: vec![HeaderOp {
-            op: HeaderOpType::Insert,
-            key: "X-Test-Header".to_string(),
-            value: Some("test-value".to_string()),
-            parsed_name: None,
-            parsed_value: None,
-        }],
-        breaker: Some(BreakerConfig {
-            threshold: 0.5,
-            cooldown: 30,
-        }),
+        auth: None,
+        headers: vec![],
+        breaker: None,
     };
 
     let upstream_ref = UpstreamRef {
@@ -48,25 +31,7 @@ fn create_valid_test_config() -> Config {
         balance: BalanceConfig {
             strategy: BalanceStrategy::RoundRobin,
         },
-        http_client: HttpClientConfig {
-            agent: "Test-Agent".to_string(),
-            keepalive: 30,
-            timeout: HttpClientTimeoutConfig {
-                connect: 5,
-                request: 30,
-                idle: 60,
-            },
-            retry: RetryConfig {
-                enabled: false,
-                attempts: 1,
-                initial: 500,
-            },
-            proxy: ProxyConfig {
-                enabled: false,
-                url: "".to_string(),
-            },
-            stream_mode: false,
-        },
+        http_client: HttpClientConfig::default(),
     };
 
     let forward_config = ForwardConfig {
@@ -83,14 +48,14 @@ fn create_valid_test_config() -> Config {
     };
 
     Config {
-        http_server: llmproxy::config::HttpServerConfig {
+        http_server: Some(HttpServerConfig {
             forwards: vec![forward_config],
-            admin: llmproxy::config::AdminConfig {
+            admin: AdminConfig {
                 port: 9000,
                 address: "127.0.0.1".to_string(),
                 timeout: TimeoutConfig { connect: 5 },
             },
-        },
+        }),
         upstreams: vec![upstream_config],
         upstream_groups: vec![group_config],
     }
@@ -121,8 +86,8 @@ fn test_config_validation_duplicate_names() {
 
     let result = config.validate();
     assert!(result.is_err());
-    if let Err(AppError::Config(msg)) = result {
-        assert!(msg.contains("duplicated"));
+    if let Err(e) = result {
+        assert!(e.to_string().contains("Duplicate"));
     } else {
         panic!("Expected Config error for duplicate name");
     }
@@ -135,10 +100,11 @@ fn test_config_validation_invalid_url() {
     // 设置无效的URL
     config.upstreams[0].url = "invalid-url".to_string().into();
 
+    // 现在我们期望 config.validate() 能够捕获 URL 错误
     let result = config.validate();
     assert!(result.is_err());
-    if let Err(AppError::Config(msg)) = result {
-        assert!(msg.contains("invalid"));
+    if let Err(e) = result {
+        assert!(e.to_string().contains("URL"));
     } else {
         panic!("Expected Config error for invalid URL");
     }
@@ -148,15 +114,19 @@ fn test_config_validation_invalid_url() {
 fn test_config_validation_invalid_breaker_config() {
     let mut config = create_valid_test_config();
 
-    // 设置无效的熔断器阈值
-    if let Some(breaker) = &mut config.upstreams[0].breaker {
-        breaker.threshold = 2.0; // 超出有效范围
-    }
+    // 先创建一个熔断器配置并赋值给 breaker 字段
+    use llmproxy::config::BreakerConfig;
+    use llmproxy::r#const::breaker_limits;
+
+    config.upstreams[0].breaker = Some(BreakerConfig {
+        threshold: breaker_limits::MAX_THRESHOLD + 1.0, // 超出有效范围
+        cooldown: breaker_limits::DEFAULT_COOLDOWN,
+    });
 
     let result = config.validate();
     assert!(result.is_err());
-    if let Err(AppError::Config(msg)) = result {
-        assert!(msg.contains("threshold"));
+    if let Err(e) = result {
+        assert!(e.to_string().contains("threshold"));
     } else {
         panic!("Expected Config error for invalid breaker threshold");
     }
@@ -176,8 +146,8 @@ fn test_config_validation_invalid_auth_config() {
 
     let result = config.validate();
     assert!(result.is_err());
-    if let Err(AppError::Config(msg)) = result {
-        assert!(msg.contains("token"));
+    if let Err(e) = result {
+        assert!(e.to_string().contains("token"));
     } else {
         panic!("Expected Config error for invalid auth config");
     }
@@ -203,8 +173,8 @@ fn test_config_validation_missing_upstream_reference() {
 
     let result = config.validate();
     assert!(result.is_err());
-    if let Err(AppError::Config(msg)) = result {
-        assert!(msg.contains("non_existent_upstream"));
+    if let Err(e) = result {
+        assert!(e.to_string().contains("non_existent_upstream"));
     } else {
         panic!("Expected Config error for missing upstream reference");
     }
@@ -233,8 +203,8 @@ fn test_config_from_file() {
         config.upstream_groups.len()
     );
     assert_eq!(
-        loaded_config.http_server.forwards.len(),
-        config.http_server.forwards.len()
+        loaded_config.http_server.as_ref().unwrap().forwards.len(),
+        config.http_server.as_ref().unwrap().forwards.len()
     );
 
     // 验证上游名称
@@ -244,7 +214,10 @@ fn test_config_from_file() {
     assert_eq!(loaded_config.upstream_groups[0].name, "test_group");
 
     // 验证转发服务名称
-    assert_eq!(loaded_config.http_server.forwards[0].name, "test_forward");
+    assert_eq!(
+        loaded_config.http_server.unwrap().forwards[0].name,
+        "test_forward"
+    );
 }
 
 #[test]
@@ -265,4 +238,26 @@ fn test_config_from_file_invalid_content() {
 
     let result = Config::from_file(&file_path);
     assert!(result.is_err());
+}
+
+#[test]
+fn test_load_config_from_file_with_http_server() {
+    let temp_dir = tempdir().unwrap();
+    let file_path = temp_dir.path().join("test_config.yaml");
+
+    let config = create_valid_test_config();
+    let yaml = serde_yaml::to_string(&config).unwrap();
+    let mut file = File::create(&file_path).unwrap();
+    file.write_all(yaml.as_bytes()).unwrap();
+
+    let loaded_config = Config::from_file(file_path.to_str().unwrap()).unwrap();
+
+    assert_eq!(
+        loaded_config.http_server.as_ref().unwrap().forwards.len(),
+        config.http_server.as_ref().unwrap().forwards.len()
+    );
+    assert_eq!(
+        loaded_config.http_server.unwrap().forwards[0].name,
+        "test_forward"
+    );
 }

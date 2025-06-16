@@ -5,7 +5,7 @@ use crate::metrics::METRICS;
 use crate::server::create_tcp_listener;
 use async_trait::async_trait;
 use axum::{
-    http::StatusCode,
+    http::{header, StatusCode},
     response::{IntoResponse, Response},
     routing::get,
     Router,
@@ -13,6 +13,7 @@ use axum::{
 use prometheus::{Encoder, TextEncoder};
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemHandle};
 use tracing::{error, info};
 
@@ -26,12 +27,12 @@ pub struct AdminServer {
     // 监听地址
     addr: SocketAddr,
     // 配置
-    config: Arc<Config>,
+    config: Arc<RwLock<Config>>,
 }
 
 impl AdminServer {
     // 创建新的管理服务
-    pub fn new(debug: bool, addr: SocketAddr, config: Arc<Config>) -> Self {
+    pub fn new(debug: bool, addr: SocketAddr, config: Arc<RwLock<Config>>) -> Self {
         Self {
             addr,
             config,
@@ -102,12 +103,11 @@ async fn metrics_handler() -> Response {
         return StatusCode::INTERNAL_SERVER_ERROR.into_response();
     }
 
-    // 返回指标
-    match String::from_utf8(buffer) {
-        Ok(metrics_text) => (StatusCode::OK, metrics_text).into_response(),
-        Err(e) => {
-            error!("Metrics UTF-8 conversion failed: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR.into_response()
-        }
-    }
+    // Prometheus指标数据总是有效的UTF-8，所以可以直接返回字节
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        buffer,
+    )
+        .into_response()
 }

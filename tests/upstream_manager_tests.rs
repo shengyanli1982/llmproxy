@@ -1,8 +1,7 @@
 use llmproxy::{
     config::{
         BalanceConfig, BalanceStrategy, BreakerConfig, HeaderOp, HeaderOpType, HttpClientConfig,
-        HttpClientTimeoutConfig, ProxyConfig, RetryConfig, UpstreamConfig, UpstreamGroupConfig,
-        UpstreamRef,
+        UpstreamConfig, UpstreamGroupConfig, UpstreamRef,
     },
     upstream::UpstreamManager,
 };
@@ -74,25 +73,7 @@ fn create_test_configs(
         balance: BalanceConfig {
             strategy: BalanceStrategy::RoundRobin,
         },
-        http_client: HttpClientConfig {
-            agent: "Test-Agent".to_string(),
-            keepalive: 30,
-            timeout: HttpClientTimeoutConfig {
-                connect: 5,
-                request: 30,
-                idle: 60,
-            },
-            retry: RetryConfig {
-                enabled: false,
-                attempts: 1,
-                initial: 500,
-            },
-            proxy: ProxyConfig {
-                enabled: false,
-                url: "".to_string(),
-            },
-            stream_mode: false,
-        },
+        http_client: HttpClientConfig::default(),
     };
 
     (vec![upstream1, upstream2], vec![group_config])
@@ -129,7 +110,7 @@ async fn test_upstream_manager_with_circuit_breaker() {
         let result = upstream_manager
             .forward_request(
                 "test_group",
-                Method::GET,
+                &Method::GET,
                 "/test",
                 reqwest::header::HeaderMap::new(),
                 None,
@@ -150,7 +131,7 @@ async fn test_upstream_manager_with_circuit_breaker() {
     let _result = upstream_manager
         .forward_request(
             "test_group",
-            Method::GET,
+            &Method::GET,
             "/test",
             reqwest::header::HeaderMap::new(),
             None,
@@ -167,7 +148,7 @@ async fn test_upstream_manager_with_circuit_breaker() {
         let result = upstream_manager
             .forward_request(
                 "test_group",
-                Method::GET,
+                &Method::GET,
                 "/test",
                 reqwest::header::HeaderMap::new(),
                 None,
@@ -189,7 +170,7 @@ async fn test_upstream_manager_with_circuit_breaker() {
         let _ = upstream_manager
             .forward_request(
                 "test_group",
-                Method::GET,
+                &Method::GET,
                 "/test",
                 reqwest::header::HeaderMap::new(),
                 None,
@@ -204,7 +185,7 @@ async fn test_upstream_manager_with_circuit_breaker() {
     let _result = upstream_manager
         .forward_request(
             "test_group",
-            Method::GET,
+            &Method::GET,
             "/test",
             reqwest::header::HeaderMap::new(),
             None,
@@ -227,7 +208,7 @@ async fn test_upstream_manager_with_circuit_breaker() {
     let result = upstream_manager
         .forward_request(
             "test_group",
-            Method::GET,
+            &Method::GET,
             "/test",
             reqwest::header::HeaderMap::new(),
             None,
@@ -272,7 +253,7 @@ async fn test_upstream_manager_without_circuit_breaker() {
         let result = upstream_manager
             .forward_request(
                 "test_group",
-                Method::GET,
+                &Method::GET,
                 "/test",
                 reqwest::header::HeaderMap::new(),
                 None,

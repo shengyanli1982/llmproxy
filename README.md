@@ -851,13 +851,13 @@ These endpoints are defined by the `http_server.admin` configuration block, by d
 ![openapi_ui](./images/openapi-ui.png)
 _Figure: OpenAPI UI Example_
 
-For enhanced operational visibility and easier debugging, the admin service provides a comprehensive, read-only Configuration Management API(**Write operations will be supported in future versions**). This RESTful API allows you to inspect the live, in-memory configuration of LLMProxy at any time, which is invaluable for auditing, troubleshooting, and integration with automated operational workflows.
+For enhanced operational visibility and easier debugging, the admin service provides a comprehensive Configuration Management API. This RESTful API allows you to inspect and modify the live, in-memory configuration of LLMProxy at any time without service restart, which is invaluable for auditing, troubleshooting, dynamic reconfiguration, and integration with automated operational workflows.
 
 The API is versioned under the `/api/v1` path prefix. For security, access to these `api endpoints` can be protected by setting the `LLMPROXY_ADMIN_AUTH_TOKEN` environment variable, which enforces `Bearer Token` authentication.
 
 **API Endpoints**
 
-The API offers a structured set of endpoints to retrieve detailed information about all key configuration entities:
+The API offers a structured set of endpoints to retrieve and modify all key configuration entities:
 
 -   **Forwards**:
     -   `GET /api/v1/forwards`: Retrieves a list of all configured forward services.
@@ -865,9 +865,22 @@ The API offers a structured set of endpoints to retrieve detailed information ab
 -   **Upstream Groups**:
     -   `GET /api/v1/upstream-groups`: Lists all configured upstream groups.
     -   `GET /api/v1/upstream-groups/{name}`: Fetches the details of a specific group.
+    -   `PATCH /api/v1/upstream-groups/{name}`: Updates the upstreams list of a specific group. This operation atomically replaces the entire upstreams list with the new one provided.
 -   **Upstreams**:
     -   `GET /api/v1/upstreams`: Lists all configured upstream services.
     -   `GET /api/v1/upstreams/{name}`: Fetches the details of a specific upstream.
+    -   `POST /api/v1/upstreams`: Creates a new upstream service.
+    -   `PUT /api/v1/upstreams/{name}`: Updates an existing upstream service.
+    -   `DELETE /api/v1/upstreams/{name}`: Deletes an upstream service (with dependency protection to prevent deletion if the service is referenced by any upstream group).
+
+**Dynamic Configuration**
+
+The dynamic configuration API enables hot-reloading of LLMProxy's configuration without service restart:
+
+-   **Upstream Service Management**: Create, update, or delete upstream services on-the-fly.
+-   **Upstream Group Management**: Reconfigure upstream groups by modifying their upstreams list.
+-   **Dependency Protection**: Built-in safeguards prevent breaking changes, such as deleting an upstream that's currently in use.
+-   **Configuration Consistency**: All modifications maintain the integrity of LLMProxy's configuration.
 
 **Interactive OpenAPI UI**
 

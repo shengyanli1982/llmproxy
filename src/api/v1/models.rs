@@ -5,6 +5,7 @@ use crate::{
 use axum::{http::StatusCode, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use validator::ValidationErrors;
 
 /// 错误详情结构
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -49,6 +50,22 @@ pub struct UpstreamGroupDetail {
     pub balance: crate::config::BalanceConfig,
     /// HTTP 客户端配置
     pub http_client: crate::config::HttpClientConfig,
+}
+
+/// 上游组PATCH操作的请求体
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+pub struct PatchUpstreamGroupPayload {
+    /// 上游服务引用列表
+    pub upstreams: Vec<UpstreamRef>,
+}
+
+/// 上游服务引用
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+pub struct UpstreamRef {
+    /// 上游服务名称
+    pub name: String,
+    /// 权重
+    pub weight: u32,
 }
 
 impl SuccessResponse<()> {
@@ -97,6 +114,30 @@ impl ErrorResponse {
             },
         }
     }
+
+    /// 从验证错误创建响应
+    pub fn from_validation_errors(errors: ValidationErrors) -> Self {
+        // 将所有验证错误平铺为一条消息
+        let message = errors
+            .field_errors()
+            .into_iter()
+            .map(|(field, errors)| {
+                let messages: Vec<String> = errors
+                    .iter()
+                    .map(|e| {
+                        e.message
+                            .as_ref()
+                            .map(|m| m.to_string())
+                            .unwrap_or_default()
+                    })
+                    .collect();
+                format!("{}: {}", field, messages.join(", "))
+            })
+            .collect::<Vec<String>>()
+            .join("; ");
+
+        Self::error(StatusCode::BAD_REQUEST, "validation_error", message)
+    }
 }
 
 impl IntoResponse for ErrorResponse {
@@ -112,12 +153,16 @@ impl UpstreamGroupDetail {
     /// 创建一个新的上游组详情，需要提供上游组配置和所有上游配置的映射
     pub fn from_config(
         group: &UpstreamGroupConfig,
-        upstream_map: &std::collections::HashMap<String, UpstreamConfig>,
+        upstream_map: &std::collections::HashMap<&str, &UpstreamConfig>,
     ) -> Self {
         let upstreams = group
             .upstreams
             .iter()
-            .filter_map(|upstream_ref| upstream_map.get(&upstream_ref.name).cloned())
+            .filter_map(|upstream_ref| {
+                upstream_map
+                    .get(&upstream_ref.name.as_str())
+                    .map(|&u| u.clone())
+            })
             .collect();
 
         Self {

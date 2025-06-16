@@ -23,19 +23,23 @@ use std::io::Read;
 use std::path::Path;
 use tracing::debug;
 use utoipa::ToSchema;
+use validator::Validate;
 
 // 配置文件结构
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
+#[validate(schema(function = "validation::validate_config"))]
 pub struct Config {
     // HTTP服务器配置
     #[serde(default)]
-    pub http_server: HttpServerConfig,
+    #[validate(nested)]
+    pub http_server: Option<HttpServerConfig>,
     // 上游定义
     #[serde(default)]
+    #[validate(nested)]
     pub upstreams: Vec<UpstreamConfig>,
     // 上游组定义
     #[serde(default)]
+    #[validate(nested)]
     pub upstream_groups: Vec<UpstreamGroupConfig>,
 }
 
@@ -69,13 +73,15 @@ impl Config {
         config.post_process()?;
 
         // 验证配置
-        config.validate()?;
+        config
+            .validate()
+            .map_err(|e| AppError::Config(format!("Configuration validation error: {}", e)))?;
 
         Ok(config)
     }
 
     // 预处理配置，例如预解析头部
-    fn post_process(&mut self) -> Result<(), AppError> {
+    pub fn post_process(&mut self) -> Result<(), AppError> {
         for upstream in &mut self.upstreams {
             for op in &mut upstream.headers {
                 // 预解析头部名称

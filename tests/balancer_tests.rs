@@ -229,7 +229,7 @@ async fn test_load_balancer_with_upstream_manager() {
     let response1 = upstream_manager
         .forward_request(
             "test_group",
-            reqwest::Method::GET,
+            &reqwest::Method::GET,
             "/test",
             reqwest::header::HeaderMap::new(),
             None,
@@ -242,7 +242,7 @@ async fn test_load_balancer_with_upstream_manager() {
     let response2 = upstream_manager
         .forward_request(
             "test_group",
-            reqwest::Method::GET,
+            &reqwest::Method::GET,
             "/test",
             reqwest::header::HeaderMap::new(),
             None,
@@ -321,7 +321,7 @@ async fn test_load_balancer_with_unavailable_upstream() {
     let response = upstream_manager
         .forward_request(
             "test_group",
-            reqwest::Method::GET,
+            &reqwest::Method::GET,
             "/test",
             reqwest::header::HeaderMap::new(),
             None,
@@ -562,7 +562,7 @@ async fn test_response_aware_with_upstream_manager() {
         let response = upstream_manager
             .forward_request(
                 "test_group",
-                reqwest::Method::GET,
+                &reqwest::Method::GET,
                 "/test",
                 reqwest::header::HeaderMap::new(),
                 None,

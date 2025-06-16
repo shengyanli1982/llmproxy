@@ -1,43 +1,60 @@
 use crate::config::common::BreakerConfig;
 use crate::config::defaults::default_weight;
-use crate::config::serializer::arc_string;
+use crate::config::serializer::SerializableArcString;
+use crate::config::validation;
 use reqwest::header::{HeaderName, HeaderValue};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use utoipa::ToSchema;
+use validator::{Validate, ValidationError};
 
 use super::http_client::HttpClientConfig;
 
 /// 上游服务配置
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 pub struct UpstreamConfig {
     // 上游服务名称
+    #[validate(length(min = 1, message = "Upstream name cannot be empty"))]
     pub name: String,
     // 上游服务地址
-    #[serde(with = "arc_string")]
     #[schema(value_type = String)]
-    pub url: Arc<String>,
+    #[validate(custom(function = "validate_url"))]
+    pub url: SerializableArcString,
     // 权重
+    #[validate(range(min = 1, max = 65535, message = "Weight must be between 1 and 65535"))]
     #[serde(default = "default_weight")]
     pub weight: u32,
     // 认证配置
     #[serde(default)]
+    #[validate(nested)]
     pub auth: Option<AuthConfig>,
     // HTTP 客户端配置
     #[serde(default)]
+    #[validate(nested)]
     pub http_client: HttpClientConfig,
     // 请求头操作
     #[serde(default)]
+    #[validate(nested)]
     pub headers: Vec<HeaderOp>,
     // 熔断器配置
     #[serde(default)]
+    #[validate(nested)]
     pub breaker: Option<BreakerConfig>,
 }
 
-// 认证配置
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+// URL 自定义验证函数
+fn validate_url(url: &SerializableArcString) -> Result<(), ValidationError> {
+    if url::Url::parse(url.as_ref()).is_err() {
+        let mut err = ValidationError::new("invalid_url");
+        err.message = Some("Upstream URL is invalid".into());
+        return Err(err);
+    }
+    Ok(())
+}
 
+// 认证配置
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
+#[validate(schema(function = "validation::validate_auth_config"))]
+#[serde(rename_all = "lowercase")]
 pub struct AuthConfig {
     // 认证类型
     #[serde(default)]
@@ -73,6 +90,7 @@ impl Default for AuthType {
 
 /// HTTP 请求头操作类型
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Copy, ToSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum HeaderOpType {
     // 插入
     Insert,
@@ -83,10 +101,12 @@ pub enum HeaderOpType {
 }
 
 // 请求头操作
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
+#[validate(schema(function = "validation::validate_header_op"))]
+#[serde(rename_all = "lowercase")]
 pub struct HeaderOp {
     pub op: HeaderOpType,
+    #[validate(length(min = 1, message = "Header key cannot be empty"))]
     pub key: String,
     pub value: Option<String>,
     #[serde(skip)]

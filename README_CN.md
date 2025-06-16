@@ -847,13 +847,13 @@ LLMProxy 对外暴露以下主要类型的 HTTP API 端点：
 ![openapi_ui](./images/openapi-ui.png)
 _图：OpenAPI UI 示意图_
 
-为了增强运维过程中的可观测性并简化调试，管理服务提供了一套全面的、只读的配置管理 API(**写入操作将在未来版本中支持**)。这套 RESTful API 允许您随时检查 LLMProxy 在内存中运行的实时配置，这对于配置审计、问题排查以及与自动化运维流程集成而言至关重要。
+为了增强运维过程中的可观测性与灵活性，管理服务提供了一套全面的配置管理 API。这套 RESTful API 允许您随时检查和修改 LLMProxy 在内存中运行的实时配置，无需重启服务，这对于配置审计、问题排查、动态重配置以及与自动化运维流程集成而言至关重要。
 
 该 API 统一以 `/api/v1` 作为路径前缀进行版本管理。为确保安全，您可以通过设置 `LLMPROXY_ADMIN_AUTH_TOKEN` 环境变量来启用 `Bearer Token` 认证，从而保护这些 `API 端点` 的访问。
 
 **API 端点**
 
-API 提供了一组结构化的端点，用于获取所有关键配置实体的详细信息：
+API 提供了一组结构化的端点，用于获取和修改所有关键配置实体的详细信息：
 
 -   **转发服务 (Forwards)**：
     -   `GET /api/v1/forwards`: 获取所有已配置的转发服务列表。
@@ -861,9 +861,22 @@ API 提供了一组结构化的端点，用于获取所有关键配置实体的�
 -   **上游组 (Upstream Groups)**：
     -   `GET /api/v1/upstream-groups`: 列出所有已配置的上游组。
     -   `GET /api/v1/upstream-groups/{name}`: 获取特定上游组的详细信息。
+    -   `PATCH /api/v1/upstream-groups/{name}`: 更新特定上游组的上游服务列表。此操作会原子性地用新提供的列表替换整个上游服务列表。
 -   **上游服务 (Upstreams)**：
     -   `GET /api/v1/upstreams`: 列出所有已配置的上游服务。
     -   `GET /api/v1/upstreams/{name}`: 获取特定上游服务的详细信息。
+    -   `POST /api/v1/upstreams`: 创建新的上游服务。
+    -   `PUT /api/v1/upstreams/{name}`: 更新已存在的上游服务。
+    -   `DELETE /api/v1/upstreams/{name}`: 删除上游服务（具有依赖保护机制，防止删除仍被上游组引用的服务）。
+
+**动态配置**
+
+动态配置 API 实现了 LLMProxy 配置的热重载，无需重启服务：
+
+-   **上游服务管理**：随时创建、更新或删除上游服务。
+-   **上游组管理**：通过修改其上游服务列表来重新配置上游组。
+-   **依赖保护**：内置安全机制防止破坏性变更，例如删除当前正在使用的上游服务。
+-   **配置一致性**：所有修改都会保持 LLMProxy 配置的完整性。
 
 **交互式 OpenAPI UI**
 
