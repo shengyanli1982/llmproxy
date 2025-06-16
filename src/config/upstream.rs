@@ -54,6 +54,7 @@ fn validate_url(url: &SerializableArcString) -> Result<(), ValidationError> {
 // 认证配置
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 #[validate(schema(function = "validation::validate_auth_config"))]
+#[serde(rename_all = "lowercase")]
 pub struct AuthConfig {
     // 认证类型
     #[serde(default)]
@@ -89,6 +90,7 @@ impl Default for AuthType {
 
 /// HTTP 请求头操作类型
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone, Copy, ToSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum HeaderOpType {
     // 插入
     Insert,
@@ -101,6 +103,7 @@ pub enum HeaderOpType {
 // 请求头操作
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 #[validate(schema(function = "validation::validate_header_op"))]
+#[serde(rename_all = "lowercase")]
 pub struct HeaderOp {
     pub op: HeaderOpType,
     #[validate(length(min = 1, message = "Header key cannot be empty"))]

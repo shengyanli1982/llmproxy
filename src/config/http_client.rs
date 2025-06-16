@@ -16,6 +16,7 @@ use validator::Validate;
 /// HTTP客户端配置
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 #[validate(schema(function = "validation::validate_http_client_config"))]
+#[serde(rename_all = "lowercase")]
 pub struct HttpClientConfig {
     /// 超时配置
     #[serde(default)]
@@ -55,6 +56,7 @@ impl Default for HttpClientConfig {
 
 /// HTTP客户端超时配置
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
+#[serde(rename_all = "lowercase")]
 pub struct HttpClientTimeoutConfig {
     /// 连接超时（秒）
     #[serde(default = "default_connect_timeout")]

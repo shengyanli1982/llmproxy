@@ -6,6 +6,7 @@ use validator::Validate;
 
 // HTTP服务器配置
 #[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema, Validate)]
+#[serde(rename_all = "lowercase")]
 pub struct HttpServerConfig {
     // 转发服务配置
     #[serde(default)]
@@ -19,6 +20,7 @@ pub struct HttpServerConfig {
 
 // 转发服务配置
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
+#[serde(rename_all = "lowercase")]
 pub struct ForwardConfig {
     // 转发服务名称
     #[validate(length(min = 1, message = "Forward service name cannot be empty"))]
@@ -44,6 +46,7 @@ pub struct ForwardConfig {
 
 // 管理服务配置
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
+#[serde(rename_all = "lowercase")]
 pub struct AdminConfig {
     // 监听端口
     #[serde(default = "default_admin_port")]

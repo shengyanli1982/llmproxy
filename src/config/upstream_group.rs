@@ -9,6 +9,7 @@ use validator::Validate;
 // 上游组配置
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 #[validate(schema(function = "validation::validate_weighted_round_robin"))]
+#[serde(rename_all = "lowercase")]
 pub struct UpstreamGroupConfig {
     // 上游组名称
     #[validate(length(min = 1, message = "Upstream group name cannot be empty"))]
@@ -27,6 +28,7 @@ pub struct UpstreamGroupConfig {
 
 // 上游引用
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
+#[serde(rename_all = "lowercase")]
 pub struct UpstreamRef {
     // 上游名称
     #[validate(length(min = 1, message = "Upstream name in group cannot be empty"))]
@@ -39,6 +41,7 @@ pub struct UpstreamRef {
 
 // 负载均衡策略配置
 #[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema)]
+#[serde(rename_all = "lowercase")]
 pub struct BalanceConfig {
     // 策略类型
     #[serde(default)]
