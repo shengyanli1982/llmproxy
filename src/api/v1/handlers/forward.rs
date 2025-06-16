@@ -1,5 +1,5 @@
 use crate::{
-    api::v1::handlers::utils::{not_found_error, success_response},
+    api::v1::handlers::utils::{log_response_body, not_found_error, success_response},
     api::v1::models::{ErrorResponse, SuccessResponse},
     config::{Config, ForwardConfig},
 };
@@ -35,7 +35,14 @@ pub async fn list_forwards(
         .map(|s| s.forwards.clone())
         .unwrap_or_default();
     info!("API: Retrieved {} forward services", forwards.len());
-    Json(SuccessResponse::success_with_data(forwards))
+
+    // 构建响应
+    let response = SuccessResponse::success_with_data(forwards);
+
+    // 记录响应体
+    log_response_body(&response);
+
+    Json(response)
 }
 
 /// 获取单个转发规则详情
@@ -68,8 +75,21 @@ pub async fn get_forward(
     match forward {
         Some(forward) => {
             info!("API: Retrieved forwarding rule '{}'", name);
+
+            // 记录响应体
+            let response = SuccessResponse::success_with_data(forward.clone());
+            log_response_body(&response);
+
             success_response(forward)
         }
-        None => not_found_error("Forwarding rule", &name),
+        None => {
+            let error = ErrorResponse::error(
+                axum::http::StatusCode::NOT_FOUND,
+                "not_found",
+                format!("Forwarding rule '{}' does not exist", name),
+            );
+            log_response_body(&error);
+            not_found_error("Forwarding rule", &name)
+        }
     }
 }

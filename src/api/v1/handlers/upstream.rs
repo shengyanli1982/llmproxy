@@ -1,8 +1,10 @@
 use crate::{
-    api::v1::handlers::utils::{find_by_name, not_found_error, success_response},
+    api::v1::handlers::utils::{
+        find_by_name, log_request_body, log_response_body, not_found_error, success_response,
+    },
     api::v1::models::{ErrorResponse, SuccessResponse},
     config::{Config, UpstreamConfig},
-    r#const::api,
+    r#const::api::error_types,
 };
 use axum::{
     extract::{Path, State},
@@ -12,7 +14,7 @@ use axum::{
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use validator::Validate;
 
 /// 获取所有上游服务列表
@@ -32,7 +34,14 @@ pub async fn list_upstreams(
 ) -> Json<SuccessResponse<Vec<UpstreamConfig>>> {
     let upstreams = config.read().await.upstreams.clone();
     info!("API: Retrieved {} upstream services", upstreams.len());
-    Json(SuccessResponse::success_with_data(upstreams))
+
+    // 构建响应
+    let response = SuccessResponse::success_with_data(upstreams);
+
+    // 记录响应体
+    log_response_body(&response);
+
+    Json(response)
 }
 
 /// 获取单个上游服务详情
@@ -63,9 +72,22 @@ pub async fn get_upstream(
     match upstream {
         Some(upstream) => {
             info!("API: Retrieved upstream service '{}'", name);
+
+            // 记录响应体
+            let response = SuccessResponse::success_with_data(upstream.clone());
+            log_response_body(&response);
+
             success_response(upstream)
         }
-        None => not_found_error("Upstream service", &name),
+        None => {
+            let error = ErrorResponse::error(
+                StatusCode::NOT_FOUND,
+                error_types::NOT_FOUND,
+                format!("Upstream service '{}' does not exist", name),
+            );
+            log_response_body(&error);
+            not_found_error("Upstream service", &name)
+        }
     }
 }
 
@@ -88,10 +110,15 @@ pub async fn create_upstream(
     State(config): State<Arc<RwLock<Config>>>,
     Json(new_upstream): Json<UpstreamConfig>,
 ) -> Response {
+    // 记录请求体
+    log_request_body(&new_upstream);
+
     // 验证上游服务配置
     if let Err(e) = new_upstream.validate() {
         warn!("API: Upstream validation failed: {}", e);
-        return Json(ErrorResponse::from_validation_errors(e)).into_response();
+        let error = ErrorResponse::from_validation_errors(e);
+        log_response_body(&error);
+        return Json(error).into_response();
     }
 
     // 获取写锁
@@ -104,12 +131,13 @@ pub async fn create_upstream(
         .any(|u| u.name == new_upstream.name)
     {
         warn!("API: Upstream '{}' already exists", new_upstream.name);
-        return Json(ErrorResponse::error(
+        let error = ErrorResponse::error(
             StatusCode::CONFLICT,
-            "conflict",
+            error_types::CONFLICT,
             format!("Upstream '{}' already exists", new_upstream.name),
-        ))
-        .into_response();
+        );
+        log_response_body(&error);
+        return Json(error).into_response();
     }
 
     // 添加新的上游服务
@@ -119,20 +147,22 @@ pub async fn create_upstream(
     // 预处理配置（解析头部等）
     if let Err(e) = config_write.post_process() {
         warn!("API: Failed to process new upstream: {}", e);
-        return Json(ErrorResponse::error(
+        let error = ErrorResponse::error(
             StatusCode::BAD_REQUEST,
-            "processing_error",
+            error_types::BAD_REQUEST,
             format!("Failed to process upstream: {}", e),
-        ))
-        .into_response();
+        );
+        log_response_body(&error);
+        return Json(error).into_response();
     }
 
     info!("API: Created upstream service '{}'", upstream_clone.name);
-    (
-        StatusCode::CREATED,
-        Json(SuccessResponse::success_with_data(upstream_clone)),
-    )
-        .into_response()
+
+    // 构建成功响应并记录
+    let response = SuccessResponse::success_with_data(upstream_clone);
+    log_response_body(&response);
+
+    (StatusCode::CREATED, Json(response)).into_response()
 }
 
 /// 更新上游服务
@@ -158,13 +188,18 @@ pub async fn update_upstream(
     Path(name): Path<String>,
     Json(mut updated_upstream): Json<UpstreamConfig>,
 ) -> Response {
+    // 记录请求体
+    log_request_body(&updated_upstream);
+
     // 设置名称为路径中的名称
     updated_upstream.name = name.clone();
 
     // 验证上游服务配置
     if let Err(e) = updated_upstream.validate() {
         warn!("API: Upstream validation failed: {}", e);
-        return Json(ErrorResponse::from_validation_errors(e)).into_response();
+        let error = ErrorResponse::from_validation_errors(e);
+        log_response_body(&error);
+        return Json(error).into_response();
     }
 
     // 获取写锁
@@ -181,25 +216,32 @@ pub async fn update_upstream(
             // 预处理配置（解析头部等）
             if let Err(e) = config_write.post_process() {
                 warn!("API: Failed to process updated upstream: {}", e);
-                return Json(ErrorResponse::error(
+                let error = ErrorResponse::error(
                     StatusCode::BAD_REQUEST,
-                    "processing_error",
+                    error_types::BAD_REQUEST,
                     format!("Failed to process upstream: {}", e),
-                ))
-                .into_response();
+                );
+                log_response_body(&error);
+                return Json(error).into_response();
             }
 
             info!("API: Updated upstream service '{}'", name);
-            Json(SuccessResponse::success_with_data(updated_upstream)).into_response()
+
+            // 构建成功响应并记录
+            let response = SuccessResponse::success_with_data(updated_upstream);
+            log_response_body(&response);
+
+            Json(response).into_response()
         }
         None => {
             warn!("API: Upstream service '{}' not found for update", name);
-            Json(ErrorResponse::error(
+            let error = ErrorResponse::error(
                 StatusCode::NOT_FOUND,
-                api::error_types::NOT_FOUND,
+                error_types::NOT_FOUND,
                 format!("Upstream service '{}' does not exist", name),
-            ))
-            .into_response()
+            );
+            log_response_body(&error);
+            Json(error).into_response()
         }
     }
 }
@@ -240,15 +282,16 @@ pub async fn delete_upstream(
             "API: Cannot delete upstream '{}' as it is used by groups: {:?}",
             name, dependent_groups
         );
-        return Json(ErrorResponse::error(
+        let error = ErrorResponse::error(
             StatusCode::CONFLICT,
-            "dependency_conflict",
+            error_types::CONFLICT,
             format!(
                 "Cannot delete upstream '{}' as it is currently used by group(s): {:?}",
                 name, dependent_groups
             ),
-        ))
-        .into_response();
+        );
+        log_response_body(&error);
+        return Json(error).into_response();
     }
 
     // 查找并删除上游服务
@@ -264,6 +307,7 @@ pub async fn delete_upstream(
         );
     }
 
-    // 无内容响应
+    // 无内容响应，状态码本身就足够
+    debug!("Response body: None (204 No Content)");
     StatusCode::NO_CONTENT.into_response()
 }

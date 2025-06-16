@@ -26,11 +26,12 @@ pub fn validate_proxy_config(proxy: &ProxyConfig) -> Result<(), ValidationError>
 }
 
 pub fn validate_http_client_config(config: &HttpClientConfig) -> Result<(), ValidationError> {
-    if config.stream_mode && config.timeout.request < http_client_limits::DEFAULT_REQUEST_TIMEOUT {
-        let mut err = ValidationError::new("stream_mode_timeout");
+    // 在流式模式下不检查请求超时，因为根据配置文件说明，流式模式下request_timeout被禁用
+    if !config.stream_mode && config.timeout.request < http_client_limits::DEFAULT_REQUEST_TIMEOUT {
+        let mut err = ValidationError::new("request_timeout_too_short");
         err.message = Some(
             format!(
-                "Request timeout with stream_mode enabled is too short, recommended minimum is {}s",
+                "Request timeout is too short, recommended minimum is {}s",
                 http_client_limits::DEFAULT_REQUEST_TIMEOUT
             )
             .into(),

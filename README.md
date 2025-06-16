@@ -292,10 +292,10 @@ LLMProxy uses structured YAML files for configuration, offering flexible and pow
 | `http_server.forwards[].address`              | String  | "0.0.0.0" | Binding network address for the forwarding service                                |
 | `http_server.forwards[].upstream_group`       | String  | -         | **[Required]** Name of the upstream group associated with this forwarding service |
 | `http_server.forwards[].ratelimit.enabled`    | Boolean | false     | Whether to enable rate limiting functionality                                     |
-| `http_server.forwards[].ratelimit.per_second` | Integer | 100       | Maximum number of requests allowed per second per IP                              |
-| `http_server.forwards[].ratelimit.burst`      | Integer | 200       | Number of burst requests allowed per IP (buffer size)                             |
+| `http_server.forwards[].ratelimit.per_second` | Integer | 100       | Maximum number of requests allowed per second per IP (range: 1-10000)             |
+| `http_server.forwards[].ratelimit.burst`      | Integer | 200       | Number of burst requests allowed per IP (buffer size) (range: 1-20000)            |
 | `http_server.forwards[].timeout.connect`      | Integer | 10        | Timeout for client connections to LLMProxy (seconds)                              |
-| `http_server.admin.port`                      | Integer | 9000      | Listening port for the admin service                                              |
+| `http_server.admin.port`                      | Integer | 9000      | Optional listening port for the admin service                                     |
 | `http_server.admin.address`                   | String  | "0.0.0.0" | Binding network address for the admin service                                     |
 | `http_server.admin.timeout.connect`           | Integer | 10        | Timeout for connections to the admin interface (seconds)                          |
 
@@ -325,17 +325,17 @@ LLMProxy uses structured YAML files for configuration, offering flexible and pow
 | ----------------------------------------------- | ------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `upstream_groups[].name`                        | String  | -              | **[Required]** Unique identifier name for the upstream group                                                                                                                                                                                       |
 | `upstream_groups[].upstreams[].name`            | String  | -              | **[Required]** Referenced upstream LLM service name, must be defined in the `upstreams` section                                                                                                                                                    |
-| `upstream_groups[].upstreams[].weight`          | Integer | 1              | Weight value effective only when `balance.strategy` is `weighted_roundrobin`, used for proportional request allocation                                                                                                                             |
+| `upstream_groups[].upstreams[].weight`          | Integer | 1              | Weight value effective only when `balance.strategy` is `weighted_roundrobin`, used for proportional request allocation (range: 1-65535)                                                                                                            |
 | `upstream_groups[].balance.strategy`            | String  | "roundrobin"   | Load balancing strategy: `roundrobin`, `weighted_roundrobin`, `random`, `response_aware` or `failover`                                                                                                                                             |
 | `upstream_groups[].http_client.agent`           | String  | "LLMProxy/1.0" | User-Agent header value sent to upstream LLM services                                                                                                                                                                                              |
-| `upstream_groups[].http_client.keepalive`       | Integer | 60             | TCP Keepalive time (seconds), range 0-600, 0 means disabled. Helps keep connections with upstream LLM services active, reducing latency                                                                                                            |
+| `upstream_groups[].http_client.keepalive`       | Integer | 30             | TCP Keepalive time (seconds), range 5-600, 0 is not allowed. Helps keep connections with upstream LLM services active, reducing latency                                                                                                            |
 | `upstream_groups[].http_client.stream`          | Boolean | true           | Controls the request timeout behavior. If `true` (default), the request timeout is disabled, which is **essential** for LLM streaming responses (Server-Sent Events). If `false`, `timeout.request` is enforced, suitable for non-streaming calls. |
-| `upstream_groups[].http_client.timeout.connect` | Integer | 10             | Timeout for connecting to upstream LLM services (seconds)                                                                                                                                                                                          |
-| `upstream_groups[].http_client.timeout.request` | Integer | 300            | Request timeout (seconds) for non-streaming requests. Only effective when `http_client.stream` is `false`. Defines the maximum waiting time for a complete upstream response.                                                                      |
-| `upstream_groups[].http_client.timeout.idle`    | Integer | 60             | Timeout (seconds) after which a connection with an upstream LLM service is considered idle and closed if no activity                                                                                                                               |
+| `upstream_groups[].http_client.timeout.connect` | Integer | 10             | Timeout for connecting to upstream LLM services (seconds) (range: 1-120)                                                                                                                                                                           |
+| `upstream_groups[].http_client.timeout.request` | Integer | 300            | Request timeout (seconds) for non-streaming requests. Only effective when `http_client.stream` is `false`. Defines the maximum waiting time for a complete upstream response. (range: 1-1200)                                                      |
+| `upstream_groups[].http_client.timeout.idle`    | Integer | 60             | Timeout (seconds) after which a connection with an upstream LLM service is considered idle and closed if no activity (range: 5-1800)                                                                                                               |
 | `upstream_groups[].http_client.retry.enabled`   | Boolean | false          | Whether to enable request retry functionality to upstream LLM services (suitable for idempotent requests or scenarios that can be safely retried)                                                                                                  |
-| `upstream_groups[].http_client.retry.attempts`  | Integer | 3              | Maximum number of retry attempts (excluding the first attempt)                                                                                                                                                                                     |
-| `upstream_groups[].http_client.retry.initial`   | Integer | 500            | Initial waiting time (milliseconds) before the first retry, subsequent retry intervals may use exponential backoff                                                                                                                                 |
+| `upstream_groups[].http_client.retry.attempts`  | Integer | 3              | Maximum number of retry attempts (excluding the first attempt) (range: 1-100)                                                                                                                                                                      |
+| `upstream_groups[].http_client.retry.initial`   | Integer | 500            | Initial waiting time (milliseconds) before the first retry, subsequent retry intervals may use exponential backoff (range: 100-10000)                                                                                                              |
 | `upstream_groups[].http_client.proxy.enabled`   | Boolean | false          | Whether to enable outbound proxy (LLMProxy connects to upstream LLM services through this proxy)                                                                                                                                                   |
 | `upstream_groups[].http_client.proxy.url`       | String  | -              | Outbound proxy server URL (e.g., `http://user:pass@proxy.example.com:8080`)                                                                                                                                                                        |
 
@@ -352,13 +352,13 @@ http_server:
           ratelimit: # [Optional] IP rate limiting
               enabled: true # Whether to enable rate limiting (default: false)
               per_second: 100 # Maximum requests per second per IP
-              burst: 200 # Burst request capacity per IP (must be >= per_second)
+              burst: 200 # Burst request capacity per IP
           timeout: # [Optional] Client connection timeout
               connect: 10 # Timeout for client connections to LLMProxy (seconds)
 
     # Admin interface configuration
     admin:
-        port: 9000 # [Required] Admin interface port (for /metrics, /health)
+        port: 9000 # [Optional] Admin interface port (for /metrics, /health)
         address: "127.0.0.1" # [Optional] Binding network address (default: "0.0.0.0", recommended "127.0.0.1" for production)
         timeout:
             connect: 10 # Timeout for connections to the admin interface (seconds)

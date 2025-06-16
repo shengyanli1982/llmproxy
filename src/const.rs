@@ -17,13 +17,13 @@ pub mod shutdown_timeout {
 // HTTP客户端配置限制
 pub mod http_client_limits {
     // 默认连接超时（秒）
-    pub const DEFAULT_CONNECT_TIMEOUT: u64 = 60;
+    pub const DEFAULT_CONNECT_TIMEOUT: u64 = 10;
     // 最小连接超时（秒）
     pub const MIN_CONNECT_TIMEOUT: u64 = 1;
     // 最大连接超时（秒）
     pub const MAX_CONNECT_TIMEOUT: u64 = 120;
     // 默认请求超时（秒）
-    pub const DEFAULT_REQUEST_TIMEOUT: u64 = 120;
+    pub const DEFAULT_REQUEST_TIMEOUT: u64 = 300;
     // 最小请求超时（秒）
     pub const MIN_REQUEST_TIMEOUT: u64 = 1;
     // 最大请求超时（秒）
@@ -126,7 +126,7 @@ pub mod error_labels {
     pub const VALIDATION_ERROR: &str = "validation_error";
     // 未知状态
     pub const UNKNOWN_ERROR: &str = "unknown_error";
-    // 
+    //
 }
 
 // 上游标签
@@ -219,6 +219,12 @@ pub mod api {
         // 未授权
         pub const UNAUTHORIZED: &str = "Unauthorized";
         // 未找到
-        pub const NOT_FOUND: &str = "Not Found";
+        pub const NOT_FOUND: &str = "NotFound";
+        // 冲突
+        pub const CONFLICT: &str = "Conflict";
+        // 服务器错误
+        pub const INTERNAL_SERVER_ERROR: &str = "InternalServerError";
+        // 请求错误
+        pub const BAD_REQUEST: &str = "BadRequest";
     }
 }
