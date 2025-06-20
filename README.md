@@ -291,12 +291,14 @@ LLMProxy uses structured YAML files for configuration, offering flexible and pow
 | `http_server.forwards[].port`                 | Integer | 3000      | **[Required]** Listening port for the forwarding service                          |
 | `http_server.forwards[].address`              | String  | "0.0.0.0" | Binding network address for the forwarding service                                |
 | `http_server.forwards[].upstream_group`       | String  | -         | **[Required]** Name of the upstream group associated with this forwarding service |
-| `http_server.forwards[].ratelimit.enabled`    | Boolean | false     | Whether to enable rate limiting functionality                                     |
+| `http_server.forwards[].ratelimit`            | Object  | null      | **[Optional]** Rate limiting configuration. If omitted, rate limiting is disabled |
 | `http_server.forwards[].ratelimit.per_second` | Integer | 100       | Maximum number of requests allowed per second per IP (range: 1-10000)             |
 | `http_server.forwards[].ratelimit.burst`      | Integer | 200       | Number of burst requests allowed per IP (buffer size) (range: 1-20000)            |
+| `http_server.forwards[].timeout`              | Object  | null      | **[Optional]** Timeout configuration. If omitted, default values are used         |
 | `http_server.forwards[].timeout.connect`      | Integer | 10        | Timeout for client connections to LLMProxy (seconds)                              |
 | `http_server.admin.port`                      | Integer | 9000      | Optional listening port for the admin service                                     |
 | `http_server.admin.address`                   | String  | "0.0.0.0" | Binding network address for the admin service                                     |
+| `http_server.admin.timeout`                   | Object  | null      | **[Optional]** Timeout configuration. If omitted, default values are used         |
 | `http_server.admin.timeout.connect`           | Integer | 10        | Timeout for connections to the admin interface (seconds)                          |
 
 #### Upstream Service Configuration Options (Upstream LLM Services)
@@ -304,7 +306,7 @@ LLMProxy uses structured YAML files for configuration, offering flexible and pow
 | Configuration Item              | Type    | Default | Description                                                                                                                    |
 | ------------------------------- | ------- | ------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | `upstreams[].name`              | String  | -       | **[Required]** Unique identifier name for the upstream LLM service                                                             |
-| `upstreams[].url`               | String  | -       | **[Required]** Base URL for the upstream LLM service (e.g., `https://api.openai.com/v1`)                                       |
+| `upstreams[].url`               | String  | -       | **[Required]** Full URL for the upstream LLM service (e.g., `https://api.openai.com/v1/chat/completions`)                      |
 | `upstreams[].auth.type`         | String  | "none"  | Authentication type: `bearer`, `basic`, or `none`                                                                              |
 | `upstreams[].auth.token`        | String  | -       | API key or token when `type` is `bearer`                                                                                       |
 | `upstreams[].auth.username`     | String  | -       | Username when `type` is `basic`                                                                                                |
@@ -319,7 +321,7 @@ LLMProxy uses structured YAML files for configuration, offering flexible and pow
 
 > [!NOTE]
 >
-> The parameter `upstreams[].url` should be configured with the base URL of the upstream service, e.g., `https://api.openai.com/v1`, not `https://api.openai.com` or `https://api.openai.com/v1/chat/completions`. LLMProxy will append the path from the client request to this base URL.
+> The parameter `upstreams[].url` should be configured with the full URL of the upstream service, e.g., `https://api.openai.com/v1/chat/completions`, not `https://api.openai.com/v1` or `https://api.openai.com`.
 
 | Configuration Item                              | Type    | Default        | Description                                                                                                                                                                                                                                        |
 | ----------------------------------------------- | ------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -330,13 +332,14 @@ LLMProxy uses structured YAML files for configuration, offering flexible and pow
 | `upstream_groups[].http_client.agent`           | String  | "LLMProxy/1.0" | User-Agent header value sent to upstream LLM services                                                                                                                                                                                              |
 | `upstream_groups[].http_client.keepalive`       | Integer | 30             | TCP Keepalive time (seconds), range 5-600, 0 is not allowed. Helps keep connections with upstream LLM services active, reducing latency                                                                                                            |
 | `upstream_groups[].http_client.stream`          | Boolean | true           | Controls the request timeout behavior. If `true` (default), the request timeout is disabled, which is **essential** for LLM streaming responses (Server-Sent Events). If `false`, `timeout.request` is enforced, suitable for non-streaming calls. |
+| `upstream_groups[].http_client.timeout`         | Object  | null           | **[Optional]** Timeout configuration. If omitted, default values are used                                                                                                                                                                          |
 | `upstream_groups[].http_client.timeout.connect` | Integer | 10             | Timeout for connecting to upstream LLM services (seconds) (range: 1-120)                                                                                                                                                                           |
 | `upstream_groups[].http_client.timeout.request` | Integer | 300            | Request timeout (seconds) for non-streaming requests. Only effective when `http_client.stream` is `false`. Defines the maximum waiting time for a complete upstream response. (range: 1-1200)                                                      |
 | `upstream_groups[].http_client.timeout.idle`    | Integer | 60             | Timeout (seconds) after which a connection with an upstream LLM service is considered idle and closed if no activity (range: 5-1800)                                                                                                               |
-| `upstream_groups[].http_client.retry.enabled`   | Boolean | false          | Whether to enable request retry functionality to upstream LLM services (suitable for idempotent requests or scenarios that can be safely retried)                                                                                                  |
+| `upstream_groups[].http_client.retry`           | Object  | null           | **[Optional]** Request retry configuration. If omitted, retry functionality is disabled                                                                                                                                                            |
 | `upstream_groups[].http_client.retry.attempts`  | Integer | 3              | Maximum number of retry attempts (excluding the first attempt) (range: 1-100)                                                                                                                                                                      |
 | `upstream_groups[].http_client.retry.initial`   | Integer | 500            | Initial waiting time (milliseconds) before the first retry, subsequent retry intervals may use exponential backoff (range: 100-10000)                                                                                                              |
-| `upstream_groups[].http_client.proxy.enabled`   | Boolean | false          | Whether to enable outbound proxy (LLMProxy connects to upstream LLM services through this proxy)                                                                                                                                                   |
+| `upstream_groups[].http_client.proxy`           | Object  | null           | **[Optional]** Outbound proxy configuration. If omitted, no proxy will be used                                                                                                                                                                     |
 | `upstream_groups[].http_client.proxy.url`       | String  | -              | Outbound proxy server URL (e.g., `http://user:pass@proxy.example.com:8080`)                                                                                                                                                                        |
 
 ### HTTP Server Configuration
@@ -427,11 +430,9 @@ upstream_groups:
               request: 360 # Request timeout (seconds) (default: 300, may need higher for time-consuming LLMs)
               idle: 90 # Idle connection timeout (seconds) (default: 60)
           retry: # [Optional] Request retry configuration
-              enabled: true # Whether to enable request retries (default: false)
               attempts: 3 # Maximum retry attempts
               initial: 1000 # Initial waiting time before first retry (milliseconds)
           proxy: # [Optional] Outbound proxy configuration
-              enabled: false # Whether to use an outbound proxy to connect to upstreams (default: false)
               url: "http://user:pass@your-proxy-server.com:8080" # Proxy server URL
 ```
 
@@ -452,7 +453,7 @@ upstream_groups:
 3. **Reliability & Resilience Design**:
     - Configure reasonable circuit breaker parameters (`breaker.threshold`, `breaker.cooldown`) for each upstream LLM service (`upstreams`). Threshold settings need to balance the sensitivity of fault detection and the inherent volatility of the service.
     - Configure multiple upstream LLM service instances in each upstream group (`upstream_groups`) to achieve redundancy and automatic failover. These can be different regional nodes of the same provider or alternative services from different providers.
-    - Enable request retries (`http_client.retry.enabled: true`) only for idempotent or safely retryable LLM API calls. Note that some LLM operations (such as content generation) may not be idempotent.
+    - Enable request retries (by configuring the `http_client.retry` object) only for idempotent or safely retryable LLM API calls. Note that some LLM operations (such as content generation) may not be idempotent.
     - Regularly monitor Prometheus metrics data about circuit breaker status, upstream error rates, request latency, etc., and use this information to optimize configurations and troubleshoot potential issues.
 
 For detailed explanations of all available configuration options, please refer to the `config.default.yaml` file included with the LLMProxy project as a complete reference.

@@ -38,9 +38,6 @@ impl Default for TimeoutConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 #[serde(rename_all = "lowercase")]
 pub struct RateLimitConfig {
-    // 是否启用限流
-    #[serde(default)]
-    pub enabled: bool,
     // 每秒请求数
     #[serde(default = "default_per_second")]
     #[validate(range(
@@ -60,7 +57,6 @@ pub struct RateLimitConfig {
 impl Default for RateLimitConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
             per_second: default_per_second(),
             burst: default_burst(),
         }
@@ -71,9 +67,6 @@ impl Default for RateLimitConfig {
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
 #[serde(rename_all = "lowercase")]
 pub struct RetryConfig {
-    // 是否启用重试
-    #[serde(default)]
-    pub enabled: bool,
     // 最大重试次数
     #[serde(default = "default_retry_attempts")]
     #[validate(range(min = "retry_limits::MIN_ATTEMPTS", max = "retry_limits::MAX_ATTEMPTS"))]
@@ -90,7 +83,6 @@ pub struct RetryConfig {
 impl Default for RetryConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
             attempts: default_retry_attempts(),
             initial: default_retry_initial(),
         }
@@ -102,9 +94,6 @@ impl Default for RetryConfig {
 #[validate(schema(function = "validation::validate_proxy_config"))]
 #[serde(rename_all = "lowercase")]
 pub struct ProxyConfig {
-    // 是否启用代理
-    #[serde(default)]
-    pub enabled: bool,
     // 代理URL
     #[serde(default)]
     pub url: String,

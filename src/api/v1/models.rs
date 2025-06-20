@@ -1,6 +1,6 @@
 use crate::{
     config::{UpstreamConfig, UpstreamGroupConfig},
-    r#const::api::response_status,
+    r#const::api::{error_types, response_status},
 };
 use axum::{http::StatusCode, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
@@ -136,7 +136,7 @@ impl ErrorResponse {
             .collect::<Vec<String>>()
             .join("; ");
 
-        Self::error(StatusCode::BAD_REQUEST, "validation_error", message)
+        Self::error(StatusCode::BAD_REQUEST, error_types::BAD_REQUEST, message)
     }
 }
 

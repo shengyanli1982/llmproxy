@@ -287,35 +287,37 @@ LLMProxy 采用结构化 YAML 文件进行配置，提供灵活且强大的配�
 | `http_server.forwards[].port`                 | 整数   | 3000      | **[必填]** 转发服务的监听端口                               |
 | `http_server.forwards[].address`              | 字符串 | "0.0.0.0" | 转发服务的绑定网络地址                                      |
 | `http_server.forwards[].upstream_group`       | 字符串 | -         | **[必填]** 此转发服务关联的上游组名称                       |
-| `http_server.forwards[].ratelimit.enabled`    | 布尔值 | false     | 是否启用速率限制功能                                        |
+| `http_server.forwards[].ratelimit`            | 对象   | null      | **[可选]** 速率限制配置。如果省略，则不启用速率限制         |
 | `http_server.forwards[].ratelimit.per_second` | 整数   | 100       | 单个 IP 每秒允许的最大请求数（取值范围：1-10000）           |
 | `http_server.forwards[].ratelimit.burst`      | 整数   | 200       | 单个 IP 允许的突发请求数（缓冲区大小）（取值范围：1-20000） |
+| `http_server.forwards[].timeout`              | 对象   | null      | **[可选]** 连接超时配置。如果省略，将使用默认值             |
 | `http_server.forwards[].timeout.connect`      | 整数   | 10        | 客户端连接到 LLMProxy 的超时时间（秒）                      |
 | `http_server.admin.port`                      | 整数   | 9000      | 可选的管理服务监听端口                                      |
 | `http_server.admin.address`                   | 字符串 | "0.0.0.0" | 管理服务的绑定网络地址                                      |
+| `http_server.admin.timeout`                   | 对象   | null      | **[可选]** 连接超时配置。如果省略，将使用默认值             |
 | `http_server.admin.timeout.connect`           | 整数   | 10        | 连接到管理接口的超时时间（秒）                              |
 
 #### 上游服务配置选项 (Upstream LLM Services)
 
-| 配置项                          | 类型   | 默认值 | 说明                                                                         |
-| ------------------------------- | ------ | ------ | ---------------------------------------------------------------------------- |
-| `upstreams[].name`              | 字符串 | -      | **[必填]** 上游 LLM 服务的唯一标识名称                                       |
-| `upstreams[].url`               | 字符串 | -      | **[必填]** 上游 LLM 服务的基础 URL (例如 `https://api.openai.com/v1`)        |
-| `upstreams[].auth.type`         | 字符串 | "none" | 认证类型：`bearer`、`basic`或`none`                                          |
-| `upstreams[].auth.token`        | 字符串 | -      | 当`type`为`bearer`时的 API 密钥或令牌                                        |
-| `upstreams[].auth.username`     | 字符串 | -      | 当`type`为`basic`时的用户名                                                  |
-| `upstreams[].auth.password`     | 字符串 | -      | 当`type`为`basic`时的密码                                                    |
-| `upstreams[].headers[].op`      | 字符串 | -      | HTTP 头部操作类型：`insert` (不存在则添加)、`replace` (替换或添加)、`remove` |
-| `upstreams[].headers[].key`     | 字符串 | -      | 要操作的 HTTP 头部名称                                                       |
-| `upstreams[].headers[].value`   | 字符串 | -      | 用于`insert`或`replace`操作的头部值                                          |
-| `upstreams[].breaker.threshold` | 浮点数 | 0.5    | 熔断器触发阈值，表示失败率（0.01-1.0），如 0.5 代表 50% 失败则熔断           |
-| `upstreams[].breaker.cooldown`  | 整数   | 30     | 熔断器冷却时间（秒），即熔断后多久尝试进入半开状态 (1-3600)                  |
+| 配置项                          | 类型   | 默认值 | 说明                                                                                   |
+| ------------------------------- | ------ | ------ | -------------------------------------------------------------------------------------- |
+| `upstreams[].name`              | 字符串 | -      | **[必填]** 上游 LLM 服务的唯一标识名称                                                 |
+| `upstreams[].url`               | 字符串 | -      | **[必填]** 上游 LLM 服务的完整 URL (例如 `https://api.openai.com/v1/chat/completions`) |
+| `upstreams[].auth.type`         | 字符串 | "none" | 认证类型：`bearer`、`basic`或`none`                                                    |
+| `upstreams[].auth.token`        | 字符串 | -      | 当`type`为`bearer`时的 API 密钥或令牌                                                  |
+| `upstreams[].auth.username`     | 字符串 | -      | 当`type`为`basic`时的用户名                                                            |
+| `upstreams[].auth.password`     | 字符串 | -      | 当`type`为`basic`时的密码                                                              |
+| `upstreams[].headers[].op`      | 字符串 | -      | HTTP 头部操作类型：`insert` (不存在则添加)、`replace` (替换或添加)、`remove`           |
+| `upstreams[].headers[].key`     | 字符串 | -      | 要操作的 HTTP 头部名称                                                                 |
+| `upstreams[].headers[].value`   | 字符串 | -      | 用于`insert`或`replace`操作的头部值                                                    |
+| `upstreams[].breaker.threshold` | 浮点数 | 0.5    | 熔断器触发阈值，表示失败率（0.01-1.0），如 0.5 代表 50% 失败则熔断                     |
+| `upstreams[].breaker.cooldown`  | 整数   | 30     | 熔断器冷却时间（秒），即熔断后多久尝试进入半开状态 (1-3600)                            |
 
 #### 上游组配置选项 (Upstream LLM Groups)
 
 > [!NOTE]
 >
-> 参数 `upstreams[].url` 需要配置上游服务的基础 URL，例如：`https://api.openai.com/v1`，而不是`https://api.openai.com` 或者 `https://api.openai.com/v1/chat/completions`。LLMProxy 会将客户端请求的路径追加到此基础 URL 后面。
+> 参数 `upstreams[].url` 需要配置上游服务的完整 URL，例如：`https://api.openai.com/v1/chat/completions`， 而不是 `https://api.openai.com/v1` 或者 `https://api.openai.com`。
 
 | 配置项                                          | 类型   | 默认值         | 说明                                                                                                                                                                       |
 | ----------------------------------------------- | ------ | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -326,13 +328,14 @@ LLMProxy 采用结构化 YAML 文件进行配置，提供灵活且强大的配�
 | `upstream_groups[].http_client.agent`           | 字符串 | "LLMProxy/1.0" | 发送到上游 LLM 服务的 User-Agent 头部值                                                                                                                                    |
 | `upstream_groups[].http_client.keepalive`       | 整数   | 30             | TCP Keepalive 时间（秒），取值范围 5-600，不允许为 0。有助于保持与上游 LLM 服务的连接活跃，减少延迟                                                                        |
 | `upstream_groups[].http_client.stream`          | 布尔值 | true           | 控制请求超时行为。若为 `true` (默认值)，则禁用请求超时，这对于 LLM 流式响应 (Server-Sent Events) **至关重要**。若为 `false`，则 `timeout.request` 生效，适用于非流式调用。 |
+| `upstream_groups[].http_client.timeout`         | 对象   | null           | **[可选]** 连接和请求超时配置。如果省略，将使用默认值                                                                                                                      |
 | `upstream_groups[].http_client.timeout.connect` | 整数   | 10             | 连接到上游 LLM 服务的超时时间（秒）（取值范围：1-120）                                                                                                                     |
 | `upstream_groups[].http_client.timeout.request` | 整数   | 300            | 非流式请求的请求超时时间（秒）。仅在 `http_client.stream` 为 `false` 时生效。定义了等待上游完整响应的最长时间。（取值范围：1-1200）                                        |
 | `upstream_groups[].http_client.timeout.idle`    | 整数   | 60             | 与上游 LLM 服务的连接在无活动后被视为空闲并关闭的超时时间（秒）（取值范围：5-1800）                                                                                        |
-| `upstream_groups[].http_client.retry.enabled`   | 布尔值 | false          | 是否启用向上游 LLM 服务的请求重试功能（适用于幂等请求或可安全重试的场景）                                                                                                  |
+| `upstream_groups[].http_client.retry`           | 对象   | null           | **[可选]** 请求重试配置。如果省略，则不启用重试功能                                                                                                                        |
 | `upstream_groups[].http_client.retry.attempts`  | 整数   | 3              | 最大重试次数（不包括首次尝试）（取值范围：1-100）                                                                                                                          |
 | `upstream_groups[].http_client.retry.initial`   | 整数   | 500            | 首次重试前的初始等待时间（毫秒），后续重试间隔可能采用指数退避策略（取值范围：100-10000）                                                                                  |
-| `upstream_groups[].http_client.proxy.enabled`   | 布尔值 | false          | 是否启用出站代理（LLMProxy 通过此代理连接到上游 LLM 服务）                                                                                                                 |
+| `upstream_groups[].http_client.proxy`           | 对象   | null           | **[可选]** 出站代理配置。如果省略，则不使用代理                                                                                                                            |
 | `upstream_groups[].http_client.proxy.url`       | 字符串 | -              | 出站代理服务器 URL (例如 `http://user:pass@proxy.example.com:8080`)                                                                                                        |
 
 ### HTTP 服务器配置
@@ -423,11 +426,9 @@ upstream_groups:
               request: 360 # 请求超时（秒）（默认：300, 对于耗时长的LLM可能需要更大）
               idle: 90 # 空闲连接超时（秒）（默认：60）
           retry: # [可选] 请求重试配置
-              enabled: true # 是否启用请求重试（默认：false）
               attempts: 3 # 最大重试次数
               initial: 1000 # 首次重试前的初始等待时间（毫秒）
           proxy: # [可选] 出站代理配置
-              enabled: false # 是否使用出站代理连接上游（默认：false）
               url: "http://user:pass@your-proxy-server.com:8080" # 代理服务器URL
 ```
 
@@ -445,10 +446,10 @@ upstream_groups:
     - 利用 `weighted_roundrobin` 负载均衡策略，结合不同 LLM 服务的成本和性能，将更多流量导向性价比高的服务。
     - 对于延迟敏感型应用，优先考虑使用 `response_aware` 负载均衡策略，它能动态选择当前表现最佳的上游服务。
 
-3. **可靠性与弹性设计**：
+3. **可靠性与弹性设计**:
     - 为每个上游 LLM 服务（`upstreams`）配置合理的断路器参数（`breaker.threshold`, `breaker.cooldown`）。阈值设置需权衡故障检测的灵敏度和服务自身的波动性。
     - 在每个上游组（`upstream_groups`）中配置多个上游 LLM 服务实例（可以是同一提供商的不同区域节点，或不同提供商的可替代服务），以实现冗余和自动故障转移。
-    - 仅对幂等或可安全重试的 LLM API 调用启用请求重试（`http_client.retry.enabled: true`）。注意某些 LLM 操作（如生成内容）可能不是幂等的。
+    - 仅对幂等或可安全重试的 LLM API 调用启用请求重试（通过配置 `http_client.retry` 对象）。注意某些 LLM 操作（如生成内容）可能不是幂等的。
     - 定期监控 Prometheus 指标中关于断路器状态、上游错误率、请求延迟等数据，据此优化配置和排查潜在问题。
 
 有关所有可用配置选项的详细说明，请参阅 LLMProxy 项目附带的`config.default.yaml`文件作为完整参考。

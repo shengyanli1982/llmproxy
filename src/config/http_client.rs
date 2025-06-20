@@ -32,11 +32,11 @@ pub struct HttpClientConfig {
     /// 重试配置
     #[serde(default)]
     #[validate(nested)]
-    pub retry: RetryConfig,
+    pub retry: Option<RetryConfig>,
     /// 代理配置
     #[serde(default)]
     #[validate(nested)]
-    pub proxy: ProxyConfig,
+    pub proxy: Option<ProxyConfig>,
     /// 是否启用流式模式
     #[serde(default)]
     pub stream_mode: bool,
@@ -47,8 +47,8 @@ impl Default for HttpClientConfig {
         Self {
             timeout: HttpClientTimeoutConfig::default(),
             keepalive: default_keepalive(),
-            retry: RetryConfig::default(),
-            proxy: ProxyConfig::default(),
+            retry: None,
+            proxy: None,
             stream_mode: false,
         }
     }

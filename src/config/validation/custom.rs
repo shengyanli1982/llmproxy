@@ -10,17 +10,15 @@ use crate::r#const::http_client_limits;
 use std::collections::HashSet;
 
 pub fn validate_proxy_config(proxy: &ProxyConfig) -> Result<(), ValidationError> {
-    if proxy.enabled {
-        if proxy.url.is_empty() {
-            let mut err = ValidationError::new("url_empty");
-            err.message = Some("Proxy URL cannot be empty when proxy is enabled".into());
-            return Err(err);
-        }
-        if url::Url::parse(&proxy.url).is_err() {
-            let mut err = ValidationError::new("url_invalid");
-            err.message = Some("Proxy URL is not a valid URL".into());
-            return Err(err);
-        }
+    if proxy.url.is_empty() {
+        let mut err = ValidationError::new("url_empty");
+        err.message = Some("Proxy URL cannot be empty".into());
+        return Err(err);
+    }
+    if url::Url::parse(&proxy.url).is_err() {
+        let mut err = ValidationError::new("url_invalid");
+        err.message = Some("Proxy URL is not a valid URL".into());
+        return Err(err);
     }
     Ok(())
 }

@@ -150,7 +150,7 @@ pub async fn create_upstream(
         let error = ErrorResponse::error(
             StatusCode::BAD_REQUEST,
             error_types::BAD_REQUEST,
-            format!("Failed to process upstream: {}", e),
+            format!("Failed to process new upstream: {}", e),
         );
         log_response_body(&error);
         return Json(error).into_response();
@@ -219,7 +219,7 @@ pub async fn update_upstream(
                 let error = ErrorResponse::error(
                     StatusCode::BAD_REQUEST,
                     error_types::BAD_REQUEST,
-                    format!("Failed to process upstream: {}", e),
+                    format!("Failed to process updated upstream: {}", e),
                 );
                 log_response_body(&error);
                 return Json(error).into_response();

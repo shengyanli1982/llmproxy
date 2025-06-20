@@ -87,15 +87,11 @@ impl UpstreamManager {
     }
 
     /// 构建请求URL
-    fn build_request_url(&self, upstream_url: &str, path: &str) -> Result<Url, AppError> {
-        // 构建请求URL - 使用 String::with_capacity 预分配内存
-        let url_capacity = upstream_url.len() + path.len();
-        let mut url = String::with_capacity(url_capacity);
-        url.push_str(upstream_url);
-        url.push_str(path);
-
-        Url::parse(&url)
-            .map_err(|e| AppError::Upstream(format!("Invalid upstream URL: {} - {}", url, e)))
+    #[inline(always)]
+    fn build_request_url(&self, upstream_url: &str) -> Result<Url, AppError> {
+        Url::parse(upstream_url).map_err(|e| {
+            AppError::Upstream(format!("Invalid upstream URL: {} - {}", upstream_url, e))
+        })
     }
 
     /// 从上游组中选择上游服务器并获取其配置
@@ -236,7 +232,6 @@ impl UpstreamManager {
         &self,
         group_name: &str,
         method: &Method,
-        path: &str,
         headers: HeaderMap,
         body: Option<Bytes>,
     ) -> Result<Response, AppError> {
@@ -249,7 +244,7 @@ impl UpstreamManager {
         let start_time = Instant::now();
 
         // 构建请求URL
-        let url = self.build_request_url(&upstream_config.url, path)?;
+        let url = self.build_request_url(&upstream_config.url)?;
 
         // 获取组的HTTP客户端
         let client = match self.group_clients.get(group_name) {
