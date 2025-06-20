@@ -226,7 +226,7 @@ mod upstreams {
         // 解析响应体
         let error_response: ErrorResponse = serde_json::from_str(&body_str).unwrap();
         assert_eq!(error_response.code, 404);
-        assert_eq!(error_response.error.r#type, "Not Found");
+        assert_eq!(error_response.error.r#type, "NotFound");
     }
 
     // 测试成功创建一个新的 Upstream
@@ -288,7 +288,7 @@ mod upstreams {
         // 解析响应体
         let error_response: ErrorResponse = serde_json::from_str(&body_str).unwrap();
         assert_eq!(error_response.code, 409);
-        assert_eq!(error_response.error.r#type, "conflict");
+        assert_eq!(error_response.error.r#type, "Conflict");
     }
 
     // 测试更新一个 Upstream
@@ -332,7 +332,7 @@ mod upstreams {
         // 解析响应体
         let error_response: ErrorResponse = serde_json::from_str(&body_str).unwrap();
         assert_eq!(error_response.code, 404);
-        assert_eq!(error_response.error.r#type, "Not Found");
+        assert_eq!(error_response.error.r#type, "NotFound");
     }
 
     // 测试成功删除一个 Upstream
@@ -369,7 +369,7 @@ mod upstreams {
         // 解析响应体
         let error_response: ErrorResponse = serde_json::from_str(&body_str).unwrap();
         assert_eq!(error_response.code, 409);
-        assert_eq!(error_response.error.r#type, "dependency_conflict");
+        assert_eq!(error_response.error.r#type, "Conflict");
         assert!(error_response.error.message.contains("default_group"));
     }
 }
@@ -429,7 +429,7 @@ mod upstream_groups {
         // 解析响应体
         let error_response: ErrorResponse = serde_json::from_str(&body_str).unwrap();
         assert_eq!(error_response.code, 404);
-        assert_eq!(error_response.error.r#type, "Not Found");
+        assert_eq!(error_response.error.r#type, "NotFound");
     }
 
     // 测试成功更新一个 Upstream Group
@@ -498,7 +498,7 @@ mod upstream_groups {
         // 解析响应体
         let error_response: ErrorResponse = serde_json::from_str(&body_str).unwrap();
         assert_eq!(error_response.code, 400);
-        assert_eq!(error_response.error.r#type, "validation_error");
+        assert_eq!(error_response.error.r#type, "BadRequest");
         assert!(error_response.error.message.contains("not found"));
     }
 }
@@ -557,6 +557,6 @@ mod forwards {
         // 解析响应体
         let error_response: ErrorResponse = serde_json::from_str(&body_str).unwrap();
         assert_eq!(error_response.code, 404);
-        assert_eq!(error_response.error.r#type, "Not Found");
+        assert_eq!(error_response.error.r#type, "NotFound");
     }
 }

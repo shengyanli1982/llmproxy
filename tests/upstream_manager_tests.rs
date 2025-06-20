@@ -111,7 +111,6 @@ async fn test_upstream_manager_with_circuit_breaker() {
             .forward_request(
                 "test_group",
                 &Method::GET,
-                "/test",
                 reqwest::header::HeaderMap::new(),
                 None,
             )
@@ -132,7 +131,6 @@ async fn test_upstream_manager_with_circuit_breaker() {
         .forward_request(
             "test_group",
             &Method::GET,
-            "/test",
             reqwest::header::HeaderMap::new(),
             None,
         )
@@ -149,7 +147,6 @@ async fn test_upstream_manager_with_circuit_breaker() {
             .forward_request(
                 "test_group",
                 &Method::GET,
-                "/test",
                 reqwest::header::HeaderMap::new(),
                 None,
             )
@@ -171,7 +168,6 @@ async fn test_upstream_manager_with_circuit_breaker() {
             .forward_request(
                 "test_group",
                 &Method::GET,
-                "/test",
                 reqwest::header::HeaderMap::new(),
                 None,
             )
@@ -186,7 +182,6 @@ async fn test_upstream_manager_with_circuit_breaker() {
         .forward_request(
             "test_group",
             &Method::GET,
-            "/test",
             reqwest::header::HeaderMap::new(),
             None,
         )
@@ -209,7 +204,6 @@ async fn test_upstream_manager_with_circuit_breaker() {
         .forward_request(
             "test_group",
             &Method::GET,
-            "/test",
             reqwest::header::HeaderMap::new(),
             None,
         )
@@ -254,7 +248,6 @@ async fn test_upstream_manager_without_circuit_breaker() {
             .forward_request(
                 "test_group",
                 &Method::GET,
-                "/test",
                 reqwest::header::HeaderMap::new(),
                 None,
             )

@@ -6,7 +6,7 @@ use axum::{
 };
 use std::sync::Arc;
 use std::time::Instant;
-use tracing::info;
+use tracing::{debug, info};
 
 use crate::{error::AppError, metrics::METRICS, r#const::error_labels};
 
@@ -156,6 +156,7 @@ pub async fn forward_handler(
 
     // 标准化请求路径
     let path = normalize_path(path);
+    debug!("Forwarding request url path: {:?}", path);
 
     // 记录请求指标
     METRICS
@@ -170,16 +171,13 @@ pub async fn forward_handler(
         Err(response) => return response,
     };
 
+    // 此处应该还有一个路由模块
+    // 可以根据用复杂的定制需求，来选择不同的上游组
+
     // 转发请求
     match state
         .upstream_manager
-        .forward_request(
-            &state.config.upstream_group,
-            &method,
-            &path,
-            headers,
-            body_bytes,
-        )
+        .forward_request(&state.config.upstream_group, &method, headers, body_bytes)
         .await
     {
         Ok(response) => {

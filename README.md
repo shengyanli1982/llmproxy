@@ -304,7 +304,7 @@ LLMProxy uses structured YAML files for configuration, offering flexible and pow
 | Configuration Item              | Type    | Default | Description                                                                                                                    |
 | ------------------------------- | ------- | ------- | ------------------------------------------------------------------------------------------------------------------------------ |
 | `upstreams[].name`              | String  | -       | **[Required]** Unique identifier name for the upstream LLM service                                                             |
-| `upstreams[].url`               | String  | -       | **[Required]** Base URL for the upstream LLM service (e.g., `https://api.openai.com/v1`)                                       |
+| `upstreams[].url`               | String  | -       | **[Required]** Full URL for the upstream LLM service (e.g., `https://api.openai.com/v1/chat/completions`)                      |
 | `upstreams[].auth.type`         | String  | "none"  | Authentication type: `bearer`, `basic`, or `none`                                                                              |
 | `upstreams[].auth.token`        | String  | -       | API key or token when `type` is `bearer`                                                                                       |
 | `upstreams[].auth.username`     | String  | -       | Username when `type` is `basic`                                                                                                |
@@ -319,7 +319,7 @@ LLMProxy uses structured YAML files for configuration, offering flexible and pow
 
 > [!NOTE]
 >
-> The parameter `upstreams[].url` should be configured with the base URL of the upstream service, e.g., `https://api.openai.com/v1`, not `https://api.openai.com` or `https://api.openai.com/v1/chat/completions`. LLMProxy will append the path from the client request to this base URL.
+> The parameter `upstreams[].url` should be configured with the full URL of the upstream service, e.g., `https://api.openai.com/v1/chat/completions`, not `https://api.openai.com/v1` or `https://api.openai.com`.
 
 | Configuration Item                              | Type    | Default        | Description                                                                                                                                                                                                                                        |
 | ----------------------------------------------- | ------- | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
