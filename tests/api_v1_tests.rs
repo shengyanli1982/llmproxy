@@ -6,12 +6,16 @@ use axum::{
     http::{Method, StatusCode},
 };
 use llmproxy::{
-    config::{self, Config, RateLimitConfig, TimeoutConfig, UpstreamConfig},
-    *,
+    api::v1::{
+        self,
+        models::{ErrorResponse, SuccessResponse},
+    },
+    config::{self, serializer::SerializableArcString, Config, TimeoutConfig, UpstreamConfig},
 };
 use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tower::ServiceExt;
 
 // 辅助模块，包含测试设置和帮助函数
 mod helpers {
@@ -19,9 +23,7 @@ mod helpers {
     use axum::body::Body;
     use axum::http::Request;
     use axum::Router;
-    use llmproxy::{
-        config::{serializer::SerializableArcString, ForwardConfig, HttpServerConfig}, // 修正SerializableArcString导入路径
-    };
+    use llmproxy::config::{ForwardConfig, HttpServerConfig};
     use tower::ServiceExt;
 
     // TestApp 结构体，封装了测试环境
@@ -130,8 +132,8 @@ mod helpers {
                     address: "0.0.0.0".to_string(),
                     port: 8080,
                     upstream_group: "default_group".to_string(),
-                    ratelimit: RateLimitConfig::default(),
-                    timeout: TimeoutConfig::default(),
+                    ratelimit: None,
+                    timeout: Some(TimeoutConfig::default()),
                 }],
             }),
             upstreams: vec![config::UpstreamConfig {
@@ -164,7 +166,7 @@ mod helpers {
 
         println!("Creating API routes with config");
         // 获取 API v1 路由并应用共享配置状态
-        let app_router = api::v1::api_routes(shared_config.clone());
+        let app_router = v1::api_routes(shared_config.clone());
         println!("API routes created");
 
         // 返回 TestApp 实例

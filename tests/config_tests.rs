@@ -1,7 +1,7 @@
 use llmproxy::config::{
     AdminConfig, AuthConfig, AuthType, BalanceConfig, BalanceStrategy, Config, ForwardConfig,
-    HttpClientConfig, HttpServerConfig, RateLimitConfig, TimeoutConfig, UpstreamConfig,
-    UpstreamGroupConfig, UpstreamRef,
+    HttpClientConfig, HttpClientTimeoutConfig, HttpServerConfig, ProxyConfig, RateLimitConfig,
+    TimeoutConfig, UpstreamConfig, UpstreamGroupConfig, UpstreamRef,
 };
 use std::fs::File;
 use std::io::Write;
@@ -39,12 +39,11 @@ fn create_valid_test_config() -> Config {
         port: 3000,
         address: "127.0.0.1".to_string(),
         upstream_group: "test_group".to_string(),
-        ratelimit: RateLimitConfig {
-            enabled: false,
+        ratelimit: Some(RateLimitConfig {
             per_second: 100,
             burst: 200,
-        },
-        timeout: TimeoutConfig { connect: 5 },
+        }),
+        timeout: Some(TimeoutConfig { connect: 5 }),
     };
 
     Config {
@@ -53,7 +52,7 @@ fn create_valid_test_config() -> Config {
             admin: AdminConfig {
                 port: 9000,
                 address: "127.0.0.1".to_string(),
-                timeout: TimeoutConfig { connect: 5 },
+                timeout: Some(TimeoutConfig { connect: 5 }),
             },
         }),
         upstreams: vec![upstream_config],
@@ -260,4 +259,165 @@ fn test_load_config_from_file_with_http_server() {
         loaded_config.http_server.unwrap().forwards[0].name,
         "test_forward"
     );
+}
+
+#[test]
+fn test_config_with_proxy() {
+    // 创建一个带有 proxy 配置的 HttpClientConfig
+    let http_client_config = HttpClientConfig {
+        timeout: HttpClientTimeoutConfig::default(),
+        keepalive: 60,
+        retry: None,
+        proxy: Some(ProxyConfig {
+            url: "http://proxy.example.com:8080".to_string(),
+        }),
+        stream_mode: false,
+    };
+
+    // 创建一个使用该 HttpClientConfig 的 UpstreamGroupConfig
+    let group_config = UpstreamGroupConfig {
+        name: "test_group".to_string(),
+        upstreams: vec![UpstreamRef {
+            name: "test_upstream".to_string(),
+            weight: 1,
+        }],
+        balance: BalanceConfig {
+            strategy: BalanceStrategy::RoundRobin,
+        },
+        http_client: http_client_config,
+    };
+
+    // 创建一个包含该 UpstreamGroupConfig 的 Config
+    let config = Config {
+        http_server: None,
+        upstreams: vec![UpstreamConfig {
+            name: "test_upstream".to_string(),
+            url: "http://localhost:8080".to_string().into(),
+            weight: 1,
+            http_client: HttpClientConfig::default(),
+            auth: None,
+            headers: vec![],
+            breaker: None,
+        }],
+        upstream_groups: vec![group_config],
+    };
+
+    // 验证配置是否有效
+    assert!(config.validate().is_ok());
+
+    // 测试序列化和反序列化
+    let yaml = serde_yaml::to_string(&config).unwrap();
+    let deserialized_config: Config = serde_yaml::from_str(&yaml).unwrap();
+
+    // 验证 proxy 配置是否正确保留
+    assert!(deserialized_config.upstream_groups[0]
+        .http_client
+        .proxy
+        .is_some());
+    assert_eq!(
+        deserialized_config.upstream_groups[0]
+            .http_client
+            .proxy
+            .as_ref()
+            .unwrap()
+            .url,
+        "http://proxy.example.com:8080"
+    );
+}
+
+#[test]
+fn test_config_with_none_options() {
+    // 创建一个 ForwardConfig，其中 ratelimit 和 timeout 明确设置为 None
+    let forward_config = ForwardConfig {
+        name: "test_forward".to_string(),
+        port: 3000,
+        address: "127.0.0.1".to_string(),
+        upstream_group: "test_group".to_string(),
+        ratelimit: None,
+        timeout: None,
+    };
+
+    // 创建一个包含该 ForwardConfig 的 Config
+    let config = Config {
+        http_server: Some(HttpServerConfig {
+            forwards: vec![forward_config],
+            admin: AdminConfig {
+                port: 9000,
+                address: "127.0.0.1".to_string(),
+                timeout: None,
+            },
+        }),
+        upstreams: vec![UpstreamConfig {
+            name: "test_upstream".to_string(),
+            url: "http://localhost:8080".to_string().into(),
+            weight: 1,
+            http_client: HttpClientConfig::default(),
+            auth: None,
+            headers: vec![],
+            breaker: None,
+        }],
+        upstream_groups: vec![UpstreamGroupConfig {
+            name: "test_group".to_string(),
+            upstreams: vec![UpstreamRef {
+                name: "test_upstream".to_string(),
+                weight: 1,
+            }],
+            balance: BalanceConfig {
+                strategy: BalanceStrategy::RoundRobin,
+            },
+            http_client: HttpClientConfig::default(),
+        }],
+    };
+
+    // 验证配置是否有效
+    assert!(config.validate().is_ok());
+
+    // 测试序列化和反序列化
+    let yaml = serde_yaml::to_string(&config).unwrap();
+    let deserialized_config: Config = serde_yaml::from_str(&yaml).unwrap();
+
+    // 验证 None 值是否正确保留
+    assert!(deserialized_config.http_server.is_some());
+    let http_server = deserialized_config.http_server.unwrap();
+    assert!(http_server.forwards[0].ratelimit.is_none());
+    assert!(http_server.forwards[0].timeout.is_none());
+    assert!(http_server.admin.timeout.is_none());
+}
+
+#[test]
+fn test_config_without_http_server() {
+    // 创建一个 http_server 为 None 的 Config
+    let config = Config {
+        http_server: None,
+        upstreams: vec![UpstreamConfig {
+            name: "test_upstream".to_string(),
+            url: "http://localhost:8080".to_string().into(),
+            weight: 1,
+            http_client: HttpClientConfig::default(),
+            auth: None,
+            headers: vec![],
+            breaker: None,
+        }],
+        upstream_groups: vec![UpstreamGroupConfig {
+            name: "test_group".to_string(),
+            upstreams: vec![UpstreamRef {
+                name: "test_upstream".to_string(),
+                weight: 1,
+            }],
+            balance: BalanceConfig {
+                strategy: BalanceStrategy::RoundRobin,
+            },
+            http_client: HttpClientConfig::default(),
+        }],
+    };
+
+    // 验证配置是否有效
+    assert!(config.validate().is_ok());
+
+    // 测试序列化和反序列化
+    let yaml = serde_yaml::to_string(&config).unwrap();
+    let deserialized_config: Config = serde_yaml::from_str(&yaml).unwrap();
+
+    // 验证 http_server 是否仍然为 None
+    assert!(deserialized_config.http_server.is_none());
 }

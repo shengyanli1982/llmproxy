@@ -69,8 +69,8 @@ async fn test_forward_server_creation() {
         port: 0, // 使用系统分配的端口
         address: "127.0.0.1".to_string(),
         upstream_group: "test_group".to_string(),
-        ratelimit: RateLimitConfig::default(),
-        timeout: TimeoutConfig::default(),
+        ratelimit: None,
+        timeout: Some(TimeoutConfig::default()),
     };
 
     // 只验证能否成功创建服务器
@@ -89,12 +89,11 @@ async fn test_rate_limiting() -> Result<(), AppError> {
         port: 0, // 使用系统分配的端口
         address: "127.0.0.1".to_string(),
         upstream_group: "test_group".to_string(),
-        ratelimit: RateLimitConfig {
-            enabled: true,
+        ratelimit: Some(RateLimitConfig {
             per_second: 1,
             burst: 2,
-        },
-        timeout: TimeoutConfig::default(),
+        }),
+        timeout: Some(TimeoutConfig::default()),
     };
 
     // 只验证能否成功创建服务器
@@ -123,10 +122,10 @@ async fn test_server_timeout() -> Result<(), AppError> {
         port: 0, // 使用系统分配的端口
         address: "127.0.0.1".to_string(),
         upstream_group: "test_group".to_string(),
-        ratelimit: RateLimitConfig::default(),
-        timeout: TimeoutConfig {
+        ratelimit: None,
+        timeout: Some(TimeoutConfig {
             connect: 1, // 1秒连接超时
-        },
+        }),
     };
 
     // 只验证能否成功创建服务器
@@ -148,12 +147,11 @@ async fn test_concurrent_requests() -> Result<(), AppError> {
         port: 0, // 使用系统分配的端口
         address: "127.0.0.1".to_string(),
         upstream_group: "test_group".to_string(),
-        ratelimit: RateLimitConfig {
-            enabled: true,
+        ratelimit: Some(RateLimitConfig {
             per_second: 5, // 每秒5个请求
             burst: 10,     // 突发上限10个
-        },
-        timeout: TimeoutConfig::default(),
+        }),
+        timeout: Some(TimeoutConfig::default()),
     };
 
     // 只验证能否成功创建服务器
@@ -186,8 +184,8 @@ async fn test_server_graceful_shutdown() -> Result<(), AppError> {
         port: 0, // 使用系统分配的端口
         address: "127.0.0.1".to_string(),
         upstream_group: "test_group".to_string(),
-        ratelimit: RateLimitConfig::default(),
-        timeout: TimeoutConfig::default(),
+        ratelimit: None,
+        timeout: Some(TimeoutConfig::default()),
     };
 
     // 只验证能否成功创建服务器

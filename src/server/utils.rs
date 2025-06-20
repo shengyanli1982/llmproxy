@@ -158,26 +158,38 @@ pub(super) fn apply_middlewares(app: Router, state: &Arc<ForwardState>) -> Route
     let mut app = app;
 
     // 应用超时配置
-    let timeout_config = &state.config.timeout;
-    // 创建服务构建器和层
-    let layers = tower::ServiceBuilder::new()
-        // 添加连接超时中间件
-        .layer(tower_http::timeout::TimeoutLayer::new(
-            std::time::Duration::from_secs(timeout_config.connect),
-        ));
+    if let Some(timeout_config) = &state.config.timeout {
+        // 创建服务构建器和层
+        let layers = tower::ServiceBuilder::new()
+            // 添加连接超时中间件
+            .layer(tower_http::timeout::TimeoutLayer::new(
+                std::time::Duration::from_secs(timeout_config.connect),
+            ));
 
-    // 应用所有中间件
-    app = app.layer(layers.into_inner());
+        // 应用所有中间件
+        app = app.layer(layers.into_inner());
+    } else {
+        // 使用默认超时配置
+        let default_timeout = crate::config::TimeoutConfig::default();
+        let layers = tower::ServiceBuilder::new()
+            // 添加连接超时中间件
+            .layer(tower_http::timeout::TimeoutLayer::new(
+                std::time::Duration::from_secs(default_timeout.connect),
+            ));
 
-    // 如果启用了限流，添加限流中间件
-    if state.config.ratelimit.enabled {
+        // 应用所有中间件
+        app = app.layer(layers.into_inner());
+    }
+
+    // 如果存在限流配置，添加限流中间件
+    if let Some(ratelimit_config) = &state.config.ratelimit {
         // 获取转发服务名称，用于指标记录
         let forward_name = state.config.name.clone();
 
         // 创建限流配置
         let governor_conf = tower_governor::governor::GovernorConfigBuilder::default()
-            .per_second(state.config.ratelimit.per_second as u64)
-            .burst_size(state.config.ratelimit.burst)
+            .per_second(ratelimit_config.per_second as u64)
+            .burst_size(ratelimit_config.burst)
             // 添加自定义错误处理，记录限流指标
             .error_handler(move |err: tower_governor::GovernorError| {
                 if let tower_governor::GovernorError::TooManyRequests { .. } = err {

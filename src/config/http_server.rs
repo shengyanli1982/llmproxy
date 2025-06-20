@@ -37,11 +37,11 @@ pub struct ForwardConfig {
     // 限流配置
     #[serde(default)]
     #[validate(nested)]
-    pub ratelimit: RateLimitConfig,
+    pub ratelimit: Option<RateLimitConfig>,
     // 超时配置
     #[serde(default)]
     #[validate(nested)]
-    pub timeout: TimeoutConfig,
+    pub timeout: Option<TimeoutConfig>,
 }
 
 // 管理服务配置
@@ -57,7 +57,7 @@ pub struct AdminConfig {
     // 超时配置
     #[serde(default)]
     #[validate(nested)]
-    pub timeout: TimeoutConfig,
+    pub timeout: Option<TimeoutConfig>,
 }
 
 impl Default for AdminConfig {
@@ -65,7 +65,7 @@ impl Default for AdminConfig {
         Self {
             port: default_admin_port(),
             address: default_listen_address(),
-            timeout: TimeoutConfig::default(),
+            timeout: None,
         }
     }
 }
