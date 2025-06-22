@@ -3,7 +3,10 @@ use std::{net::SocketAddr, sync::Arc};
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemHandle};
 use tracing::{error, info};
 
-use super::utils::{apply_middlewares, build_router, create_tcp_listener};
+use super::{
+    router::Router,
+    utils::{apply_middlewares, build_router, create_tcp_listener},
+};
 
 // 转发服务状态
 pub struct ForwardState {
@@ -11,6 +14,8 @@ pub struct ForwardState {
     pub upstream_manager: Arc<UpstreamManager>,
     // 转发配置
     pub config: ForwardConfig,
+    // 路由器
+    pub router: Router,
 }
 
 // 转发服务
@@ -32,9 +37,13 @@ impl ForwardServer {
             .parse()
             .map_err(|e| AppError::Config(format!("Invalid listening address: {}", e)))?;
 
+        // 创建路由器(转发路由，不是 axum 的路由)
+        let router = Router::new(&config)?;
+
         let state = Arc::new(ForwardState {
             upstream_manager,
             config,
+            router,
         });
 
         Ok(Self { addr, state })

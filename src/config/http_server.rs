@@ -4,6 +4,18 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use validator::Validate;
 
+// 路由规则
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Validate)]
+#[serde(rename_all = "lowercase")]
+pub struct RoutingRule {
+    // 路径模式
+    #[validate(length(min = 1, message = "Path pattern cannot be empty"))]
+    pub path: String,
+    // 目标上游组
+    #[validate(length(min = 1, message = "Target group cannot be empty"))]
+    pub target_group: String,
+}
+
 // HTTP服务器配置
 #[derive(Debug, Clone, Serialize, Deserialize, Default, ToSchema, Validate)]
 #[serde(rename_all = "lowercase")]
@@ -42,6 +54,10 @@ pub struct ForwardConfig {
     #[serde(default)]
     #[validate(nested)]
     pub timeout: Option<TimeoutConfig>,
+    // 路由规则配置
+    #[serde(default)]
+    #[validate(nested)]
+    pub routing: Option<Vec<RoutingRule>>,
 }
 
 // 管理服务配置

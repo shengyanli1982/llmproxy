@@ -145,6 +145,23 @@ pub fn validate_config(config: &Config) -> Result<(), ValidationError> {
                 );
                 return Err(err);
             }
+
+            // 验证路由规则中的上游组引用
+            if let Some(routing) = &forward.routing {
+                for rule in routing {
+                    if !group_names.contains(&rule.target_group) {
+                        let mut err = ValidationError::new("unknown_upstream_group_reference");
+                        err.message = Some(
+                            format!(
+                                "Routing rule in forward '{}' references an unknown upstream group: {}",
+                                forward.name, rule.target_group
+                            )
+                            .into(),
+                        );
+                        return Err(err);
+                    }
+                }
+            }
         }
     }
 

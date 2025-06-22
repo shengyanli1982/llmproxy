@@ -180,11 +180,15 @@ pub async fn forward_handler(
     // 1. 根据请求路径，找到对应的 routing 规则
     // 2. 如果找到对应的 routing 规则，则使用对应的 "target_group", 同时 "target_group" 必须在 "upstream_groups" 中定义, 如果 "target_group" 没有定义, 则使用默认的 "default_group" 配置。
     // 3. 如果找不到对应的 routing 规则，则使用默认的 "default_group" 配置。
+    //
+    // 使用路由器获取目标上游组
+    let routing_result = state.router.get_target_group(&path);
+    let target_group = &routing_result.target_group;
 
     // 转发请求
     match state
         .upstream_manager
-        .forward_request(&state.config.default_group, &method, headers, body_bytes)
+        .forward_request(target_group, &method, headers, body_bytes)
         .await
     {
         Ok(response) => {
@@ -194,7 +198,7 @@ pub async fn forward_handler(
                 &state.config.name,
                 &method,
                 &path,
-                &state.config.default_group,
+                target_group,
             )
             .await
         }
@@ -204,7 +208,7 @@ pub async fn forward_handler(
             &state.config.name,
             &method,
             &path,
-            &state.config.default_group,
+            target_group,
         ),
     }
 }
