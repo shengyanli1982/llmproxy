@@ -24,7 +24,7 @@ http_server:
       address:
         "0.0.0.0" # [可选] 服务监听的网络地址。默认值: "0.0.0.0" (监听所有网络接口)。
         # 考虑安全性，可设置为 "127.0.0.1" (仅本地访问)。
-      upstream_group: "mixgroup" # [必填] 此转发服务关联的上游组名称。该名称必须在 `upstream_groups` 部分定义。
+      default_group: "mixgroup" # [必填] 此转发服务关联的上游组名称。该名称必须在 `upstream_groups` 部分定义。
       # [可选] IP 速率限制配置。如果省略，则不启用此转发的速率限制。
       ratelimit:
         per_second: 100 # [可选] 每秒允许来自单个 IP 的最大请求数。默认值: 100
@@ -37,7 +37,7 @@ http_server:
     - name: openai_group # [必填] 转发服务名称。
       port: 3001 # [必填] 监听端口。
       address: "0.0.0.0" # [可选] 监听地址。默认值: "0.0.0.0"
-      upstream_group: "openai" # [必填] 关联的上游组名称。该名称必须在 `upstream_groups` 部分定义。
+      default_group: "openai" # [必填] 关联的上游组名称。该名称必须在 `upstream_groups` 部分定义。
       # [可选] 速率限制配置。如果省略，则不启用速率限制。
       ratelimit:
         per_second: 100 # [可选] 每秒允许的最大请求数。默认值: 100
@@ -50,7 +50,7 @@ http_server:
     - name: to_failover # [必填] 转发服务名称。
       port: 3002 # [必填] 监听端口。
       address: "0.0.0.0" # [可选] 监听地址。默认值: "0.0.0.0"
-      upstream_group: "failover_group" # [必填] 关联的上游组名称。
+      default_group: "failover_group" # [必填] 关联的上游组名称。
       # [可选] 速率限制配置。如果省略，则不启用速率限制。
       ratelimit:
         per_second: 100 # [可选] 每秒允许的最大请求数。默认值: 100

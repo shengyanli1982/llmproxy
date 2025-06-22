@@ -65,7 +65,7 @@ http_server:
         - name: "llm_openai_service"      # Forward service name
           port: 3000                      # Port LLMProxy listens on
           address: "0.0.0.0"              # Listen on all network interfaces
-          upstream_group: "openai_main_group" # Link to the upstream group defined below
+          default_group: "openai_main_group" # Link to the upstream group defined below
     admin:
         port: 9000                      # Admin port for monitoring
         address: "127.0.0.1"            # Recommended local-only access for security
@@ -351,7 +351,7 @@ http_server:
         - name: "to_openai_llm_group" # [Required] Unique name for the forwarding service
           port: 3000 # [Required] Port this service listens on
           address: "0.0.0.0" # [Optional] Binding network address (default: "0.0.0.0", listen on all interfaces)
-          upstream_group: "openai_llm_group" # [Required] Target upstream group for this forward
+          default_group: "openai_llm_group" # [Required] Target upstream group for this forward
           ratelimit: # [Optional] IP rate limiting
               enabled: true # Whether to enable rate limiting (default: false)
               per_second: 100 # Maximum requests per second per IP
@@ -473,7 +473,7 @@ http_server:
         - name: "tenant-a-service"
           port: 3001
           address: "0.0.0.0"
-          upstream_group: "tenant-a-group"
+          default_group: "tenant-a-group"
           ratelimit:
               enabled: true
               per_second: 50 # Rate limit for Tenant A
@@ -481,7 +481,7 @@ http_server:
         - name: "tenant-b-service"
           port: 3002
           address: "0.0.0.0"
-          upstream_group: "tenant-b-group"
+          default_group: "tenant-b-group"
           ratelimit:
               enabled: true
               per_second: 20 # Rate limit for Tenant B

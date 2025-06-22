@@ -10,7 +10,7 @@ data:
         - name: to_mixgroup
           port: 3000
           address: "0.0.0.0"
-          upstream_group: "mixgroup"
+          default_group: "mixgroup"
           ratelimit:
             enabled: true
             per_second: 100
@@ -20,7 +20,7 @@ data:
         - name: openai_group
           port: 3001
           address: "0.0.0.0"
-          upstream_group: "openai"
+          default_group: "openai"
           ratelimit:
             enabled: true
             per_second: 100

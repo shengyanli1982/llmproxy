@@ -24,7 +24,7 @@ async fn handle_response(
     config_name: &str,
     method: &Method,
     path: &str,
-    upstream_group: &str,
+    default_group: &str,
 ) -> Response {
     // 获取响应状态码和头
     let status = response.status();
@@ -101,7 +101,7 @@ async fn handle_response(
     // 记录请求完成的延迟时间（毫秒）
     info!(
         "Request completed: {} {} to upstream group {}, status: {}, time: {}ms",
-        method, path, upstream_group, status, duration_ms
+        method, path, default_group, status, duration_ms
     );
 
     result
@@ -114,7 +114,7 @@ fn handle_request_error(
     config_name: &str,
     method: &Method,
     path: &str,
-    upstream_group: &str,
+    default_group: &str,
 ) -> Response {
     tracing::error!("Failed to forward request: {}", error);
 
@@ -136,7 +136,7 @@ fn handle_request_error(
         "Request failed: {} {} to upstream group {}, time: {}ms",
         method,
         path,
-        upstream_group,
+        default_group,
         duration.as_millis()
     );
 
@@ -172,12 +172,19 @@ pub async fn forward_handler(
     };
 
     // 此处应该还有一个路由模块
-    // 可以根据用复杂的定制需求，来选择不同的上游组
+    // 可以根据用户的请求路径，来选择不同的上游组
+    //
+    // 输入: 请求路径
+    // 输出: 上游组名称
+    //
+    // 1. 根据请求路径，找到对应的 routing 规则
+    // 2. 如果找到对应的 routing 规则，则使用对应的 "target_group", 同时 "target_group" 必须在 "upstream_groups" 中定义, 如果 "target_group" 没有定义, 则使用默认的 "default_group" 配置。
+    // 3. 如果找不到对应的 routing 规则，则使用默认的 "default_group" 配置。
 
     // 转发请求
     match state
         .upstream_manager
-        .forward_request(&state.config.upstream_group, &method, headers, body_bytes)
+        .forward_request(&state.config.default_group, &method, headers, body_bytes)
         .await
     {
         Ok(response) => {
@@ -187,7 +194,7 @@ pub async fn forward_handler(
                 &state.config.name,
                 &method,
                 &path,
-                &state.config.upstream_group,
+                &state.config.default_group,
             )
             .await
         }
@@ -197,7 +204,7 @@ pub async fn forward_handler(
             &state.config.name,
             &method,
             &path,
-            &state.config.upstream_group,
+            &state.config.default_group,
         ),
     }
 }

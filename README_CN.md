@@ -65,7 +65,7 @@ http_server:
         - name: "llm_openai_service"      # 转发服务名称
           port: 3000                      # LLMProxy 监听此端口
           address: "0.0.0.0"              # 监听所有网络接口
-          upstream_group: "openai_main_group" # 关联到下面的上游组
+          default_group: "openai_main_group" # 关联到下面的上游组
     admin:
         port: 9000                      # 管理端口，用于监控等
         address: "127.0.0.1"            # 建议仅本地访问，确保安全
@@ -347,7 +347,7 @@ http_server:
         - name: "to_openai_llm_group" # [必需] 转发服务的唯一名称
           port: 3000 # [必需] 此服务监听的端口
           address: "0.0.0.0" # [可选] 绑定的网络地址（默认："0.0.0.0"，监听所有接口）
-          upstream_group: "openai_llm_group" # [必需] 此转发对应的目标上游组
+          default_group: "openai_llm_group" # [必需] 此转发对应的目标上游组
           ratelimit: # [可选] IP 速率限制
               enabled: true # 是否启用速率限制（默认：false）
               per_second: 100 # 单个IP每秒最大请求数
@@ -469,7 +469,7 @@ http_server:
         - name: "tenant-a-service"
           port: 3001
           address: "0.0.0.0"
-          upstream_group: "tenant-a-group"
+          default_group: "tenant-a-group"
           ratelimit:
               enabled: true
               per_second: 50 # 租户A的速率限制
@@ -477,7 +477,7 @@ http_server:
         - name: "tenant-b-service"
           port: 3002
           address: "0.0.0.0"
-          upstream_group: "tenant-b-group"
+          default_group: "tenant-b-group"
           ratelimit:
               enabled: true
               per_second: 20 # 租户B的速率限制

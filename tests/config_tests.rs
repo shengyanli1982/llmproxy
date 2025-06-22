@@ -38,7 +38,7 @@ fn create_valid_test_config() -> Config {
         name: "test_forward".to_string(),
         port: 3000,
         address: "127.0.0.1".to_string(),
-        upstream_group: "test_group".to_string(),
+        default_group: "test_group".to_string(),
         ratelimit: Some(RateLimitConfig {
             per_second: 100,
             burst: 200,
@@ -332,7 +332,7 @@ fn test_config_with_none_options() {
         name: "test_forward".to_string(),
         port: 3000,
         address: "127.0.0.1".to_string(),
-        upstream_group: "test_group".to_string(),
+        default_group: "test_group".to_string(),
         ratelimit: None,
         timeout: None,
     };

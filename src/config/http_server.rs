@@ -33,7 +33,7 @@ pub struct ForwardConfig {
     pub address: String,
     // 指向的上游组名
     #[validate(length(min = 1, message = "Upstream group cannot be empty"))]
-    pub upstream_group: String,
+    pub default_group: String,
     // 限流配置
     #[serde(default)]
     #[validate(nested)]
