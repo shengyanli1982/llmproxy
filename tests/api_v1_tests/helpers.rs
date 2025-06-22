@@ -113,6 +113,7 @@ pub async fn spawn_app() -> TestApp {
                 default_group: "default_group".to_string(),
                 ratelimit: None,
                 timeout: Some(TimeoutConfig::default()),
+                routing: None,
             }],
         }),
         upstreams: vec![config::UpstreamConfig {

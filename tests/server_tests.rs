@@ -71,6 +71,7 @@ async fn test_forward_server_creation() {
         default_group: "test_group".to_string(),
         ratelimit: None,
         timeout: Some(TimeoutConfig::default()),
+        routing: None,
     };
 
     // 只验证能否成功创建服务器
@@ -94,6 +95,7 @@ async fn test_rate_limiting() -> Result<(), AppError> {
             burst: 2,
         }),
         timeout: Some(TimeoutConfig::default()),
+        routing: None,
     };
 
     // 只验证能否成功创建服务器
@@ -126,6 +128,7 @@ async fn test_server_timeout() -> Result<(), AppError> {
         timeout: Some(TimeoutConfig {
             connect: 1, // 1秒连接超时
         }),
+        routing: None,
     };
 
     // 只验证能否成功创建服务器
@@ -152,6 +155,7 @@ async fn test_concurrent_requests() -> Result<(), AppError> {
             burst: 10,     // 突发上限10个
         }),
         timeout: Some(TimeoutConfig::default()),
+        routing: None,
     };
 
     // 只验证能否成功创建服务器
@@ -186,6 +190,7 @@ async fn test_server_graceful_shutdown() -> Result<(), AppError> {
         default_group: "test_group".to_string(),
         ratelimit: None,
         timeout: Some(TimeoutConfig::default()),
+        routing: None,
     };
 
     // 只验证能否成功创建服务器

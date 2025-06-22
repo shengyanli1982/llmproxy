@@ -185,6 +185,9 @@ pub async fn forward_handler(
     let routing_result = state.router.get_target_group(&path);
     let target_group = &routing_result.target_group;
 
+    // 记录路由匹配
+    METRICS.record_route_match(&state.config.name, target_group);
+
     // 转发请求
     match state
         .upstream_manager

@@ -1,27 +1,29 @@
 use once_cell::sync::Lazy;
-use prometheus::{CounterVec, HistogramOpts, HistogramVec, Opts, Registry};
+use prometheus::{HistogramOpts, HistogramVec, IntCounterVec, Opts, Registry};
 
 // 应用指标
 pub struct Metrics {
     registry: Registry,
     // 上游请求计数
-    upstream_requests_total: CounterVec,
+    upstream_requests_total: IntCounterVec,
     // 上游请求耗时
     upstream_duration_seconds: HistogramVec,
     // 上游错误计数
-    upstream_errors_total: CounterVec,
+    upstream_errors_total: IntCounterVec,
     // HTTP请求计数
-    http_requests_total: CounterVec,
+    http_requests_total: IntCounterVec,
     // HTTP请求耗时
     http_request_duration_seconds: HistogramVec,
     // HTTP请求错误计数
-    http_request_errors_total: CounterVec,
+    http_request_errors_total: IntCounterVec,
     // 限流计数
-    ratelimit_total: CounterVec,
+    ratelimit_total: IntCounterVec,
     // 熔断器状态变化计数
-    circuitbreaker_state_changes_total: CounterVec,
+    circuitbreaker_state_changes_total: IntCounterVec,
     // 熔断器调用结果计数
-    circuitbreaker_calls_total: CounterVec,
+    circuitbreaker_calls_total: IntCounterVec,
+    // 路由匹配计数
+    route_matches_total: IntCounterVec,
 }
 
 impl Metrics {
@@ -30,7 +32,7 @@ impl Metrics {
         let registry = Registry::new();
 
         // 上游请求计数
-        let upstream_requests_total = CounterVec::new(
+        let upstream_requests_total = IntCounterVec::new(
             Opts::new(
                 "llmproxy_upstream_requests_total",
                 "Total number of requests forwarded to upstream services.",
@@ -53,7 +55,7 @@ impl Metrics {
         .unwrap();
 
         // 上游错误计数
-        let upstream_errors_total = CounterVec::new(
+        let upstream_errors_total = IntCounterVec::new(
             Opts::new(
                 "llmproxy_upstream_errors_total",
                 "Total number of errors encountered when making requests to upstream services.",
@@ -63,7 +65,7 @@ impl Metrics {
         .unwrap();
 
         // HTTP请求计数
-        let http_requests_total = CounterVec::new(
+        let http_requests_total = IntCounterVec::new(
             Opts::new(
                 "llmproxy_http_requests_total",
                 "Total number of incoming HTTP requests received by the proxy.",
@@ -86,7 +88,7 @@ impl Metrics {
         .unwrap();
 
         // HTTP请求错误计数
-        let http_request_errors_total = CounterVec::new(
+        let http_request_errors_total = IntCounterVec::new(
             Opts::new(
                 "llmproxy_http_request_errors_total",
                 "Total number of errors encountered while processing incoming HTTP requests (e.g., client errors, proxy errors).",
@@ -96,7 +98,7 @@ impl Metrics {
         .unwrap();
 
         // 限流计数
-        let ratelimit_total = CounterVec::new(
+        let ratelimit_total = IntCounterVec::new(
             Opts::new(
                 "llmproxy_ratelimit_total",
                 "Total number of requests that were rejected due to rate limiting.",
@@ -106,7 +108,7 @@ impl Metrics {
         .unwrap();
 
         // 熔断器状态变化计数
-        let circuitbreaker_state_changes_total = CounterVec::new(
+        let circuitbreaker_state_changes_total = IntCounterVec::new(
             Opts::new(
                 "llmproxy_circuitbreaker_state_changes_total",
                 "Total number of state changes for the circuit breaker.",
@@ -116,12 +118,22 @@ impl Metrics {
         .unwrap();
 
         // 熔断器调用结果计数
-        let circuitbreaker_calls_total = CounterVec::new(
+        let circuitbreaker_calls_total = IntCounterVec::new(
             Opts::new(
                 "llmproxy_circuitbreaker_calls_total",
                 "Total number of calls to the circuit breaker.",
             ),
             &["group", "upstream", "result"],
+        )
+        .unwrap();
+
+        // 路由匹配计数
+        let route_matches_total = IntCounterVec::new(
+            Opts::new(
+                "llmproxy_route_matches_total",
+                "Total number of route matches.",
+            ),
+            &["forward", "group"],
         )
         .unwrap();
 
@@ -153,6 +165,9 @@ impl Metrics {
         registry
             .register(Box::new(circuitbreaker_calls_total.clone()))
             .unwrap();
+        registry
+            .register(Box::new(route_matches_total.clone()))
+            .unwrap();
 
         Self {
             registry,
@@ -165,6 +180,7 @@ impl Metrics {
             ratelimit_total,
             circuitbreaker_state_changes_total,
             circuitbreaker_calls_total,
+            route_matches_total,
         }
     }
 
@@ -174,7 +190,7 @@ impl Metrics {
     }
 
     // 上游请求计数
-    pub fn upstream_requests_total(&self) -> &CounterVec {
+    pub fn upstream_requests_total(&self) -> &IntCounterVec {
         &self.upstream_requests_total
     }
 
@@ -184,12 +200,12 @@ impl Metrics {
     }
 
     // 上游错误计数
-    pub fn upstream_errors_total(&self) -> &CounterVec {
+    pub fn upstream_errors_total(&self) -> &IntCounterVec {
         &self.upstream_errors_total
     }
 
     // HTTP请求计数
-    pub fn http_requests_total(&self) -> &CounterVec {
+    pub fn http_requests_total(&self) -> &IntCounterVec {
         &self.http_requests_total
     }
 
@@ -199,22 +215,22 @@ impl Metrics {
     }
 
     // HTTP请求错误计数
-    pub fn http_request_errors_total(&self) -> &CounterVec {
+    pub fn http_request_errors_total(&self) -> &IntCounterVec {
         &self.http_request_errors_total
     }
 
     // 限流计数
-    pub fn ratelimit_total(&self) -> &CounterVec {
+    pub fn ratelimit_total(&self) -> &IntCounterVec {
         &self.ratelimit_total
     }
 
     // 熔断器状态变化计数
-    pub fn circuitbreaker_state_changes_total(&self) -> &CounterVec {
+    pub fn circuitbreaker_state_changes_total(&self) -> &IntCounterVec {
         &self.circuitbreaker_state_changes_total
     }
 
     // 熔断器调用结果计数
-    pub fn circuitbreaker_calls_total(&self) -> &CounterVec {
+    pub fn circuitbreaker_calls_total(&self) -> &IntCounterVec {
         &self.circuitbreaker_calls_total
     }
 
@@ -222,6 +238,13 @@ impl Metrics {
     pub fn record_upstream_request_error(&self, group: &str, upstream: &str, error_type: &str) {
         self.upstream_errors_total
             .with_label_values(&[error_type, group, upstream])
+            .inc();
+    }
+
+    // 记录路由匹配
+    pub fn record_route_match(&self, forward: &str, group: &str) {
+        self.route_matches_total
+            .with_label_values(&[forward, group])
             .inc();
     }
 }

@@ -44,6 +44,7 @@ fn create_valid_test_config() -> Config {
             burst: 200,
         }),
         timeout: Some(TimeoutConfig { connect: 5 }),
+        routing: None,
     };
 
     Config {
@@ -335,6 +336,7 @@ fn test_config_with_none_options() {
         default_group: "test_group".to_string(),
         ratelimit: None,
         timeout: None,
+        routing: None,
     };
 
     // 创建一个包含该 ForwardConfig 的 Config
