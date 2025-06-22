@@ -151,7 +151,7 @@ async fn create_components(debug: bool, config: Config) -> Result<AppComponents,
     .parse()
     .map_err(|e| AppError::Config(format!("Invalid admin server address: {}", e)))?;
     let admin_server = AdminServer::new(debug, admin_addr, config_arc.clone());
-    info!("Admin server initialized successfully: {}", admin_addr);
+    info!("Admin server initialized successfully: {:?}", admin_addr);
 
     // 创建转发服务
     let mut forward_servers = Vec::with_capacity(http_server_config.forwards.len());
@@ -160,14 +160,14 @@ async fn create_components(debug: bool, config: Config) -> Result<AppComponents,
         match ForwardServer::new(forward_config.clone(), upstream_manager.clone()) {
             Ok(server) => {
                 info!(
-                    "Forwarding service {} initialized successfully",
+                    "Forwarding service {:?} initialized successfully",
                     forward_config.name
                 );
                 forward_servers.push(server);
             }
             Err(e) => {
                 error!(
-                    "Failed to initialize forwarding service {}: {}",
+                    "Failed to initialize forwarding service {:?}: {}",
                     forward_config.name, e
                 );
                 return Err(e);

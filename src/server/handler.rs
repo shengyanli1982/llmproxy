@@ -100,7 +100,7 @@ async fn handle_response(
 
     // 记录请求完成的延迟时间（毫秒）
     info!(
-        "Request completed: {} {} to upstream group {}, status: {}, time: {}ms",
+        "Request completed: {:?} {:?} to upstream group {:?}, status: {}, time: {}ms",
         method, path, default_group, status, duration_ms
     );
 
@@ -133,7 +133,7 @@ fn handle_request_error(
 
     // 记录请求失败的信息
     info!(
-        "Request failed: {} {} to upstream group {}, time: {}ms",
+        "Request failed: {:?} {:?} to upstream group {:?}, time: {}ms",
         method,
         path,
         default_group,

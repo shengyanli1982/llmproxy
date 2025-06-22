@@ -59,7 +59,7 @@ impl IntoSubsystem<AppError> for AdminServer {
         // 创建 TCP 监听器
         let listener = create_tcp_listener(self.addr, u16::MAX.into())?;
 
-        info!("Admin service listening on {}", self.addr);
+        info!("Admin service listening on {:?}", self.addr);
 
         // 使用tokio::select!监听服务器和关闭信号
         tokio::select! {

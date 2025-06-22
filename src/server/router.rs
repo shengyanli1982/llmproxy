@@ -34,19 +34,22 @@ impl Router {
                 // 检查路径唯一性
                 if !paths.insert(&rule.path) {
                     return Err(AppError::Config(format!(
-                        "Duplicate routing path found: {}",
+                        "Duplicate routing path found: {:?}",
                         rule.path
                     )));
                 }
 
                 if let Err(e) = path_map.insert(rule.path.clone(), rule.target_group.clone()) {
                     return Err(AppError::Config(format!(
-                        "Error adding route: {} -> {}, error: {}",
+                        "Error adding route: {:?} -> {:?}, error: {}",
                         rule.path, rule.target_group, e
                     )));
                 }
 
-                debug!("Added routing rule: {} -> {}", rule.path, rule.target_group);
+                debug!(
+                    "Added routing rule: {:?} -> {:?}",
+                    rule.path, rule.target_group
+                );
             }
         }
 
@@ -62,7 +65,7 @@ impl Router {
         // 查找匹配的路由规则
         // 使用 .as_bytes() 将 &str 转换为 &[u8]
         if let Some(target_group) = self.path_map.get(path.as_bytes()) {
-            debug!("Routing matched: {} -> {}", path, target_group);
+            debug!("Routing matched: {:?} -> {:?}", path, target_group);
             return RoutingResult {
                 target_group,
                 is_default: false,
@@ -71,7 +74,7 @@ impl Router {
 
         // 没有匹配规则，使用默认上游组
         debug!(
-            "No routing rule matched for path: {}, using default group: {}",
+            "No routing rule matched for path: {:?}, using default group: {:?}",
             path, self.default_group
         );
         RoutingResult {

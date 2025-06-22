@@ -13,7 +13,7 @@ pub(super) fn build_upstream_map(upstreams: &[UpstreamConfig]) -> HashMap<String
 
     for upstream in upstreams {
         debug!(
-            "Loaded upstream: {}, url: {:?}",
+            "Loaded upstream: {:?}, url: {:?}",
             upstream.name, upstream.url
         );
         upstream_map.insert(upstream.name.clone(), upstream.clone());

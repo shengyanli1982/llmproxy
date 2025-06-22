@@ -35,7 +35,7 @@ impl ForwardServer {
         // 解析监听地址
         let addr = format!("{}:{}", config.address, config.port)
             .parse()
-            .map_err(|e| AppError::Config(format!("Invalid listening address: {}", e)))?;
+            .map_err(|e| AppError::Config(format!("Invalid listening address: {:?}", e)))?;
 
         // 创建路由器(转发路由，不是 axum 的路由)
         let router = Router::new(&config)?;
@@ -68,7 +68,7 @@ impl IntoSubsystem<AppError> for ForwardServer {
         let listener = create_tcp_listener(self.addr, u16::MAX.into())?;
 
         info!(
-            "Forwarding service {} listening on {}",
+            "Forwarding service {:?} listening on {:?}",
             self.state.config.name, self.addr
         );
 
