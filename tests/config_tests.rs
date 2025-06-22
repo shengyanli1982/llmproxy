@@ -38,12 +38,13 @@ fn create_valid_test_config() -> Config {
         name: "test_forward".to_string(),
         port: 3000,
         address: "127.0.0.1".to_string(),
-        upstream_group: "test_group".to_string(),
+        default_group: "test_group".to_string(),
         ratelimit: Some(RateLimitConfig {
             per_second: 100,
             burst: 200,
         }),
         timeout: Some(TimeoutConfig { connect: 5 }),
+        routing: None,
     };
 
     Config {
@@ -332,9 +333,10 @@ fn test_config_with_none_options() {
         name: "test_forward".to_string(),
         port: 3000,
         address: "127.0.0.1".to_string(),
-        upstream_group: "test_group".to_string(),
+        default_group: "test_group".to_string(),
         ratelimit: None,
         timeout: None,
+        routing: None,
     };
 
     // 创建一个包含该 ForwardConfig 的 Config
@@ -420,4 +422,298 @@ fn test_config_without_http_server() {
 
     // 验证 http_server 是否仍然为 None
     assert!(deserialized_config.http_server.is_none());
+}
+
+#[test]
+fn test_config_with_routing() {
+    // 创建基本的上游配置
+    let upstream_config = UpstreamConfig {
+        name: "test_upstream".to_string(),
+        url: "http://localhost:8080".to_string().into(),
+        weight: 1,
+        http_client: HttpClientConfig::default(),
+        auth: None,
+        headers: vec![],
+        breaker: None,
+    };
+
+    // 创建两个上游组配置
+    let group_config = UpstreamGroupConfig {
+        name: "test_group".to_string(),
+        upstreams: vec![UpstreamRef {
+            name: "test_upstream".to_string(),
+            weight: 1,
+        }],
+        balance: BalanceConfig {
+            strategy: BalanceStrategy::RoundRobin,
+        },
+        http_client: HttpClientConfig::default(),
+    };
+
+    let api_group_config = UpstreamGroupConfig {
+        name: "api_group".to_string(),
+        upstreams: vec![UpstreamRef {
+            name: "test_upstream".to_string(),
+            weight: 1,
+        }],
+        balance: BalanceConfig {
+            strategy: BalanceStrategy::RoundRobin,
+        },
+        http_client: HttpClientConfig::default(),
+    };
+
+    // 创建一个包含路由规则的转发配置
+    use llmproxy::config::http_server::RoutingRule;
+
+    let routing_rules = vec![RoutingRule {
+        path: "/api".to_string(),
+        target_group: "api_group".to_string(),
+    }];
+
+    let forward_config = ForwardConfig {
+        name: "test_forward".to_string(),
+        port: 3000,
+        address: "127.0.0.1".to_string(),
+        default_group: "test_group".to_string(),
+        ratelimit: None,
+        timeout: None,
+        routing: Some(routing_rules),
+    };
+
+    // 创建完整的配置
+    let config = Config {
+        http_server: Some(HttpServerConfig {
+            forwards: vec![forward_config],
+            admin: AdminConfig {
+                port: 9000,
+                address: "127.0.0.1".to_string(),
+                timeout: None,
+            },
+        }),
+        upstreams: vec![upstream_config],
+        upstream_groups: vec![group_config, api_group_config],
+    };
+
+    // 验证配置是否有效
+    let result = config.validate();
+    assert!(result.is_ok());
+}
+
+#[test]
+fn test_config_validation_invalid_routing_target_group() {
+    // 创建基本的上游配置
+    let upstream_config = UpstreamConfig {
+        name: "test_upstream".to_string(),
+        url: "http://localhost:8080".to_string().into(),
+        weight: 1,
+        http_client: HttpClientConfig::default(),
+        auth: None,
+        headers: vec![],
+        breaker: None,
+    };
+
+    // 创建上游组配置
+    let group_config = UpstreamGroupConfig {
+        name: "test_group".to_string(),
+        upstreams: vec![UpstreamRef {
+            name: "test_upstream".to_string(),
+            weight: 1,
+        }],
+        balance: BalanceConfig {
+            strategy: BalanceStrategy::RoundRobin,
+        },
+        http_client: HttpClientConfig::default(),
+    };
+
+    // 创建一个路由规则，其目标上游组不存在
+    use llmproxy::config::http_server::RoutingRule;
+
+    let routing_rules = vec![RoutingRule {
+        path: "/api".to_string(),
+        target_group: "non_existent_group".to_string(), // 这个上游组不存在
+    }];
+
+    let forward_config = ForwardConfig {
+        name: "test_forward".to_string(),
+        port: 3000,
+        address: "127.0.0.1".to_string(),
+        default_group: "test_group".to_string(),
+        ratelimit: None,
+        timeout: None,
+        routing: Some(routing_rules),
+    };
+
+    // 创建完整的配置
+    let config = Config {
+        http_server: Some(HttpServerConfig {
+            forwards: vec![forward_config],
+            admin: AdminConfig {
+                port: 9000,
+                address: "127.0.0.1".to_string(),
+                timeout: None,
+            },
+        }),
+        upstreams: vec![upstream_config],
+        upstream_groups: vec![group_config], // 注意这里没有包含 "non_existent_group"
+    };
+
+    // 验证配置应该失败，因为路由引用了不存在的上游组
+    let result = config.validate();
+    assert!(result.is_err());
+    if let Err(e) = result {
+        assert!(e.to_string().contains("non_existent_group"));
+        assert!(e.to_string().contains("unknown upstream group"));
+    } else {
+        panic!("Expected Config error for unknown upstream group reference");
+    }
+}
+
+#[test]
+fn test_config_with_various_routing_paths() {
+    // 创建基本的上游配置
+    let upstream_config = UpstreamConfig {
+        name: "test_upstream".to_string(),
+        url: "http://localhost:8080".to_string().into(),
+        weight: 1,
+        http_client: HttpClientConfig::default(),
+        auth: None,
+        headers: vec![],
+        breaker: None,
+    };
+
+    // 创建多个上游组配置
+    let default_group = UpstreamGroupConfig {
+        name: "default_group".to_string(),
+        upstreams: vec![UpstreamRef {
+            name: "test_upstream".to_string(),
+            weight: 1,
+        }],
+        balance: BalanceConfig {
+            strategy: BalanceStrategy::RoundRobin,
+        },
+        http_client: HttpClientConfig::default(),
+    };
+
+    let static_group = UpstreamGroupConfig {
+        name: "static_group".to_string(),
+        upstreams: vec![UpstreamRef {
+            name: "test_upstream".to_string(),
+            weight: 1,
+        }],
+        balance: BalanceConfig {
+            strategy: BalanceStrategy::RoundRobin,
+        },
+        http_client: HttpClientConfig::default(),
+    };
+
+    let param_group = UpstreamGroupConfig {
+        name: "param_group".to_string(),
+        upstreams: vec![UpstreamRef {
+            name: "test_upstream".to_string(),
+            weight: 1,
+        }],
+        balance: BalanceConfig {
+            strategy: BalanceStrategy::RoundRobin,
+        },
+        http_client: HttpClientConfig::default(),
+    };
+
+    let regex_group = UpstreamGroupConfig {
+        name: "regex_group".to_string(),
+        upstreams: vec![UpstreamRef {
+            name: "test_upstream".to_string(),
+            weight: 1,
+        }],
+        balance: BalanceConfig {
+            strategy: BalanceStrategy::RoundRobin,
+        },
+        http_client: HttpClientConfig::default(),
+    };
+
+    let wildcard_group = UpstreamGroupConfig {
+        name: "wildcard_group".to_string(),
+        upstreams: vec![UpstreamRef {
+            name: "test_upstream".to_string(),
+            weight: 1,
+        }],
+        balance: BalanceConfig {
+            strategy: BalanceStrategy::RoundRobin,
+        },
+        http_client: HttpClientConfig::default(),
+    };
+
+    // 创建各种路径模式的路由规则
+    use llmproxy::config::http_server::RoutingRule;
+
+    let routing_rules = vec![
+        // 静态路径
+        RoutingRule {
+            path: "/api/users/admin".to_string(),
+            target_group: "static_group".to_string(),
+        },
+        // 参数化路径
+        RoutingRule {
+            path: "/api/users/:id".to_string(),
+            target_group: "param_group".to_string(),
+        },
+        // 正则表达式路径
+        RoutingRule {
+            path: "/api/items/{id:[0-9]+}".to_string(),
+            target_group: "regex_group".to_string(),
+        },
+        // 复杂正则表达式路径
+        RoutingRule {
+            path: "/api/products/{code:[A-Z][A-Z][A-Z][0-9][0-9][0-9]}".to_string(),
+            target_group: "regex_group".to_string(),
+        },
+        // 中间通配符路径
+        RoutingRule {
+            path: "/api/*/docs".to_string(),
+            target_group: "wildcard_group".to_string(),
+        },
+        // 尾部通配符路径
+        RoutingRule {
+            path: "/files/*".to_string(),
+            target_group: "wildcard_group".to_string(),
+        },
+        // 混合路径模式
+        RoutingRule {
+            path: "/api/:version/users/{id:[0-9]+}/profile".to_string(),
+            target_group: "regex_group".to_string(),
+        },
+    ];
+
+    let forward_config = ForwardConfig {
+        name: "test_forward".to_string(),
+        port: 3000,
+        address: "127.0.0.1".to_string(),
+        default_group: "default_group".to_string(),
+        ratelimit: None,
+        timeout: None,
+        routing: Some(routing_rules),
+    };
+
+    // 创建完整的配置
+    let config = Config {
+        http_server: Some(HttpServerConfig {
+            forwards: vec![forward_config],
+            admin: AdminConfig {
+                port: 9000,
+                address: "127.0.0.1".to_string(),
+                timeout: None,
+            },
+        }),
+        upstreams: vec![upstream_config],
+        upstream_groups: vec![
+            default_group,
+            static_group,
+            param_group,
+            regex_group,
+            wildcard_group,
+        ],
+    };
+
+    // 验证配置是否有效
+    let result = config.validate();
+    assert!(result.is_ok());
 }

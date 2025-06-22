@@ -65,7 +65,7 @@ http_server:
         - name: "llm_openai_service"      # Forward service name
           port: 3000                      # Port LLMProxy listens on
           address: "0.0.0.0"              # Listen on all network interfaces
-          upstream_group: "openai_main_group" # Link to the upstream group defined below
+          default_group: "openai_main_group" # Link to the upstream group defined below
     admin:
         port: 9000                      # Admin port for monitoring
         address: "127.0.0.1"            # Recommended local-only access for security
@@ -285,21 +285,24 @@ LLMProxy uses structured YAML files for configuration, offering flexible and pow
 
 #### HTTP Server Configuration Options
 
-| Configuration Item                            | Type    | Default   | Description                                                                       |
-| --------------------------------------------- | ------- | --------- | --------------------------------------------------------------------------------- |
-| `http_server.forwards[].name`                 | String  | -         | **[Required]** Unique identifier name for the forwarding service                  |
-| `http_server.forwards[].port`                 | Integer | 3000      | **[Required]** Listening port for the forwarding service                          |
-| `http_server.forwards[].address`              | String  | "0.0.0.0" | Binding network address for the forwarding service                                |
-| `http_server.forwards[].upstream_group`       | String  | -         | **[Required]** Name of the upstream group associated with this forwarding service |
-| `http_server.forwards[].ratelimit`            | Object  | null      | **[Optional]** Rate limiting configuration. If omitted, rate limiting is disabled |
-| `http_server.forwards[].ratelimit.per_second` | Integer | 100       | Maximum number of requests allowed per second per IP (range: 1-10000)             |
-| `http_server.forwards[].ratelimit.burst`      | Integer | 200       | Number of burst requests allowed per IP (buffer size) (range: 1-20000)            |
-| `http_server.forwards[].timeout`              | Object  | null      | **[Optional]** Timeout configuration. If omitted, default values are used         |
-| `http_server.forwards[].timeout.connect`      | Integer | 10        | Timeout for client connections to LLMProxy (seconds)                              |
-| `http_server.admin.port`                      | Integer | 9000      | Optional listening port for the admin service                                     |
-| `http_server.admin.address`                   | String  | "0.0.0.0" | Binding network address for the admin service                                     |
-| `http_server.admin.timeout`                   | Object  | null      | **[Optional]** Timeout configuration. If omitted, default values are used         |
-| `http_server.admin.timeout.connect`           | Integer | 10        | Timeout for connections to the admin interface (seconds)                          |
+| Configuration Item                              | Type    | Default   | Description                                                                                    |
+| ----------------------------------------------- | ------- | --------- | ---------------------------------------------------------------------------------------------- |
+| `http_server.forwards[].name`                   | String  | -         | **[Required]** Unique identifier name for the forwarding service                               |
+| `http_server.forwards[].port`                   | Integer | 3000      | **[Required]** Listening port for the forwarding service                                       |
+| `http_server.forwards[].address`                | String  | "0.0.0.0" | Binding network address for the forwarding service                                             |
+| `http_server.forwards[].default_group`          | String  | -         | **[Required]** Name of the default upstream group when no routing rules match                  |
+| `http_server.forwards[].routing`                | Array   | null      | **[Optional]** Advanced routing rules configuration. If omitted, routing is disabled           |
+| `http_server.forwards[].routing[].path`         | String  | -         | **[Required]** Path pattern for this routing rule                                              |
+| `http_server.forwards[].routing[].target_group` | String  | -         | **[Required]** Name of the upstream group for this route, must be defined in `upstream_groups` |
+| `http_server.forwards[].ratelimit`              | Object  | null      | **[Optional]** Rate limiting configuration. If omitted, rate limiting is disabled              |
+| `http_server.forwards[].ratelimit.per_second`   | Integer | 100       | Maximum number of requests allowed per second per IP (range: 1-10000)                          |
+| `http_server.forwards[].ratelimit.burst`        | Integer | 200       | Number of burst requests allowed per IP (buffer size) (range: 1-20000)                         |
+| `http_server.forwards[].timeout`                | Object  | null      | **[Optional]** Timeout configuration. If omitted, default values are used                      |
+| `http_server.forwards[].timeout.connect`        | Integer | 10        | Timeout for client connections to LLMProxy (seconds)                                           |
+| `http_server.admin.port`                        | Integer | 9000      | Optional listening port for the admin service                                                  |
+| `http_server.admin.address`                     | String  | "0.0.0.0" | Binding network address for the admin service                                                  |
+| `http_server.admin.timeout`                     | Object  | null      | **[Optional]** Timeout configuration. If omitted, default values are used                      |
+| `http_server.admin.timeout.connect`             | Integer | 10        | Timeout for connections to the admin interface (seconds)                                       |
 
 #### Upstream Service Configuration Options (Upstream LLM Services)
 
@@ -351,7 +354,18 @@ http_server:
         - name: "to_openai_llm_group" # [Required] Unique name for the forwarding service
           port: 3000 # [Required] Port this service listens on
           address: "0.0.0.0" # [Optional] Binding network address (default: "0.0.0.0", listen on all interfaces)
-          upstream_group: "openai_llm_group" # [Required] Target upstream group for this forward
+          default_group: "openai_llm_group" # [Required] Default upstream group when no routing rules match
+          # [Optional] Advanced path-based routing rules
+          routing:
+              # Static path rule - highest priority matching
+              - path: "/api/specific-endpoint"
+                target_group: "specialized_llm_group"
+              # Named parameter rule
+              - path: "/api/users/:id/history"
+                target_group: "user_history_group"
+              # Regular expression rule - only matches numeric IDs
+              - path: "/api/items/{id:[0-9]+}"
+                target_group: "item_api_group"
           ratelimit: # [Optional] IP rate limiting
               enabled: true # Whether to enable rate limiting (default: false)
               per_second: 100 # Maximum requests per second per IP
@@ -366,6 +380,112 @@ http_server:
         timeout:
             connect: 10 # Timeout for connections to the admin interface (seconds)
 ```
+
+### Advanced Path-Based Routing
+
+LLMProxy supports sophisticated path-based routing within each forward service, allowing requests to be directed to different upstream groups based on the request path. This feature enables creating complex routing topologies and service meshes for LLM services.
+
+#### Routing Rule Configuration
+
+Routing rules are defined under the `routing` array in each forward service configuration. When a request arrives, LLMProxy evaluates all configured routing rules in order and selects the first matching rule. If no rules match, the request is sent to the `default_group`.
+
+```yaml
+forwards:
+    - name: "advanced_routing_service"
+      port: 3000
+      address: "0.0.0.0"
+      default_group: "fallback_group" # Used when no routing rules match
+      routing:
+          - path: "/path/to/match"
+            target_group: "target_upstream_group"
+          # Additional rules...
+```
+
+#### Path Matching Patterns
+
+LLMProxy supports several path matching patterns, from simple static paths to complex regex-based patterns:
+
+1. **Static Paths**: Exact path matching with highest priority.
+
+    ```yaml
+    - path: "/api/users/admin"
+      target_group: "admin_api_group"
+    ```
+
+2. **Named Parameters**: Match variable path segments using `:param_name` syntax.
+
+    ```yaml
+    - path: "/api/users/:id"
+      target_group: "user_api_group" # Matches "/api/users/123", "/api/users/abc", etc.
+    ```
+
+3. **Regex-Constrained Parameters**: Match path segments with regex constraints using `{param:regex}` syntax.
+
+    ```yaml
+    - path: "/api/items/{id:[0-9]+}"
+      target_group: "item_api_group" # Matches "/api/items/42", but not "/api/items/abc"
+    ```
+
+4. **Complex Regex Patterns**: Match specific formats with more complex regex patterns.
+
+    ```yaml
+    - path: "/api/products/{code:[A-Z][A-Z][A-Z][0-9][0-9][0-9]}"
+      target_group: "product_api_group" # Matches "/api/products/ABC123"
+    ```
+
+5. **Wildcards**: Use `*` to match single path segments or trailing content.
+
+    ```yaml
+    - path: "/api/*/docs"
+      target_group: "api_docs_group" # Matches "/api/v1/docs", "/api/v2/docs"
+
+    - path: "/files/*"
+      target_group: "file_server_group" # Matches any path starting with "/files/"
+    ```
+
+6. **Mixed Patterns**: Combine various patterns for complex routing needs.
+    ```yaml
+    - path: "/api/:version/users/{id:[0-9]+}/profile"
+      target_group: "user_profile_group" # Matches "/api/v2/users/42/profile"
+    ```
+
+#### Routing Matching Priority
+
+When multiple rules could match a path, `LLMProxy` follows these priority rules:
+
+1. Static paths always have the highest priority
+2. Parameterized paths with more static segments have higher priority
+3. Regex-constrained parameters have higher priority than unconstrained parameters
+4. Longer path patterns have higher priority than shorter ones
+5. Rules are evaluated in the order they are defined
+
+#### Use Cases for Advanced Routing
+
+-   **Model-Specific Routing**: Direct different model requests to specialized upstream groups.
+
+    ```yaml
+    - path: "/v1/chat/completions" # Default chat completions
+      target_group: "standard_models_group"
+    - path: "/v1/embeddings"
+      target_group: "embedding_models_group"
+    ```
+
+-   **Version-Based Routing**: Support API versioning or A/B testing.
+
+    ```yaml
+    - path: "/api/v1/*"
+      target_group: "api_v1_group"
+    - path: "/api/v2/*"
+      target_group: "api_v2_group"
+    ```
+
+-   **Resource-Based Routing**: Route different resource types to specialized services.
+    ```yaml
+    - path: "/api/images/*"
+      target_group: "image_generation_group"
+    - path: "/api/text/*"
+      target_group: "text_generation_group"
+    ```
 
 ### Upstream Service Configuration (Defining Backend LLM API Services)
 
@@ -473,7 +593,7 @@ http_server:
         - name: "tenant-a-service"
           port: 3001
           address: "0.0.0.0"
-          upstream_group: "tenant-a-group"
+          default_group: "tenant-a-group"
           ratelimit:
               enabled: true
               per_second: 50 # Rate limit for Tenant A
@@ -481,7 +601,7 @@ http_server:
         - name: "tenant-b-service"
           port: 3002
           address: "0.0.0.0"
-          upstream_group: "tenant-b-group"
+          default_group: "tenant-b-group"
           ratelimit:
               enabled: true
               per_second: 20 # Rate limit for Tenant B

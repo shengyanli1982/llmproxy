@@ -24,7 +24,7 @@ http_server:
       address:
         "0.0.0.0" # [可选] 服务监听的网络地址。默认值: "0.0.0.0" (监听所有网络接口)。
         # 考虑安全性，可设置为 "127.0.0.1" (仅本地访问)。
-      upstream_group: "mixgroup" # [必填] 此转发服务关联的上游组名称。该名称必须在 `upstream_groups` 部分定义。
+      default_group: "mixgroup" # [必填] 此转发服务关联的上游组名称。该名称必须在 `upstream_groups` 部分定义。
       # [可选] IP 速率限制配置。如果省略，则不启用此转发的速率限制。
       ratelimit:
         per_second: 100 # [可选] 每秒允许来自单个 IP 的最大请求数。默认值: 100
@@ -32,12 +32,16 @@ http_server:
       # [可选] 连接超时配置。如果省略，将使用默认值。
       timeout:
         connect: 10 # [可选] 客户端连接到 LLMProxy 的超时时间 (秒)。默认值: 10
+      # [可选] 路由规则配置。如果省略，则不启用路由规则。
+      routing:
+        - path: "/api/v1/chat/completions" # [必填] 路由规则路径。
+          target_group: "openai" # [必填] 路由规则目标组名称。该名称必须在 `upstream_groups` 部分定义。
 
     # 示例 2: 转发到 OpenAI 上游组 (openai_group)
     - name: openai_group # [必填] 转发服务名称。
       port: 3001 # [必填] 监听端口。
       address: "0.0.0.0" # [可选] 监听地址。默认值: "0.0.0.0"
-      upstream_group: "openai" # [必填] 关联的上游组名称。该名称必须在 `upstream_groups` 部分定义。
+      default_group: "openai" # [必填] 关联的上游组名称。该名称必须在 `upstream_groups` 部分定义。
       # [可选] 速率限制配置。如果省略，则不启用速率限制。
       ratelimit:
         per_second: 100 # [可选] 每秒允许的最大请求数。默认值: 100
@@ -50,7 +54,7 @@ http_server:
     - name: to_failover # [必填] 转发服务名称。
       port: 3002 # [必填] 监听端口。
       address: "0.0.0.0" # [可选] 监听地址。默认值: "0.0.0.0"
-      upstream_group: "failover_group" # [必填] 关联的上游组名称。
+      default_group: "failover_group" # [必填] 关联的上游组名称。
       # [可选] 速率限制配置。如果省略，则不启用速率限制。
       ratelimit:
         per_second: 100 # [可选] 每秒允许的最大请求数。默认值: 100
@@ -58,6 +62,59 @@ http_server:
       # [可选] 连接超时配置。如果省略，将使用默认值。
       timeout:
         connect: 10 # [可选] 连接超时时间 (秒)。默认值: 10
+
+    # 示例 4: 展示高级路由规则 (to_routing_examples)
+    # 此示例专门用于演示 `routing` 功能的各种高级用法，
+    # 包括命名参数、正则表达式、通配符以及路由优先级。
+    # 它监听 3003 端口。
+    - name: to_routing_examples # [必填] 转发服务名称。
+      port: 3003 # [必填] 监听端口。
+      address: "0.0.0.0" # [可选] 监听地址。默认值: "0.0.0.0"
+      default_group: "default_routing_target" # [必填] 未匹配任何路由规则时的默认目标组。
+      # [可选] 高级路由规则配置。
+      # 路由匹配遵循最长、最精确匹配原则。静态路径的优先级高于参数化路径和通配符路径。
+      routing:
+        # 规则 1: 静态路径（最高优先级）
+        # 完全匹配 "/api/users/admin" 的请求将被路由到 "static_path_group"。
+        # 它的优先级高于下面的 "/api/users/:id"。
+        - path: "/api/users/admin"
+          target_group: "static_path_group"
+
+        # 规则 2: 命名参数
+        # 匹配如 "/api/users/123" 或 "/api/users/abc" 的路径。
+        # `:id` 是一个参数，可以匹配任何单个路径段。
+        - path: "/api/users/:id"
+          target_group: "user_api_group"
+
+        # 规则 3: 带正则表达式的命名参数
+        # 匹配如 "/api/items/42" 的路径，但 `id` 必须是数字。
+        # 不会匹配 "/api/items/abc"。
+        - path: "/api/items/{id:[0-9]+}"
+          target_group: "item_api_group"
+
+        # 规则 4: 更复杂的正则表达式参数
+        # [注意] 正则表达式语法受底层库限制，不支持 `{m,n}` 简写形式，请使用完整模式。
+        # 匹配如 "/api/products/SKU123" 的路径。
+        # `code` 必须由三个大写字母和三个数字组成。
+        - path: "/api/products/{code:[A-Z][A-Z][A-Z][0-9][0-9][0-9]}"
+          target_group: "product_api_group"
+
+        # 规则 5: 中间通配符
+        # `*` 匹配单个路径段。例如，匹配 "/api/v1/docs" 或 "/api/v2/docs"，
+        # 但不匹配 "/api/v1/v2/docs"。
+        - path: "/api/*/docs"
+          target_group: "api_docs_group"
+
+        # 规则 6: 混合模式（参数化 + 正则）
+        # 结合命名参数和正则表达式，匹配如 "/api/v2/users/99/profile" 的复杂路径。
+        - path: "/api/:version/users/{id:[0-9]+}/profile"
+          target_group: "user_profile_group"
+
+        # 规则 7: 尾部通配符
+        # `*` 匹配路径末尾的任何内容，包括多个段。
+        # 例如，匹配 "/files/a/b/c.txt"。
+        - path: "/files/*"
+          target_group: "file_server_group"
 
   #-----------------------------------------------------------------------------
   # 管理服务 (admin)
@@ -212,7 +269,7 @@ upstream_groups:
         initial:
           500 # [可选] 首次重试前的初始等待间隔 (毫秒)。默认值: 500
           # 后续重试间隔可能会增加 (例如指数退避)。
-      # [可选] HTTP/HTTPS 代理配置，用于 LLMProxy 通过出站代理连接到上游服务。如果省略，则不使用代理。
+      # [可选] HTTP/HTTPS 代理配置。如果省略，则不使用代理。
       proxy:
         url:
           "http://user:pass@your-proxy-server.com:8080" # [必填] 代理服务器 URL。
@@ -296,3 +353,87 @@ upstream_groups:
       # [可选] HTTP/HTTPS 代理配置。如果省略，则不使用代理。
       proxy:
         url: "http://proxy.example.com:8080" # [必填] 代理服务器 URL。
+
+  # --- 为高级路由示例定义的上游组 ---
+  # 以下是为 'to_routing_examples' 转发服务中的高级路由规则定义的专用上游组。
+  # 每个组都配置了简单的轮询负载均衡，并将请求路由到相应的后端服务。
+
+  # 示例: 默认目标组
+  # 当 'to_routing_examples' 中的请求未匹配任何特定路由规则时，将使用此默认组。
+  - name: default_routing_target # [必填] 上游组名称。必须在配置文件中唯一。
+    # [必填] 此组包含的上游服务列表。
+    upstreams:
+      - name: custom_service_basic_auth # [必填] 引用在 'upstreams' 部分定义的上游服务名称。
+    # [可选] 负载均衡策略。
+    balance:
+      strategy: "roundrobin" # [可选] 负载均衡策略。默认值: "roundrobin"。
+
+  # 示例: 静态路径目标组
+  # 用于处理到 "/api/users/admin" 的请求，演示静态路径的最高优先级匹配。
+  - name: static_path_group # [必填] 上游组名称。必须在配置文件中唯一。
+    # [必填] 此组包含的上游服务列表。
+    upstreams:
+      - name: openai_primary # [必填] 引用在 'upstreams' 部分定义的上游服务名称。
+    # [可选] 负载均衡策略。
+    balance:
+      strategy: "roundrobin" # [可选] 负载均衡策略。默认值: "roundrobin"。
+
+  # 示例: 用户 API 目标组 (命名参数)
+  # 用于处理到 "/api/users/:id" 的请求，演示了使用命名参数进行路由。
+  - name: user_api_group # [必填] 上游组名称。必须在配置文件中唯一。
+    # [必填] 此组包含的上游服务列表。
+    upstreams:
+      - name: custom_service_basic_auth # [必填] 引用在 'upstreams' 部分定义的上游服务名称。
+    # [可选] 负载均衡策略。
+    balance:
+      strategy: "roundrobin" # [可选] 负载均衡策略。默认值: "roundrobin"。
+
+  # 示例: 物品 API 目标组 (带正则的命名参数)
+  # 用于处理到 "/api/items/{id:[0-9]+}" 的请求，演示了参数的正则约束。
+  - name: item_api_group # [必填] 上游组名称。必须在配置文件中唯一。
+    # [必填] 此组包含的上游服务列表。
+    upstreams:
+      - name: custom_service_basic_auth # [必填] 引用在 'upstreams' 部分定义的上游服务名称。
+    # [可选] 负载均衡策略。
+    balance:
+      strategy: "roundrobin" # [可选] 负载均衡策略。默认值: "roundrobin"。
+
+  # 示例: 产品 API 目标组 (复杂正则)
+  # 用于处理到 "/api/products/{code:[A-Z][A-Z][A-Z][0-9][0-9][0-9]}" 的请求。
+  - name: product_api_group # [必填] 上游组名称。必须在配置文件中唯一。
+    # [必填] 此组包含的上游服务列表。
+    upstreams:
+      - name: custom_service_basic_auth # [必填] 引用在 'upstreams' 部分定义的上游服务名称。
+    # [可选] 负载均衡策略。
+    balance:
+      strategy: "roundrobin" # [可选] 负载均衡策略。默认值: "roundrobin"。
+
+  # 示例: API 文档目标组 (中间通配符)
+  # 用于处理到 "/api/*/docs" 的请求，演示了使用中间通配符 `*`。
+  - name: api_docs_group # [必填] 上游组名称。必须在配置文件中唯一。
+    # [必填] 此组包含的上游服务列表。
+    upstreams:
+      - name: custom_service_basic_auth # [必填] 引用在 'upstreams' 部分定义的上游服务名称。
+    # [可选] 负载均衡策略。
+    balance:
+      strategy: "roundrobin" # [可选] 负载均衡策略。默认值: "roundrobin"。
+
+  # 示例: 用户资料目标组 (混合模式)
+  # 用于处理到 "/api/:version/users/{id:[0-9]+}/profile" 的请求，演示混合路由模式。
+  - name: user_profile_group # [必填] 上游组名称。必须在配置文件中唯一。
+    # [必填] 此组包含的上游服务列表。
+    upstreams:
+      - name: custom_service_basic_auth # [必填] 引用在 'upstreams' 部分定义的上游服务名称。
+    # [可选] 负载均衡策略。
+    balance:
+      strategy: "roundrobin" # [可选] 负载均衡策略。默认值: "roundrobin"。
+
+  # 示例: 文件服务器目标组 (尾部通配符)
+  # 用于处理到 "/files/*" 的请求，演示尾部通配符 `*` 匹配剩余所有路径段。
+  - name: file_server_group # [必填] 上游组名称。必须在配置文件中唯一。
+    # [必填] 此组包含的上游服务列表。
+    upstreams:
+      - name: custom_service_basic_auth # [必填] 引用在 'upstreams' 部分定义的上游服务名称。
+    # [可选] 负载均衡策略。
+    balance:
+      strategy: "roundrobin" # [可选] 负载均衡策略。默认值: "roundrobin"。

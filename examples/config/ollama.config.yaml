@@ -7,7 +7,7 @@ http_server:
     - name: to_ollama_local # 转发服务名
       port: 3000 # 监听端口 (避免与默认端口冲突)
       address: "0.0.0.0" # 监听地址
-      upstream_group: "ollama_group" # 指向 Ollama 模型组
+      default_group: "ollama_group" # 指向 Ollama 模型组
       # 本地服务通常不需要限流，按需开启
       # ratelimit:
       #   enabled: false
@@ -26,7 +26,7 @@ http_server:
 upstreams:
   # 本地 Ollama 服务
   - name: ollama_local # 上游名
-    url: "http://localhost:11434" # Ollama 默认地址和端口
+    url: "http://localhost:11434/v1/chat/completions" # Ollama 默认地址和端口
     auth:
       type: "none" # 本地 Ollama 通常不需要认证
     # headers: # 通常不需要为本地 Ollama 自定义 headers
