@@ -21,7 +21,7 @@ use utoipa_scalar::{Scalar, Servable};
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        // 转发规则
+        // 转发服务
         forward::list_forwards,
         forward::get_forward,
         // 路由规则
@@ -82,7 +82,7 @@ use utoipa_scalar::{Scalar, Servable};
         ),
     ),
     tags(
-        (name = "Forwards", description = "转发规则 APIs | Forward Rule APIs"),
+        (name = "Forwards", description = "转发服务 APIs | Forwarding Service APIs"),
         (name = "Routes", description = "路由规则 APIs | Routing Rule APIs"),
         (name = "UpstreamGroups", description = "上游组 APIs | Upstream Group APIs"),
         (name = "Upstreams", description = "上游服务 APIs | Upstream Service APIs"),
@@ -98,14 +98,7 @@ use utoipa_scalar::{Scalar, Servable};
         <br><br>
         LLMProxy 是一款专为大型语言模型（LLM）设计的企业级智能代理与负载均衡器。它统一管理和编排各类 LLM 服务（如公有云 API、私有化部署的 vLLM/Ollama 等），实现高效、稳定、可扩展的 LLM 应用访问。此管理 API 提供了对 LLMProxy 核心配置资源的只读访问能力，便于监控、审计和集成自动化运维体系。
         <br><br>
-        LLMProxy is an enterprise-grade intelligent proxy and load balancer designed for Large Language Models (LLMs). It unifies the management and orchestration of various LLM services (e.g., public cloud APIs, privately deployed vLLM/Ollama) to enable efficient, stable, and scalable LLM application access. This Admin API provides read-only access to LLMProxy's core configuration resources, facilitating monitoring, auditing, and integration with automated operational systems.
-        
-        <br><br>
-        <strong>路由规则路径参数说明 | Note on Routing Rule Path Parameters</strong>
-        <br>
-        路由规则API中的路径参数使用base64编码（URL安全格式）。例如，获取路径为'/api/v1/chat/completions'的路由规则时，您需要使用'/api/v1/chat/completions'的base64编码值（即'L2FwaS92MS9jaGF0L2NvbXBsZXRpb25z'）作为路径参数。
-        <br><br>
-        Path parameters in routing rule APIs use base64 encoding (URL-safe format). For example, to get a routing rule with path '/api/v1/chat/completions', you need to use the base64 encoded value of '/api/v1/chat/completions' (which is 'L2FwaS92MS9jaGF0L2NvbXBsZXRpb25z') as the path parameter.",
+        LLMProxy is an enterprise-grade intelligent proxy and load balancer designed for Large Language Models (LLMs). It unifies the management and orchestration of various LLM services (e.g., public cloud APIs, privately deployed vLLM/Ollama) to enable efficient, stable, and scalable LLM application access. This Admin API provides read-only access to LLMProxy's core configuration resources, facilitating monitoring, auditing, and integration with automated operational systems.",
         license(
             name = "MIT",
             url = "https://opensource.org/licenses/MIT"

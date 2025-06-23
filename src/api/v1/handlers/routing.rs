@@ -111,12 +111,12 @@ fn route_not_found(path: &str, forward_name: &str) -> Response {
     path = "/api/v1/forwards/{name}/routes",
     tag = "Routes",
     params(
-        ("name" = String, Path, description = "转发服务名称")
+        ("name" = String, Path, description = "转发服务名称 | Forwarding service name")
     ),
     responses(
-        (status = 200, description = "成功获取所有路由规则", body = SuccessResponse<Vec<RoutingRule>>),
-        (status = 404, description = "转发服务不存在", body = ErrorResponse),
-        (status = 500, description = "服务器内部错误", body = ErrorResponse),
+        (status = 200, description = "成功获取所有路由规则 | Successfully retrieved all routing rules", body = SuccessResponse<Vec<RoutingRule>>),
+        (status = 404, description = "转发服务不存在 | Forwarding service not found", body = ErrorResponse),
+        (status = 500, description = "服务器内部错误 | Internal server error", body = ErrorResponse),
     )
 )]
 pub async fn list_routes(
@@ -163,14 +163,14 @@ pub async fn list_routes(
     path = "/api/v1/forwards/{name}/routes/{path}",
     tag = "Routes",
     params(
-        ("name" = String, Path, description = "转发服务名称"),
-        ("path" = String, Path, description = "Base64编码的路径模式")
+        ("name" = String, Path, description = "转发服务名称 | Forwarding service name"),
+        ("path" = String, Path, description = "Base64编码的路径模式 | Base64 encoded path pattern")
     ),
     responses(
-        (status = 200, description = "成功获取路由规则", body = SuccessResponse<RoutingRule>),
-        (status = 400, description = "无效的Base64编码", body = ErrorResponse),
-        (status = 404, description = "转发服务或路由规则不存在", body = ErrorResponse),
-        (status = 500, description = "服务器内部错误", body = ErrorResponse),
+        (status = 200, description = "成功获取路由规则 | Successfully retrieved routing rule", body = SuccessResponse<RoutingRule>),
+        (status = 400, description = "无效的Base64编码 | Invalid Base64 encoding", body = ErrorResponse),
+        (status = 404, description = "转发服务或路由规则不存在 | Forwarding service or routing rule not found", body = ErrorResponse),
+        (status = 500, description = "服务器内部错误 | Internal server error", body = ErrorResponse),
     )
 )]
 pub async fn get_route(
@@ -228,15 +228,15 @@ pub async fn get_route(
     path = "/api/v1/forwards/{name}/routes",
     tag = "Routes",
     params(
-        ("name" = String, Path, description = "转发服务名称")
+        ("name" = String, Path, description = "转发服务名称 | Forwarding service name")
     ),
     request_body = RoutingRule,
     responses(
-        (status = 201, description = "成功创建路由规则", body = SuccessResponse<RoutingRule>),
-        (status = 400, description = "无效的请求参数", body = ErrorResponse),
-        (status = 404, description = "转发服务或目标上游组不存在", body = ErrorResponse),
-        (status = 409, description = "路由规则已存在", body = ErrorResponse),
-        (status = 500, description = "服务器内部错误", body = ErrorResponse),
+        (status = 201, description = "成功创建路由规则 | Successfully created routing rule", body = SuccessResponse<RoutingRule>),
+        (status = 400, description = "无效的请求参数 | Invalid request parameters", body = ErrorResponse),
+        (status = 404, description = "转发服务或目标上游组不存在 | Forwarding service or target upstream group not found", body = ErrorResponse),
+        (status = 409, description = "路由规则已存在 | Routing rule already exists", body = ErrorResponse),
+        (status = 500, description = "服务器内部错误 | Internal server error", body = ErrorResponse),
     )
 )]
 pub async fn create_route(
@@ -319,15 +319,15 @@ pub async fn create_route(
     path = "/api/v1/forwards/{name}/routes/{path}",
     tag = "Routes",
     params(
-        ("name" = String, Path, description = "转发服务名称"),
-        ("path" = String, Path, description = "Base64编码的路径模式")
+        ("name" = String, Path, description = "转发服务名称 | Forwarding service name"),
+        ("path" = String, Path, description = "Base64编码的路径模式 | Base64 encoded path pattern")
     ),
     request_body = UpdateRoutePayload,
     responses(
-        (status = 200, description = "成功更新路由规则", body = SuccessResponse<RoutingRule>),
-        (status = 400, description = "无效的请求参数或Base64编码", body = ErrorResponse),
-        (status = 404, description = "转发服务、路由规则或目标上游组不存在", body = ErrorResponse),
-        (status = 500, description = "服务器内部错误", body = ErrorResponse),
+        (status = 200, description = "成功更新路由规则 | Successfully updated routing rule", body = SuccessResponse<RoutingRule>),
+        (status = 400, description = "无效的请求参数或Base64编码 | Invalid request parameters or Base64 encoding", body = ErrorResponse),
+        (status = 404, description = "转发服务、路由规则或目标上游组不存在 | Forwarding service, routing rule or target upstream group not found", body = ErrorResponse),
+        (status = 500, description = "服务器内部错误 | Internal server error", body = ErrorResponse),
     )
 )]
 pub async fn update_route(
@@ -423,14 +423,14 @@ pub async fn update_route(
     path = "/api/v1/forwards/{name}/routes/{path}",
     tag = "Routes",
     params(
-        ("name" = String, Path, description = "转发服务名称"),
-        ("path" = String, Path, description = "Base64编码的路径模式")
+        ("name" = String, Path, description = "转发服务名称 | Forwarding service name"),
+        ("path" = String, Path, description = "Base64编码的路径模式 | Base64 encoded path pattern")
     ),
     responses(
-        (status = 204, description = "成功删除路由规则"),
-        (status = 400, description = "无效的Base64编码", body = ErrorResponse),
-        (status = 404, description = "转发服务或路由规则不存在", body = ErrorResponse),
-        (status = 500, description = "服务器内部错误", body = ErrorResponse),
+        (status = 204, description = "成功删除路由规则 | Successfully deleted routing rule"),
+        (status = 400, description = "无效的Base64编码 | Invalid Base64 encoding", body = ErrorResponse),
+        (status = 404, description = "转发服务或路由规则不存在 | Forwarding service or routing rule not found", body = ErrorResponse),
+        (status = 500, description = "服务器内部错误 | Internal server error", body = ErrorResponse),
     )
 )]
 pub async fn delete_route(

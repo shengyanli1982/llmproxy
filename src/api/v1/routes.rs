@@ -30,7 +30,7 @@ pub fn api_routes(config: Arc<RwLock<Config>>) -> Router {
     let auth_token = std::env::var(api::ADMIN_AUTH_TOKEN_ENV).ok();
 
     let mut api_router = Router::new()
-        // 转发规则路由
+        // 转发服务路由
         .route(FORWARD_PATH, get(forward::list_forwards))
         .route(FORWARD_NAME_PATH, get(forward::get_forward))
         // 路由规则路由
