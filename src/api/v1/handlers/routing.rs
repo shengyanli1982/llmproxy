@@ -135,7 +135,7 @@ pub async fn list_routes(
     match forward {
         Some(forward) => {
             // 提取路由规则，如果不存在则返回空数组
-            let routes: Vec<RoutingRule> = forward.routing.clone().unwrap_or_default();
+            let routes = forward.routing.as_deref().unwrap_or_default();
 
             info!(
                 "API: Retrieved {} routing rules for forward '{}'",
@@ -269,19 +269,15 @@ pub async fn create_route(
     };
 
     // 查找指定转发服务的索引
-    let forward_index = http_server
+    let forward = http_server
         .forwards
-        .iter()
-        .position(|f| f.name == forward_name);
+        .iter_mut()
+        .find(|f| f.name == forward_name);
 
-    match forward_index {
-        Some(index) => {
+    match forward {
+        Some(forward) => {
             // 初始化routing字段（如果不存在）
-            if http_server.forwards[index].routing.is_none() {
-                http_server.forwards[index].routing = Some(Vec::new());
-            }
-
-            let routing = http_server.forwards[index].routing.as_mut().unwrap();
+            let routing = forward.routing.get_or_insert_with(Vec::new);
 
             // 检查路径是否已存在
             if routing.iter().any(|r| r.path == payload.path) {
@@ -298,17 +294,18 @@ pub async fn create_route(
             }
 
             // 添加新的路由规则
-            routing.push(payload.clone());
+            routing.push(payload);
+            let created_rule = routing.last().unwrap(); // 因为我们刚刚 push, 所以 unwrap 是安全的
 
             info!(
                 "API: Created new route '{}' -> '{}' in forward '{}'",
-                payload.path, payload.target_group, forward_name
+                created_rule.path, created_rule.target_group, forward_name
             );
 
-            let response = SuccessResponse::success_with_data(&payload);
+            let response = SuccessResponse::success_with_data(created_rule);
             log_response_body(&response);
 
-            (StatusCode::CREATED, success_response(&payload)).into_response()
+            (StatusCode::CREATED, success_response(created_rule)).into_response()
         }
         None => forward_not_found(&forward_name),
     }
@@ -369,15 +366,15 @@ pub async fn update_route(
     };
 
     // 查找指定的转发服务
-    let forward_index = http_server
+    let forward = http_server
         .forwards
-        .iter()
-        .position(|f| f.name == forward_name);
+        .iter_mut()
+        .find(|f| f.name == forward_name);
 
-    match forward_index {
-        Some(index) => {
+    match forward {
+        Some(forward) => {
             // 获取路由规则（如果存在）
-            let routing = match http_server.forwards[index].routing.as_mut() {
+            let routing = match forward.routing.as_mut() {
                 Some(r) => r,
                 None => {
                     let error = ErrorResponse::error(
@@ -456,15 +453,15 @@ pub async fn delete_route(
     };
 
     // 查找指定的转发服务
-    let forward_index = http_server
+    let forward = http_server
         .forwards
-        .iter()
-        .position(|f| f.name == forward_name);
+        .iter_mut()
+        .find(|f| f.name == forward_name);
 
-    match forward_index {
-        Some(index) => {
+    match forward {
+        Some(forward) => {
             // 获取路由规则（如果存在）
-            let routing = match http_server.forwards[index].routing.as_mut() {
+            let routing = match forward.routing.as_mut() {
                 Some(r) => r,
                 None => {
                     let error = ErrorResponse::error(
@@ -488,7 +485,7 @@ pub async fn delete_route(
 
             // 如果删除后路由规则为空，将routing设置为None
             if routing.is_empty() {
-                http_server.forwards[index].routing = None;
+                forward.routing = None;
             }
 
             info!(
