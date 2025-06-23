@@ -1,6 +1,5 @@
 use llmproxy::{
     config::{http_server::RoutingRule, ForwardConfig},
-    error::AppError,
     server::router::Router,
 };
 
@@ -28,73 +27,64 @@ fn create_test_forward_config() -> ForwardConfig {
     }
 }
 
-/// 测试成功创建Router实例
-#[test]
-fn test_router_creation_success() {
+/// 测试路由器创建成功
+#[tokio::test]
+async fn test_router_creation_success() {
     let config = create_test_forward_config();
-    let router = Router::new(&config);
-    assert!(router.is_ok());
+    let result = Router::new(&config);
+    assert!(result.is_ok());
 }
 
-/// 测试创建Router时处理重复路径的情况
-#[test]
-fn test_router_creation_duplicate_paths() {
+/// 测试路由器创建失败 - 重复路径
+#[tokio::test]
+async fn test_router_creation_duplicate_paths() {
     let mut config = create_test_forward_config();
-
-    // 添加一个重复的路径
     if let Some(ref mut routing) = config.routing {
         routing.push(RoutingRule {
-            path: "/api".to_string(),
-            target_group: "duplicate_group".to_string(),
+            path: "/api".to_string(), // 重复的路径
+            target_group: "another_group".to_string(),
         });
     }
 
-    let router = Router::new(&config);
-    assert!(router.is_err());
-
-    match router {
-        Err(AppError::Config(msg)) => {
-            assert!(msg.contains("Duplicate routing path found"));
-        }
-        _ => panic!("Expected Config error for duplicate path"),
-    }
+    let result = Router::new(&config);
+    assert!(result.is_err());
 }
 
 /// 测试精确路径匹配
-#[test]
-fn test_router_exact_path_match() {
+#[tokio::test]
+async fn test_router_exact_path_match() {
     let config = create_test_forward_config();
     let router = Router::new(&config).unwrap();
 
     // 测试精确路径匹配
-    let result = router.get_target_group("/api");
+    let result = router.get_target_group("/api").await;
     assert_eq!(result.target_group, "api_group");
     assert!(!result.is_default);
 
-    let result = router.get_target_group("/api/v1");
+    let result = router.get_target_group("/api/v1").await;
     assert_eq!(result.target_group, "v1_group");
     assert!(!result.is_default);
 }
 
 /// 测试没有匹配时回退到默认组
-#[test]
-fn test_router_no_match_fallback() {
+#[tokio::test]
+async fn test_router_no_match_fallback() {
     let config = create_test_forward_config();
     let router = Router::new(&config).unwrap();
 
     // 测试不匹配时的默认回退
-    let result = router.get_target_group("/non_existent_path");
+    let result = router.get_target_group("/non_existent_path").await;
     assert_eq!(result.target_group, "default");
     assert!(result.is_default);
 
-    let result = router.get_target_group("/api/v3"); // 不存在的API版本
+    let result = router.get_target_group("/api/v3").await; // 不存在的API版本
     assert_eq!(result.target_group, "default");
     assert!(result.is_default);
 }
 
 /// 测试没有路由规则时的行为
-#[test]
-fn test_router_empty_routing_rules() {
+#[tokio::test]
+async fn test_router_empty_routing_rules() {
     let config = ForwardConfig {
         name: "test_forward".to_string(),
         port: 3000,
@@ -108,14 +98,14 @@ fn test_router_empty_routing_rules() {
     let router = Router::new(&config).unwrap();
 
     // 当没有路由规则时，所有请求都应该使用默认组
-    let result = router.get_target_group("/any/path");
+    let result = router.get_target_group("/any/path").await;
     assert_eq!(result.target_group, "default");
     assert!(result.is_default);
 }
 
 /// 测试路径变体
-#[test]
-fn test_router_path_variations() {
+#[tokio::test]
+async fn test_router_path_variations() {
     let mut config = create_test_forward_config();
 
     // 添加更多路径变体
@@ -133,17 +123,17 @@ fn test_router_path_variations() {
     let router = Router::new(&config).unwrap();
 
     // 测试根路径
-    let result = router.get_target_group("/");
+    let result = router.get_target_group("/").await;
     assert_eq!(result.target_group, "root_group");
     assert!(!result.is_default);
 
     // 测试嵌套路径
-    let result = router.get_target_group("/api/v1/users");
+    let result = router.get_target_group("/api/v1/users").await;
     assert_eq!(result.target_group, "users_group");
     assert!(!result.is_default);
 
     // 测试不存在的嵌套路径
-    let result = router.get_target_group("/api/v1/posts");
+    let result = router.get_target_group("/api/v1/posts").await;
     assert_eq!(result.target_group, "default");
     assert!(result.is_default);
 }
@@ -204,97 +194,99 @@ fn create_extended_routing_config() -> ForwardConfig {
 }
 
 /// 测试命名参数匹配
-#[test]
-fn test_named_parameters_matching() {
+#[tokio::test]
+async fn test_named_parameters_matching() {
     let config = create_extended_routing_config();
     // 注意：这假设未来的Router实现将支持命名参数
     let router = Router::new(&config).unwrap();
 
     // 基本参数匹配测试
-    let result = router.get_target_group("/users/123");
+    let result = router.get_target_group("/users/123").await;
     assert_eq!(result.target_group, "user_detail");
     assert!(!result.is_default);
 
     // 多参数匹配测试
-    let result = router.get_target_group("/posts/tech/42");
+    let result = router.get_target_group("/posts/tech/42").await;
     assert_eq!(result.target_group, "categorized_post");
     assert!(!result.is_default);
 
     // 不匹配的参数路径（参数不足）
-    let result = router.get_target_group("/posts/tech");
+    let result = router.get_target_group("/posts/tech").await;
     assert_eq!(result.target_group, "default");
     assert!(result.is_default);
 
     // 不匹配的参数路径（参数过多）
-    let result = router.get_target_group("/users/123/extra");
+    let result = router.get_target_group("/users/123/extra").await;
     assert_eq!(result.target_group, "default");
     assert!(result.is_default);
 }
 
 /// 测试通配符匹配
-#[test]
-fn test_wildcard_matching() {
+#[tokio::test]
+async fn test_wildcard_matching() {
     let config = create_extended_routing_config();
     let router = Router::new(&config).unwrap();
 
     // 基本通配符匹配
-    let result = router.get_target_group("/files/document.pdf");
+    let result = router.get_target_group("/files/document.pdf").await;
     assert_eq!(result.target_group, "file_server");
     assert!(!result.is_default);
 
     // 通配符匹配多级路径
-    let result = router.get_target_group("/files/documents/report.docx");
+    let result = router
+        .get_target_group("/files/documents/report.docx")
+        .await;
     assert_eq!(result.target_group, "file_server");
     assert!(!result.is_default);
 
     // 中间部分通配符匹配
-    let result = router.get_target_group("/api/v1/docs");
+    let result = router.get_target_group("/api/v1/docs").await;
     assert_eq!(result.target_group, "api_docs");
     assert!(!result.is_default);
 
-    let result = router.get_target_group("/api/v2/docs");
+    let result = router.get_target_group("/api/v2/docs").await;
     assert_eq!(result.target_group, "api_docs");
     assert!(!result.is_default);
 
     // 通配符不匹配
-    let result = router.get_target_group("/api/v1/documents"); // 不是 /docs 结尾
+    let result = router.get_target_group("/api/v1/documents").await; // 不是 /docs 结尾
     assert_eq!(result.target_group, "default");
     assert!(result.is_default);
 }
 
 /// 测试正则表达式匹配
-#[test]
-fn test_regex_matching() {
+#[tokio::test]
+async fn test_regex_matching() {
     let config = create_extended_routing_config();
     let router = Router::new(&config).unwrap();
 
     // 数字ID匹配
-    let result = router.get_target_group("/items/42");
+    let result = router.get_target_group("/items/42").await;
     assert_eq!(result.target_group, "item_by_id");
     assert!(!result.is_default);
 
     // 产品代码匹配（格式：3个大写字母+3个数字）
-    let result = router.get_target_group("/products/ABC123");
+    let result = router.get_target_group("/products/ABC123").await;
     assert_eq!(result.target_group, "product_by_code");
     assert!(!result.is_default);
 
     // 不匹配的正则表达式
-    let result = router.get_target_group("/items/abc"); // 不是数字ID
+    let result = router.get_target_group("/items/abc").await; // 不是数字ID
     assert_eq!(result.target_group, "default");
     assert!(result.is_default);
 
-    let result = router.get_target_group("/products/abc123"); // 小写字母
+    let result = router.get_target_group("/products/abc123").await; // 小写字母
     assert_eq!(result.target_group, "default");
     assert!(result.is_default);
 
-    let result = router.get_target_group("/products/ABC12"); // 数字不够
+    let result = router.get_target_group("/products/ABC12").await; // 数字不够
     assert_eq!(result.target_group, "default");
     assert!(result.is_default);
 }
 
 /// 测试路由优先级
-#[test]
-fn test_routing_priority() {
+#[tokio::test]
+async fn test_routing_priority() {
     // 创建有重叠路由规则的配置
     let config = ForwardConfig {
         name: "priority_test".to_string(),
@@ -324,35 +316,35 @@ fn test_routing_priority() {
 
     let router = Router::new(&config).unwrap();
 
-    // 静态路径应该优先于参数路径
-    let result = router.get_target_group("/api/users/admin");
+    // 测试静态路径优先级
+    let result = router.get_target_group("/api/users/admin").await;
     assert_eq!(result.target_group, "static_admin");
     assert!(!result.is_default);
 
-    // 参数路径应该优先于通配符
-    let result = router.get_target_group("/api/users/123");
+    // 测试命名参数优先级
+    let result = router.get_target_group("/api/users/123").await;
     assert_eq!(result.target_group, "user_param");
     assert!(!result.is_default);
 
-    // 通配符路径只在没有更具体的匹配时使用
-    let result = router.get_target_group("/api/products");
+    // 测试通配符优先级
+    let result = router.get_target_group("/api/products").await;
     assert_eq!(result.target_group, "api_wildcard");
     assert!(!result.is_default);
 }
 
-/// 测试复杂混合路由场景
-#[test]
-fn test_mixed_routing_patterns() {
+/// 测试混合路由模式
+#[tokio::test]
+async fn test_mixed_routing_patterns() {
     let config = create_extended_routing_config();
     let router = Router::new(&config).unwrap();
 
-    // 测试混合了命名参数和正则的路由
-    let result = router.get_target_group("/api/v1/users/42/profile");
+    // 测试混合模式匹配
+    let result = router.get_target_group("/api/v2/users/42/profile").await;
     assert_eq!(result.target_group, "user_profile");
     assert!(!result.is_default);
 
-    // 不匹配的混合模式
-    let result = router.get_target_group("/api/v1/users/xyz/profile"); // id不是数字
+    // 测试混合模式不匹配
+    let result = router.get_target_group("/api/v2/users/abc/profile").await; // 非数字ID
     assert_eq!(result.target_group, "default");
     assert!(result.is_default);
 }

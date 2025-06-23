@@ -1,9 +1,10 @@
 use crate::{
     api::v1::handlers::utils::{
-        find_by_name, log_request_body, log_response_body, not_found_error, success_response,
+        find_by_name, log_request_body, log_response_body, not_found_error, success_response_ref,
     },
     api::v1::models::{ErrorResponse, SuccessResponse},
-    config::{Config, UpstreamConfig},
+    api::v1::routes::AppState,
+    config::UpstreamConfig,
     r#const::api::error_types,
 };
 use axum::{
@@ -12,8 +13,6 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 use validator::Validate;
 
@@ -30,9 +29,9 @@ use validator::Validate;
     )
 )]
 pub async fn list_upstreams(
-    State(config): State<Arc<RwLock<Config>>>,
+    State(app_state): State<AppState>,
 ) -> Json<SuccessResponse<Vec<UpstreamConfig>>> {
-    let upstreams = config.read().await.upstreams.clone();
+    let upstreams = app_state.config.read().await.upstreams.clone();
     info!("API: Retrieved {} upstream services", upstreams.len());
 
     // 构建响应
@@ -61,12 +60,9 @@ pub async fn list_upstreams(
     )
 )]
 #[axum::debug_handler]
-pub async fn get_upstream(
-    State(config): State<Arc<RwLock<Config>>>,
-    Path(name): Path<String>,
-) -> Response {
+pub async fn get_upstream(State(app_state): State<AppState>, Path(name): Path<String>) -> Response {
     // 查找指定名称的上游服务
-    let config_read = config.read().await;
+    let config_read = app_state.config.read().await;
     let upstream = find_by_name(&config_read.upstreams, &name, |u| &u.name);
 
     match upstream {
@@ -74,10 +70,10 @@ pub async fn get_upstream(
             info!("API: Retrieved upstream service '{}'", name);
 
             // 记录响应体
-            let response = SuccessResponse::success_with_data(upstream.clone());
+            let response = SuccessResponse::success_with_data(upstream);
             log_response_body(&response);
 
-            success_response(upstream)
+            success_response_ref(upstream)
         }
         None => {
             let error = ErrorResponse::error(
@@ -107,7 +103,7 @@ pub async fn get_upstream(
     )
 )]
 pub async fn create_upstream(
-    State(config): State<Arc<RwLock<Config>>>,
+    State(app_state): State<AppState>,
     Json(new_upstream): Json<UpstreamConfig>,
 ) -> Response {
     // 记录请求体
@@ -122,7 +118,7 @@ pub async fn create_upstream(
     }
 
     // 获取写锁
-    let mut config_write = config.write().await;
+    let mut config_write = app_state.config.write().await;
 
     // 检查名称是否已存在
     if config_write
@@ -184,7 +180,7 @@ pub async fn create_upstream(
     )
 )]
 pub async fn update_upstream(
-    State(config): State<Arc<RwLock<Config>>>,
+    State(app_state): State<AppState>,
     Path(name): Path<String>,
     Json(mut updated_upstream): Json<UpstreamConfig>,
 ) -> Response {
@@ -203,7 +199,7 @@ pub async fn update_upstream(
     }
 
     // 获取写锁
-    let mut config_write = config.write().await;
+    let mut config_write = app_state.config.write().await;
 
     // 查找并更新上游服务
     let upstream_index = config_write.upstreams.iter().position(|u| u.name == name);
@@ -263,11 +259,11 @@ pub async fn update_upstream(
     )
 )]
 pub async fn delete_upstream(
-    State(config): State<Arc<RwLock<Config>>>,
+    State(app_state): State<AppState>,
     Path(name): Path<String>,
 ) -> Response {
     // 获取写锁
-    let mut config_write = config.write().await;
+    let mut config_write = app_state.config.write().await;
 
     // 检查是否被任何上游组使用
     let dependent_groups: Vec<String> = config_write

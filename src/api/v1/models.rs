@@ -5,7 +5,7 @@ use crate::{
 use axum::{http::StatusCode, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use validator::ValidationErrors;
+use validator::{Validate, ValidationErrors};
 
 /// 错误详情结构
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
@@ -66,6 +66,14 @@ pub struct UpstreamRef {
     pub name: String,
     /// 权重
     pub weight: u32,
+}
+
+/// 更新路由规则请求
+#[derive(Debug, Serialize, Deserialize, ToSchema, Validate)]
+pub struct UpdateRoutePayload {
+    /// 目标上游组名称
+    #[validate(length(min = 1, message = "Target group cannot be empty"))]
+    pub target_group: String,
 }
 
 impl SuccessResponse<()> {

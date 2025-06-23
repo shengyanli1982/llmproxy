@@ -90,7 +90,7 @@ impl UpstreamManager {
     #[inline(always)]
     fn build_request_url(&self, upstream_url: &str) -> Result<Url, AppError> {
         Url::parse(upstream_url).map_err(|e| {
-            AppError::Upstream(format!("Invalid upstream URL: {} - {}", upstream_url, e))
+            AppError::Upstream(format!("Invalid upstream URL: {:?} - {}", upstream_url, e))
         })
     }
 
@@ -103,7 +103,7 @@ impl UpstreamManager {
         let load_balancer = match self.groups.get(group_name) {
             Some(lb) => lb,
             None => {
-                error!("Upstream group not found: {}", group_name);
+                error!("Upstream group not found: {:?}", group_name);
                 return Err(AppError::UpstreamGroupNotFound(group_name.to_string()));
             }
         };
@@ -133,17 +133,17 @@ impl UpstreamManager {
             Some(config) => config,
             None => {
                 error!(
-                    "Upstream configuration not found: {}",
+                    "Upstream configuration not found: {:?}",
                     managed_upstream.upstream_ref.name
                 );
                 return Err(AppError::Upstream(format!(
-                    "Upstream configuration not found: {}",
+                    "Upstream configuration not found: {:?}",
                     managed_upstream.upstream_ref.name
                 )));
             }
         };
 
-        debug!("Selected upstream server: {}", upstream_config.url);
+        debug!("Selected upstream server: {:?}", upstream_config.url);
 
         // 记录上游请求指标
         METRICS
@@ -235,7 +235,7 @@ impl UpstreamManager {
         headers: HeaderMap,
         body: Option<Bytes>,
     ) -> Result<Response, AppError> {
-        debug!("Forwarding request to upstream group: {}", group_name);
+        debug!("Forwarding request to upstream group: {:?}", group_name);
 
         // 选择一个上游服务器
         let (managed_upstream, upstream_config) = self.select_upstream_server(group_name).await?;
@@ -250,7 +250,7 @@ impl UpstreamManager {
         let client = match self.group_clients.get(group_name) {
             Some(c) => c,
             None => {
-                error!("HTTP client not found: {}", group_name);
+                error!("HTTP client not found: {:?}", group_name);
                 return Err(AppError::UpstreamGroupNotFound(group_name.to_string()));
             }
         };
@@ -284,7 +284,7 @@ impl UpstreamManager {
                 match request_builder.send().await {
                     Ok(response) => Ok(response),
                     Err(e) => Err(UpstreamError(format!(
-                        "Request to {} failed: {}",
+                        "Request to {:?} failed: {}",
                         upstream_url.as_str(),
                         e
                     ))),
@@ -340,7 +340,7 @@ impl UpstreamManager {
             // 记录响应状态码
             let status = response.status().as_u16();
             debug!(
-                "Upstream response status: {} from {}",
+                "Upstream response status: {:?} from {:?}",
                 status,
                 upstream_url.as_str()
             );

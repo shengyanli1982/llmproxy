@@ -1,33 +1,33 @@
 use crate::{
-    api::v1::handlers::utils::{log_response_body, not_found_error, success_response},
+    api::v1::handlers::utils::{log_response_body, not_found_error, success_response_ref},
     api::v1::models::{ErrorResponse, SuccessResponse},
-    config::{Config, ForwardConfig},
+    api::v1::routes::AppState,
+    config::ForwardConfig,
 };
 use axum::{
     extract::{Path, State},
     response::Response,
     Json,
 };
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::info;
 
-/// 获取所有转发规则列表
+/// 获取所有转发服务列表
 ///
-/// Get all forwarding rules list
+/// Get all forwarding services list
 #[utoipa::path(
     get,
     path = "/api/v1/forwards",
     tag = "Forwards",
     responses(
-        (status = 200, description = "成功获取所有转发规则 | Successfully retrieved all forwarding rules", body = SuccessResponse<Vec<ForwardConfig>>),
+        (status = 200, description = "成功获取所有转发服务 | Successfully retrieved all forwarding services", body = SuccessResponse<Vec<ForwardConfig>>),
         (status = 500, description = "服务器内部错误 | Internal server error", body = ErrorResponse),
     )
 )]
 pub async fn list_forwards(
-    State(config): State<Arc<RwLock<Config>>>,
+    State(app_state): State<AppState>,
 ) -> Json<SuccessResponse<Vec<ForwardConfig>>> {
-    let forwards = config
+    let forwards = app_state
+        .config
         .read()
         .await
         .http_server
@@ -45,28 +45,25 @@ pub async fn list_forwards(
     Json(response)
 }
 
-/// 获取单个转发规则详情
+/// 获取单个转发服务详情
 ///
-/// Get a single forwarding rule detail
+/// Get a single forwarding service detail
 #[utoipa::path(
     get,
     path = "/api/v1/forwards/{name}",
     tag = "Forwards",
     params(
-        ("name" = String, Path, description = "转发规则名称 | Forwarding rule name")
+        ("name" = String, Path, description = "转发服务名称 | Forwarding service name")
     ),
     responses(
-        (status = 200, description = "成功获取转发规则 | Successfully retrieved forwarding rule", body = SuccessResponse<ForwardConfig>),
-        (status = 404, description = "转发规则不存在 | Forwarding rule not found", body = ErrorResponse),
+        (status = 200, description = "成功获取转发服务 | Successfully retrieved forwarding service", body = SuccessResponse<ForwardConfig>),
+        (status = 404, description = "转发服务不存在 | Forwarding service not found", body = ErrorResponse),
         (status = 500, description = "服务器内部错误 | Internal server error", body = ErrorResponse),
     )
 )]
 #[axum::debug_handler]
-pub async fn get_forward(
-    State(config): State<Arc<RwLock<Config>>>,
-    Path(name): Path<String>,
-) -> Response {
-    let config_read = config.read().await;
+pub async fn get_forward(State(app_state): State<AppState>, Path(name): Path<String>) -> Response {
+    let config_read = app_state.config.read().await;
     let forward = config_read
         .http_server
         .as_ref()
@@ -74,22 +71,23 @@ pub async fn get_forward(
 
     match forward {
         Some(forward) => {
-            info!("API: Retrieved forwarding rule '{}'", name);
+            info!("API: Retrieved forwarding service '{}'", name);
 
-            // 记录响应体
-            let response = SuccessResponse::success_with_data(forward.clone());
+            // 记录响应体并直接使用引用
+            let response = SuccessResponse::success_with_data(forward);
             log_response_body(&response);
 
-            success_response(forward)
+            // 使用新的success_response_ref函数处理引用
+            success_response_ref(forward)
         }
         None => {
             let error = ErrorResponse::error(
                 axum::http::StatusCode::NOT_FOUND,
                 "not_found",
-                format!("Forwarding rule '{}' does not exist", name),
+                format!("Forwarding service '{}' does not exist", name),
             );
             log_response_body(&error);
-            not_found_error("Forwarding rule", &name)
+            not_found_error("Forwarding service", &name)
         }
     }
 }

@@ -87,7 +87,7 @@ impl ResponseAwareBalancer {
             }
 
             debug!(
-                "Updated metrics for {}: response_time={}ms, pending={}",
+                "Updated metrics for {:?}: response_time={}ms, pending={}",
                 upstream.upstream_ref.name,
                 new_time,
                 self.metrics[index].pending_requests.load(Ordering::Relaxed)
@@ -177,7 +177,7 @@ impl LoadBalancer for ResponseAwareBalancer {
             .fetch_add(1, Ordering::SeqCst);
 
         debug!(
-            "ResponseAwareBalancer selected upstream: {}, score: {:.2}",
+            "ResponseAwareBalancer selected upstream: {:?}, score: {:.2}",
             self.upstreams[best_index].upstream_ref.name, best_score
         );
 

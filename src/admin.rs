@@ -3,6 +3,7 @@ use crate::config::Config;
 use crate::error::AppError;
 use crate::metrics::METRICS;
 use crate::server::create_tcp_listener;
+use crate::server::ForwardState;
 use async_trait::async_trait;
 use axum::{
     http::{header, StatusCode},
@@ -11,6 +12,7 @@ use axum::{
     Router,
 };
 use prometheus::{Encoder, TextEncoder};
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -28,14 +30,22 @@ pub struct AdminServer {
     addr: SocketAddr,
     // 配置
     config: Arc<RwLock<Config>>,
+    // 转发服务状态
+    forward_states: Arc<HashMap<String, Arc<ForwardState>>>,
 }
 
 impl AdminServer {
     // 创建新的管理服务
-    pub fn new(debug: bool, addr: SocketAddr, config: Arc<RwLock<Config>>) -> Self {
+    pub fn new(
+        debug: bool,
+        addr: SocketAddr,
+        config: Arc<RwLock<Config>>,
+        forward_states: Arc<HashMap<String, Arc<ForwardState>>>,
+    ) -> Self {
         Self {
             addr,
             config,
+            forward_states,
             debug,
         }
     }
@@ -49,7 +59,7 @@ impl IntoSubsystem<AppError> for AdminServer {
             .route(HEALTH_PATH, get(health_handler))
             .route(METRICS_PATH, get(metrics_handler))
             // 添加 API v1 路由
-            .merge(api_routes(self.config.clone()));
+            .merge(api_routes(self.config.clone(), self.forward_states.clone()));
 
         // 如果开启调试模式，添加 OpenAPI UI
         if self.debug {
@@ -59,7 +69,7 @@ impl IntoSubsystem<AppError> for AdminServer {
         // 创建 TCP 监听器
         let listener = create_tcp_listener(self.addr, u16::MAX.into())?;
 
-        info!("Admin service listening on {}", self.addr);
+        info!("Admin service listening on {:?}", self.addr);
 
         // 使用tokio::select!监听服务器和关闭信号
         tokio::select! {

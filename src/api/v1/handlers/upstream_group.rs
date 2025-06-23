@@ -4,7 +4,8 @@ use crate::{
         success_response,
     },
     api::v1::models::{ErrorResponse, SuccessResponse, UpstreamGroupDetail},
-    config::{Config, UpstreamRef},
+    api::v1::routes::AppState,
+    config::UpstreamRef,
     r#const::api::error_types,
 };
 use axum::{
@@ -14,8 +15,6 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::{info, warn};
 use utoipa::ToSchema;
 use validator::Validate;
@@ -33,10 +32,10 @@ use validator::Validate;
     )
 )]
 pub async fn list_upstream_groups(
-    State(config): State<Arc<RwLock<Config>>>,
+    State(app_state): State<AppState>,
 ) -> Json<SuccessResponse<Vec<UpstreamGroupDetail>>> {
     // 获取读锁
-    let config_read = config.read().await;
+    let config_read = app_state.config.read().await;
 
     // 创建上游服务名称到配置的映射 (使用引用)
     let upstream_map = create_upstream_map(&config_read.upstreams);
@@ -77,11 +76,11 @@ pub async fn list_upstream_groups(
 )]
 #[axum::debug_handler]
 pub async fn get_upstream_group(
-    State(config): State<Arc<RwLock<Config>>>,
+    State(app_state): State<AppState>,
     Path(name): Path<String>,
 ) -> Response {
     // 获取读锁
-    let config_read = config.read().await;
+    let config_read = app_state.config.read().await;
 
     // 查找指定名称的上游组
     let group = find_by_name(&config_read.upstream_groups, &name, |g| &g.name);
@@ -99,7 +98,8 @@ pub async fn get_upstream_group(
             let response = SuccessResponse::success_with_data(&detail);
             log_response_body(&response);
 
-            success_response(&detail)
+            // 直接返回detail的所有权，避免克隆
+            success_response(detail)
         }
         None => {
             let error = ErrorResponse::error(
@@ -140,7 +140,7 @@ pub struct RequestPatchUpstreamGroupPayload {
     )
 )]
 pub async fn patch_upstream_group(
-    State(config): State<Arc<RwLock<Config>>>,
+    State(app_state): State<AppState>,
     Path(name): Path<String>,
     Json(payload): Json<RequestPatchUpstreamGroupPayload>,
 ) -> Response {
@@ -156,7 +156,7 @@ pub async fn patch_upstream_group(
     }
 
     // 获取写锁
-    let mut config_write = config.write().await;
+    let mut config_write = app_state.config.write().await;
 
     // 查找上游组索引
     let group_index = config_write
@@ -206,7 +206,8 @@ pub async fn patch_upstream_group(
             // 记录响应体
             log_response_body(&detail);
 
-            success_response(&detail)
+            // 直接返回detail的所有权，避免克隆
+            success_response(detail)
         }
         None => {
             let error = ErrorResponse::error(

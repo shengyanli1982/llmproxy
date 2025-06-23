@@ -100,7 +100,7 @@ async fn handle_response(
 
     // 记录请求完成的延迟时间（毫秒）
     info!(
-        "Request completed: {} {} to upstream group {}, status: {}, time: {}ms",
+        "Request completed: {:?} {:?} to upstream group {:?}, status: {}, time: {}ms",
         method, path, default_group, status, duration_ms
     );
 
@@ -133,7 +133,7 @@ fn handle_request_error(
 
     // 记录请求失败的信息
     info!(
-        "Request failed: {} {} to upstream group {}, time: {}ms",
+        "Request failed: {:?} {:?} to upstream group {:?}, time: {}ms",
         method,
         path,
         default_group,
@@ -182,7 +182,7 @@ pub async fn forward_handler(
     // 3. 如果找不到对应的 routing 规则，则使用默认的 "default_group" 配置。
     //
     // 使用路由器获取目标上游组
-    let routing_result = state.router.get_target_group(&path);
+    let routing_result = state.router.get_target_group(&path).await;
     let target_group = &routing_result.target_group;
 
     // 记录路由匹配

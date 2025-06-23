@@ -57,6 +57,7 @@ utoipa-scalar = { version = "0.3", features = ["axum"] }
 axum-token-auth = "0.2"
 validator = { version = "0.19", features = ["derive"] }
 radixmap = "0.2"
+base64 = "0.21"
 
 # 这个一定要放在最后，否则会报错
 [target.'cfg(unix)'.dependencies]

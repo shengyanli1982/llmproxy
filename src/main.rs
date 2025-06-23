@@ -3,7 +3,7 @@ use llmproxy::{
     upstream::UpstreamManager,
 };
 use mimalloc::MiMalloc;
-use std::process;
+use std::{collections::HashMap, process, sync::Arc};
 use tokio::sync::RwLock;
 use tokio_graceful_shutdown::{IntoSubsystem, SubsystemBuilder, Toplevel};
 use tracing::{error, info};
@@ -143,6 +143,38 @@ async fn create_components(debug: bool, config: Config) -> Result<AppComponents,
             }
         };
 
+    // 创建转发服务
+    let mut forward_servers = Vec::with_capacity(http_server_config.forwards.len());
+
+    // 预先分配HashMap容量，减少重新分配
+    let mut states_map = HashMap::with_capacity(http_server_config.forwards.len());
+
+    for forward_config in &http_server_config.forwards {
+        // 使用克隆避免所有权转移
+        match ForwardServer::new(forward_config.clone(), upstream_manager.clone()) {
+            Ok(server) => {
+                info!(
+                    "Forwarding service {:?} initialized successfully",
+                    forward_config.name
+                );
+
+                // 获取状态并直接插入HashMap（避免后续再克隆）
+                states_map.insert(forward_config.name.clone(), server.get_state().clone());
+                forward_servers.push(server);
+            }
+            Err(e) => {
+                error!(
+                    "Failed to initialize forwarding service {:?}: {}",
+                    forward_config.name, e
+                );
+                return Err(e);
+            }
+        }
+    }
+
+    // 只在所有状态收集完成后创建一次Arc
+    let forward_states = Arc::new(states_map);
+
     // 创建管理服务
     let admin_addr = format!(
         "{}:{}",
@@ -150,30 +182,8 @@ async fn create_components(debug: bool, config: Config) -> Result<AppComponents,
     )
     .parse()
     .map_err(|e| AppError::Config(format!("Invalid admin server address: {}", e)))?;
-    let admin_server = AdminServer::new(debug, admin_addr, config_arc.clone());
-    info!("Admin server initialized successfully: {}", admin_addr);
-
-    // 创建转发服务
-    let mut forward_servers = Vec::with_capacity(http_server_config.forwards.len());
-    for forward_config in &http_server_config.forwards {
-        // 使用克隆避免所有权转移
-        match ForwardServer::new(forward_config.clone(), upstream_manager.clone()) {
-            Ok(server) => {
-                info!(
-                    "Forwarding service {} initialized successfully",
-                    forward_config.name
-                );
-                forward_servers.push(server);
-            }
-            Err(e) => {
-                error!(
-                    "Failed to initialize forwarding service {}: {}",
-                    forward_config.name, e
-                );
-                return Err(e);
-            }
-        }
-    }
+    let admin_server = AdminServer::new(debug, admin_addr, config_arc.clone(), forward_states);
+    info!("Admin server initialized successfully: {:?}", admin_addr);
 
     // 返回应用组件
     Ok(AppComponents {

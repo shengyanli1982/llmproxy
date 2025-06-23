@@ -8,24 +8,31 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use base64::{engine::general_purpose, Engine as _};
 use serde::Serialize;
 use serde_json;
 use std::collections::HashMap;
 use tracing::{debug, warn};
+
 /// 生成"资源未找到"错误响应
 pub fn not_found_error(resource_type: &str, name: &str) -> Response {
     warn!("API: {} '{}' not found", resource_type, name);
-    Json(ErrorResponse::error(
+    let error = ErrorResponse::error(
         StatusCode::NOT_FOUND,
         api::error_types::NOT_FOUND,
         format!("{} '{}' does not exist", resource_type, name),
-    ))
-    .into_response()
+    );
+    (StatusCode::NOT_FOUND, Json(error)).into_response()
 }
 
-/// 生成成功响应，避免不必要的克隆
-pub fn success_response<T: Clone + Serialize>(item: &T) -> Response {
-    Json(SuccessResponse::success_with_data(item.clone())).into_response()
+/// 生成成功响应，支持引用或所有权传递
+pub fn success_response<T: Serialize>(item: T) -> Response {
+    Json(SuccessResponse::success_with_data(item)).into_response()
+}
+
+// 为引用版本提供一个单独的函数，保持向后兼容
+pub fn success_response_ref<T: Clone + Serialize>(item: &T) -> Response {
+    Json(SuccessResponse::success_with_data(item)).into_response()
 }
 
 /// 创建上游服务名称到配置的引用映射
@@ -66,5 +73,18 @@ pub fn log_response_body<T: Serialize>(body: &T) {
         Err(e) => {
             warn!("Response body is not serializable: {}", e);
         }
+    }
+}
+
+/// 将base64字符串解码为路径
+///
+/// 用于解析API路径参数，返回Result表示解码可能失败
+pub fn decode_base64_to_path(encoded: &str) -> Result<String, String> {
+    match general_purpose::URL_SAFE.decode(encoded) {
+        Ok(bytes) => match String::from_utf8(bytes) {
+            Ok(path) => Ok(path),
+            Err(e) => Err(format!("Failed to convert decoded bytes to string: {}", e)),
+        },
+        Err(e) => Err(format!("Failed to decode base64 string: {}", e)),
     }
 }

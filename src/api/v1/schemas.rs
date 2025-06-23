@@ -1,15 +1,15 @@
 use crate::{
-    api::v1::handlers::{forward, upstream, upstream_group},
+    api::v1::handlers::{forward, routing, upstream, upstream_group},
     api::v1::models::{
-        ErrorDetail, ErrorResponse, PatchUpstreamGroupPayload, SuccessResponse,
+        ErrorDetail, ErrorResponse, PatchUpstreamGroupPayload, SuccessResponse, UpdateRoutePayload,
         UpstreamGroupDetail, UpstreamRef,
     },
     api::v1::routes::API_V1_PREFIX,
     config::{
-        AuthConfig, AuthType, BalanceConfig, BalanceStrategy, BreakerConfig, ForwardConfig,
-        HeaderOp, HeaderOpType, HttpClientConfig, HttpClientTimeoutConfig, ProxyConfig,
-        RateLimitConfig, RetryConfig, TimeoutConfig, UpstreamConfig, UpstreamGroupConfig,
-        UpstreamRef as ConfigUpstreamRef,
+        http_server::RoutingRule, AuthConfig, AuthType, BalanceConfig, BalanceStrategy,
+        BreakerConfig, ForwardConfig, HeaderOp, HeaderOpType, HttpClientConfig,
+        HttpClientTimeoutConfig, ProxyConfig, RateLimitConfig, RetryConfig, TimeoutConfig,
+        UpstreamConfig, UpstreamGroupConfig, UpstreamRef as ConfigUpstreamRef,
     },
 };
 use axum::Router;
@@ -21,9 +21,15 @@ use utoipa_scalar::{Scalar, Servable};
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        // 转发规则
+        // 转发服务
         forward::list_forwards,
         forward::get_forward,
+        // 路由规则
+        routing::list_routes,
+        routing::get_route,
+        routing::create_route,
+        routing::update_route,
+        routing::delete_route,
         // 上游组
         upstream_group::list_upstream_groups,
         upstream_group::get_upstream_group,
@@ -40,6 +46,8 @@ use utoipa_scalar::{Scalar, Servable};
             // 响应模型
             SuccessResponse<Vec<ForwardConfig>>,
             SuccessResponse<ForwardConfig>,
+            SuccessResponse<Vec<RoutingRule>>,
+            SuccessResponse<RoutingRule>,
             SuccessResponse<Vec<UpstreamGroupDetail>>,
             SuccessResponse<UpstreamGroupDetail>,
             SuccessResponse<Vec<UpstreamConfig>>,
@@ -51,6 +59,7 @@ use utoipa_scalar::{Scalar, Servable};
             UpstreamConfig,
             UpstreamGroupConfig,
             UpstreamGroupDetail,
+            RoutingRule,
             // 配置相关类型
             AuthConfig,
             AuthType,
@@ -69,10 +78,12 @@ use utoipa_scalar::{Scalar, Servable};
             // 新增API模型
             PatchUpstreamGroupPayload,
             UpstreamRef,
+            UpdateRoutePayload,
         ),
     ),
     tags(
-        (name = "Forwards", description = "转发规则 APIs | Forward Rule APIs"),
+        (name = "Forwards", description = "转发服务 APIs | Forwarding Service APIs"),
+        (name = "Routes", description = "路由规则 APIs | Routing Rule APIs"),
         (name = "UpstreamGroups", description = "上游组 APIs | Upstream Group APIs"),
         (name = "Upstreams", description = "上游服务 APIs | Upstream Service APIs"),
     ),
