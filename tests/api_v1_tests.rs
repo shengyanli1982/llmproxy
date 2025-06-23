@@ -8,6 +8,8 @@ mod api_v1_tests {
     #[cfg(test)]
     mod forwards;
     #[cfg(test)]
+    mod routing;
+    #[cfg(test)]
     mod upstream_groups;
     #[cfg(test)]
     mod upstreams;

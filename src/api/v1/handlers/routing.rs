@@ -32,7 +32,7 @@ fn decode_path(encoded_path: &str) -> Result<String, Response> {
                 format!("Invalid base64 path: {}", e),
             );
             log_response_body(&error);
-            Err(Json(error).into_response())
+            Err((StatusCode::BAD_REQUEST, Json(error)).into_response())
         }
     }
 }
@@ -51,7 +51,7 @@ fn get_http_server(
                 "HTTP server configuration is missing",
             );
             log_response_body(&error);
-            Err(Json(error).into_response())
+            Err((StatusCode::INTERNAL_SERVER_ERROR, Json(error)).into_response())
         }
     }
 }
@@ -71,7 +71,7 @@ fn check_upstream_group_exists(config_write: &Config, target_group: &str) -> Res
             format!("Target upstream group '{}' does not exist", target_group),
         );
         log_response_body(&error);
-        return Err(Json(error).into_response());
+        return Err((StatusCode::BAD_REQUEST, Json(error)).into_response());
     }
     Ok(())
 }
@@ -135,11 +135,7 @@ pub async fn list_routes(
     match forward {
         Some(forward) => {
             // 提取路由规则，如果不存在则返回空数组
-            let routes: Vec<RoutingRule> = forward
-                .routing
-                .as_ref()
-                .map(|rules| rules.clone())
-                .unwrap_or_default();
+            let routes: Vec<RoutingRule> = forward.routing.clone().unwrap_or_default();
 
             info!(
                 "API: Retrieved {} routing rules for forward '{}'",
@@ -255,7 +251,7 @@ pub async fn create_route(
     if let Err(e) = payload.validate() {
         let error = ErrorResponse::from_validation_errors(e);
         log_response_body(&error);
-        return Json(error).into_response();
+        return (StatusCode::BAD_REQUEST, Json(error)).into_response();
     }
 
     // 获取配置的写锁
@@ -349,7 +345,7 @@ pub async fn update_route(
     if let Err(e) = payload.validate() {
         let error = ErrorResponse::from_validation_errors(e);
         log_response_body(&error);
-        return Json(error).into_response();
+        return (StatusCode::BAD_REQUEST, Json(error)).into_response();
     }
 
     // 解码路径

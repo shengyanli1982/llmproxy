@@ -17,12 +17,12 @@ use tracing::{debug, warn};
 /// 生成"资源未找到"错误响应
 pub fn not_found_error(resource_type: &str, name: &str) -> Response {
     warn!("API: {} '{}' not found", resource_type, name);
-    Json(ErrorResponse::error(
+    let error = ErrorResponse::error(
         StatusCode::NOT_FOUND,
         api::error_types::NOT_FOUND,
         format!("{} '{}' does not exist", resource_type, name),
-    ))
-    .into_response()
+    );
+    (StatusCode::NOT_FOUND, Json(error)).into_response()
 }
 
 /// 生成成功响应，避免不必要的克隆
