@@ -2,9 +2,10 @@ use crate::{
     api::v1::{
         handlers::utils::{
             decode_base64_to_path, log_request_body, log_response_body, not_found_error,
-            success_response,
+            success_response_ref,
         },
         models::{ErrorResponse, SuccessResponse, UpdateRoutePayload},
+        routes::AppState,
     },
     config::{http_server::RoutingRule, Config},
     r#const::api::error_types,
@@ -15,9 +16,7 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use tracing::info;
+use tracing::{debug, info};
 use validator::Validate;
 
 // 解码 base64 路径
@@ -103,6 +102,110 @@ fn route_not_found(path: &str, forward_name: &str) -> Response {
     not_found_error("Route", path)
 }
 
+// 查找指定的转发服务
+#[inline(always)]
+fn find_forward<'a>(
+    config: &'a impl std::ops::Deref<Target = Config>,
+    forward_name: &str,
+) -> Option<&'a crate::config::ForwardConfig> {
+    config
+        .http_server
+        .as_ref()
+        .and_then(|s| s.forwards.iter().find(|f| f.name == forward_name))
+}
+
+// 查找指定的转发服务（可变引用版本）
+#[inline(always)]
+fn find_forward_mut<'a>(
+    http_server: &'a mut crate::config::http_server::HttpServerConfig,
+    forward_name: &str,
+) -> Option<&'a mut crate::config::ForwardConfig> {
+    http_server
+        .forwards
+        .iter_mut()
+        .find(|f| f.name == forward_name)
+}
+
+// 更新运行时路由表
+#[inline(always)]
+async fn update_runtime_router(
+    app_state: &AppState,
+    forward_name: &str,
+    path: &str,
+    target_group: Option<&str>,
+) {
+    let forward_state = match app_state.forward_states.get(forward_name) {
+        Some(state) => state,
+        None => {
+            // 只记录错误，不影响API响应
+            debug!(
+                "Forward state '{}' not found for runtime router update",
+                forward_name
+            );
+            return;
+        }
+    };
+
+    let result = match target_group {
+        // 添加或更新路由
+        Some(target) => {
+            forward_state
+                .router
+                .insert_or_update_route(path.to_string(), target.to_string())
+                .await
+        }
+        // 删除路由
+        None => forward_state.router.remove_route(path).await,
+    };
+
+    match result {
+        Ok(_) => {
+            let action = if target_group.is_some() {
+                "updated"
+            } else {
+                "removed"
+            };
+            debug!(
+                "Runtime router {} path '{}' in forward '{}'",
+                action, path, forward_name
+            );
+        }
+        Err(e) => {
+            let action = if target_group.is_some() {
+                "update"
+            } else {
+                "remove"
+            };
+            // 只记录错误，不影响API响应
+            debug!(
+                "Failed to {} path '{}' in runtime router for forward '{}': {}",
+                action, path, forward_name, e
+            );
+        }
+    }
+}
+
+/// 获取路由规则列表，如果不存在则返回错误响应
+#[inline(always)]
+fn get_routing_or_error<'a>(
+    forward: &'a mut crate::config::ForwardConfig,
+    forward_name: &str,
+    path: &str,
+) -> Result<&'a mut Vec<RoutingRule>, Response> {
+    match forward.routing.as_mut() {
+        Some(r) => Ok(r),
+        None => {
+            let error = ErrorResponse::error(
+                StatusCode::NOT_FOUND,
+                error_types::NOT_FOUND,
+                format!("Forward '{}' has no routing rules", forward_name),
+            );
+            log_response_body(&error);
+            Err(not_found_error("Route", path))
+        }
+    }
+}
+
 /// 获取指定转发服务的所有路由规则
 ///
 /// Get all routing rules for a specified forwarding service
@@ -120,19 +223,14 @@ fn route_not_found(path: &str, forward_name: &str) -> Response {
     )
 )]
 pub async fn list_routes(
-    State(config): State<Arc<RwLock<Config>>>,
+    State(app_state): State<AppState>,
     Path(forward_name): Path<String>,
 ) -> Response {
     // 获取配置的读锁
-    let config_read = config.read().await;
+    let config_read = app_state.config.read().await;
 
     // 查找指定的转发服务
-    let forward = config_read
-        .http_server
-        .as_ref()
-        .and_then(|s| s.forwards.iter().find(|f| f.name == forward_name));
-
-    match forward {
+    match find_forward(&config_read, &forward_name) {
         Some(forward) => {
             // 提取路由规则，如果不存在则返回空数组
             let routes = forward.routing.as_deref().unwrap_or_default();
@@ -174,7 +272,7 @@ pub async fn list_routes(
     )
 )]
 pub async fn get_route(
-    State(config): State<Arc<RwLock<Config>>>,
+    State(app_state): State<AppState>,
     Path((forward_name, encoded_path)): Path<(String, String)>,
 ) -> Response {
     // 解码路径
@@ -184,15 +282,10 @@ pub async fn get_route(
     };
 
     // 获取配置的读锁
-    let config_read = config.read().await;
+    let config_read = app_state.config.read().await;
 
     // 查找指定的转发服务
-    let forward = config_read
-        .http_server
-        .as_ref()
-        .and_then(|s| s.forwards.iter().find(|f| f.name == forward_name));
-
-    match forward {
+    match find_forward(&config_read, &forward_name) {
         Some(forward) => {
             // 查找指定的路由规则
             let route = forward
@@ -211,7 +304,7 @@ pub async fn get_route(
                     let response = SuccessResponse::success_with_data(route);
                     log_response_body(&response);
 
-                    success_response(route)
+                    success_response_ref(route)
                 }
                 None => route_not_found(&path, &forward_name),
             }
@@ -240,7 +333,7 @@ pub async fn get_route(
     )
 )]
 pub async fn create_route(
-    State(config): State<Arc<RwLock<Config>>>,
+    State(app_state): State<AppState>,
     Path(forward_name): Path<String>,
     Json(payload): Json<RoutingRule>,
 ) -> Response {
@@ -255,7 +348,7 @@ pub async fn create_route(
     }
 
     // 获取配置的写锁
-    let mut config_write = config.write().await;
+    let mut config_write = app_state.config.write().await;
 
     // 先检查上游组是否存在
     if let Err(response) = check_upstream_group_exists(&config_write, &payload.target_group) {
@@ -269,12 +362,7 @@ pub async fn create_route(
     };
 
     // 查找指定转发服务的索引
-    let forward = http_server
-        .forwards
-        .iter_mut()
-        .find(|f| f.name == forward_name);
-
-    match forward {
+    match find_forward_mut(http_server, &forward_name) {
         Some(forward) => {
             // 初始化routing字段（如果不存在）
             let routing = forward.routing.get_or_insert_with(Vec::new);
@@ -294,18 +382,26 @@ pub async fn create_route(
             }
 
             // 添加新的路由规则
-            routing.push(payload);
-            let created_rule = routing.last().unwrap(); // 因为我们刚刚 push, 所以 unwrap 是安全的
+            routing.push(payload.clone());
+
+            // 同步更新Router中的路由表
+            update_runtime_router(
+                &app_state,
+                &forward_name,
+                &payload.path,
+                Some(&payload.target_group),
+            )
+            .await;
 
             info!(
                 "API: Created new route '{}' -> '{}' in forward '{}'",
-                created_rule.path, created_rule.target_group, forward_name
+                payload.path, payload.target_group, forward_name
             );
 
-            let response = SuccessResponse::success_with_data(created_rule);
+            let response = SuccessResponse::success_with_data(&payload);
             log_response_body(&response);
 
-            (StatusCode::CREATED, success_response(created_rule)).into_response()
+            (StatusCode::CREATED, Json(response)).into_response()
         }
         None => forward_not_found(&forward_name),
     }
@@ -331,7 +427,7 @@ pub async fn create_route(
     )
 )]
 pub async fn update_route(
-    State(config): State<Arc<RwLock<Config>>>,
+    State(app_state): State<AppState>,
     Path((forward_name, encoded_path)): Path<(String, String)>,
     Json(payload): Json<UpdateRoutePayload>,
 ) -> Response {
@@ -352,7 +448,7 @@ pub async fn update_route(
     };
 
     // 获取配置的写锁
-    let mut config_write = config.write().await;
+    let mut config_write = app_state.config.write().await;
 
     // 先检查上游组是否存在
     if let Err(response) = check_upstream_group_exists(&config_write, &payload.target_group) {
@@ -366,25 +462,12 @@ pub async fn update_route(
     };
 
     // 查找指定的转发服务
-    let forward = http_server
-        .forwards
-        .iter_mut()
-        .find(|f| f.name == forward_name);
-
-    match forward {
+    match find_forward_mut(http_server, &forward_name) {
         Some(forward) => {
             // 获取路由规则（如果存在）
-            let routing = match forward.routing.as_mut() {
-                Some(r) => r,
-                None => {
-                    let error = ErrorResponse::error(
-                        StatusCode::NOT_FOUND,
-                        error_types::NOT_FOUND,
-                        format!("Forward '{}' has no routing rules", forward_name),
-                    );
-                    log_response_body(&error);
-                    return not_found_error("Route", &path);
-                }
+            let routing = match get_routing_or_error(forward, &forward_name, &path) {
+                Ok(r) => r,
+                Err(response) => return response,
             };
 
             // 查找指定的路由规则
@@ -394,6 +477,15 @@ pub async fn update_route(
                 Some(idx) => {
                     // 更新路由规则
                     routing[idx].target_group = payload.target_group.clone();
+
+                    // 同步更新Router中的路由表
+                    update_runtime_router(
+                        &app_state,
+                        &forward_name,
+                        &path,
+                        Some(&payload.target_group),
+                    )
+                    .await;
 
                     info!(
                         "API: Updated route '{}' to target '{}' in forward '{}'",
@@ -406,7 +498,7 @@ pub async fn update_route(
                     let response = SuccessResponse::success_with_data(updated_rule);
                     log_response_body(&response);
 
-                    success_response(updated_rule)
+                    success_response_ref(updated_rule)
                 }
                 None => route_not_found(&path, &forward_name),
             }
@@ -434,7 +526,7 @@ pub async fn update_route(
     )
 )]
 pub async fn delete_route(
-    State(config): State<Arc<RwLock<Config>>>,
+    State(app_state): State<AppState>,
     Path((forward_name, encoded_path)): Path<(String, String)>,
 ) -> Response {
     // 解码路径
@@ -444,7 +536,7 @@ pub async fn delete_route(
     };
 
     // 获取配置的写锁
-    let mut config_write = config.write().await;
+    let mut config_write = app_state.config.write().await;
 
     // 查找指定的HTTP服务器配置
     let http_server = match get_http_server(&mut config_write) {
@@ -453,25 +545,12 @@ pub async fn delete_route(
     };
 
     // 查找指定的转发服务
-    let forward = http_server
-        .forwards
-        .iter_mut()
-        .find(|f| f.name == forward_name);
-
-    match forward {
+    match find_forward_mut(http_server, &forward_name) {
         Some(forward) => {
             // 获取路由规则（如果存在）
-            let routing = match forward.routing.as_mut() {
-                Some(r) => r,
-                None => {
-                    let error = ErrorResponse::error(
-                        StatusCode::NOT_FOUND,
-                        error_types::NOT_FOUND,
-                        format!("Forward '{}' has no routing rules", forward_name),
-                    );
-                    log_response_body(&error);
-                    return not_found_error("Route", &path);
-                }
+            let routing = match get_routing_or_error(forward, &forward_name, &path) {
+                Ok(r) => r,
+                Err(response) => return response,
             };
 
             // 查找并删除指定的路由规则
@@ -482,6 +561,9 @@ pub async fn delete_route(
             if routing.len() == initial_len {
                 return route_not_found(&path, &forward_name);
             }
+
+            // 同步更新Router中的路由表
+            update_runtime_router(&app_state, &forward_name, &path, None).await;
 
             // 如果删除后路由规则为空，将routing设置为None
             if routing.is_empty() {

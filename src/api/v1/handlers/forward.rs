@@ -1,15 +1,14 @@
 use crate::{
-    api::v1::handlers::utils::{log_response_body, not_found_error, success_response},
+    api::v1::handlers::utils::{log_response_body, not_found_error, success_response_ref},
     api::v1::models::{ErrorResponse, SuccessResponse},
-    config::{Config, ForwardConfig},
+    api::v1::routes::AppState,
+    config::ForwardConfig,
 };
 use axum::{
     extract::{Path, State},
     response::Response,
     Json,
 };
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::info;
 
 /// 获取所有转发服务列表
@@ -25,9 +24,10 @@ use tracing::info;
     )
 )]
 pub async fn list_forwards(
-    State(config): State<Arc<RwLock<Config>>>,
+    State(app_state): State<AppState>,
 ) -> Json<SuccessResponse<Vec<ForwardConfig>>> {
-    let forwards = config
+    let forwards = app_state
+        .config
         .read()
         .await
         .http_server
@@ -62,11 +62,8 @@ pub async fn list_forwards(
     )
 )]
 #[axum::debug_handler]
-pub async fn get_forward(
-    State(config): State<Arc<RwLock<Config>>>,
-    Path(name): Path<String>,
-) -> Response {
-    let config_read = config.read().await;
+pub async fn get_forward(State(app_state): State<AppState>, Path(name): Path<String>) -> Response {
+    let config_read = app_state.config.read().await;
     let forward = config_read
         .http_server
         .as_ref()
@@ -76,11 +73,12 @@ pub async fn get_forward(
         Some(forward) => {
             info!("API: Retrieved forwarding service '{}'", name);
 
-            // 记录响应体
-            let response = SuccessResponse::success_with_data(forward.clone());
+            // 记录响应体并直接使用引用
+            let response = SuccessResponse::success_with_data(forward);
             log_response_body(&response);
 
-            success_response(forward)
+            // 使用新的success_response_ref函数处理引用
+            success_response_ref(forward)
         }
         None => {
             let error = ErrorResponse::error(

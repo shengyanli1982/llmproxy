@@ -25,9 +25,14 @@ pub fn not_found_error(resource_type: &str, name: &str) -> Response {
     (StatusCode::NOT_FOUND, Json(error)).into_response()
 }
 
-/// 生成成功响应，避免不必要的克隆
-pub fn success_response<T: Clone + Serialize>(item: &T) -> Response {
-    Json(SuccessResponse::success_with_data(item.clone())).into_response()
+/// 生成成功响应，支持引用或所有权传递
+pub fn success_response<T: Serialize>(item: T) -> Response {
+    Json(SuccessResponse::success_with_data(item)).into_response()
+}
+
+// 为引用版本提供一个单独的函数，保持向后兼容
+pub fn success_response_ref<T: Clone + Serialize>(item: &T) -> Response {
+    Json(SuccessResponse::success_with_data(item)).into_response()
 }
 
 /// 创建上游服务名称到配置的引用映射

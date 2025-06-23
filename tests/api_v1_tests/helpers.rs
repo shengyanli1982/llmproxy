@@ -13,6 +13,7 @@ use llmproxy::{
         TimeoutConfig,
     },
 };
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tower::ServiceExt;
@@ -144,9 +145,12 @@ pub async fn spawn_app() -> TestApp {
     // 将配置包装在 Arc<RwLock<>> 中以实现共享和可变性
     let shared_config = Arc::new(RwLock::new(config));
 
+    // 创建一个空的forward_states
+    let forward_states = Arc::new(HashMap::new());
+
     println!("Creating API routes with config");
     // 获取 API v1 路由并应用共享配置状态
-    let app_router = v1::api_routes(shared_config.clone());
+    let app_router = v1::api_routes(shared_config.clone(), forward_states);
     println!("API routes created");
 
     // 返回 TestApp 实例

@@ -50,8 +50,15 @@ impl ForwardServer {
     }
 
     // 获取服务器监听地址
+    #[inline(always)]
     pub fn get_addr(&self) -> &SocketAddr {
         &self.addr
+    }
+
+    // 获取服务器状态
+    #[inline(always)]
+    pub fn get_state(&self) -> &Arc<ForwardState> {
+        &self.state
     }
 }
 
