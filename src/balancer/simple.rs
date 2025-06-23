@@ -51,7 +51,7 @@ impl LoadBalancer for RoundRobinBalancer {
 
             if is_upstream_healthy(managed_upstream) {
                 debug!(
-                    "RoundRobinBalancer selected upstream: {}, index: {}",
+                    "RoundRobinBalancer selected upstream: {:?}, index: {}",
                     managed_upstream.upstream_ref.name, index
                 );
                 return Ok(managed_upstream);
@@ -140,7 +140,7 @@ impl LoadBalancer for WeightedRoundRobinBalancer {
 
             if is_upstream_healthy(managed_upstream) {
                 debug!(
-                    "WeightedRoundRobinBalancer selected upstream: {}, weight: {}, index: {}",
+                    "WeightedRoundRobinBalancer selected upstream: {:?}, weight: {}, index: {}",
                     managed_upstream.upstream_ref.name, managed_upstream.upstream_ref.weight, index
                 );
                 return Ok(managed_upstream);
@@ -201,7 +201,7 @@ impl LoadBalancer for RandomBalancer {
             if let Some(upstream) = self.upstreams.choose(&mut rng) {
                 if is_upstream_healthy(upstream) {
                     debug!(
-                        "RandomBalancer selected upstream: {}",
+                        "RandomBalancer selected upstream: {:?}",
                         upstream.upstream_ref.name
                     );
                     return Ok(upstream);
@@ -228,7 +228,7 @@ impl LoadBalancer for RandomBalancer {
             .expect("Should have at least one healthy upstream");
 
         debug!(
-            "RandomBalancer selected upstream: {}",
+            "RandomBalancer selected upstream: {:?}",
             upstream.upstream_ref.name
         );
 
@@ -272,7 +272,7 @@ impl LoadBalancer for FailoverBalancer {
         for (index, upstream) in self.upstreams.iter().enumerate() {
             if is_upstream_healthy(upstream) {
                 debug!(
-                    "FailoverBalancer selected upstream: {}, index: {}",
+                    "FailoverBalancer selected upstream: {:?}, index: {}",
                     upstream.upstream_ref.name, index
                 );
                 return Ok(upstream);
