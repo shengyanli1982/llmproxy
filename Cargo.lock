@@ -268,6 +268,12 @@ dependencies = [
 
 [[package]]
 name = "base64"
+version = "0.21.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9d297deb1925b89f2ccc13d7635fa0714f12c87adce1c75356b39ca9b7178567"
+
+[[package]]
+name = "base64"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
@@ -407,7 +413,7 @@ version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ddef33a339a91ea89fb53151bd0a4689cfce27055c291dfa69945475d22c747"
 dependencies = [
- "base64",
+ "base64 0.22.1",
  "hmac",
  "percent-encoding",
  "rand 0.8.5",
@@ -1183,6 +1189,7 @@ dependencies = [
  "async-trait",
  "axum",
  "axum-token-auth",
+ "base64 0.21.7",
  "bytes",
  "circuitbreaker-rs",
  "clap",
@@ -1814,7 +1821,7 @@ version = "0.12.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d19c46a6fdd48bc4dab94b6103fccc55d34c67cc0ad04653aad4ea2a07cd7bbb"
 dependencies = [
- "base64",
+ "base64 0.22.1",
  "bytes",
  "encoding_rs",
  "futures-core",
@@ -3107,7 +3114,7 @@ checksum = "101681b74cd87b5899e87bcf5a64e83334dd313fcd3053ea72e6dba18928e301"
 dependencies = [
  "assert-json-diff",
  "async-trait",
- "base64",
+ "base64 0.22.1",
  "deadpool",
  "futures",
  "http",

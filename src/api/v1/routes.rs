@@ -1,7 +1,7 @@
 use crate::{
     api::v1::{
         auth::auth_middleware,
-        handlers::{forward, upstream, upstream_group},
+        handlers::{forward, routing, upstream, upstream_group},
     },
     config::Config,
     r#const::api,
@@ -21,6 +21,8 @@ const UPSTREAM_GROUP_PATH: &str = "/upstream-groups";
 const UPSTREAM_GROUP_NAME_PATH: &str = "/upstream-groups/{name}";
 const UPSTREAM_PATH: &str = "/upstreams";
 const UPSTREAM_NAME_PATH: &str = "/upstreams/{name}";
+const ROUTES_PATH: &str = "/forwards/{name}/routes";
+const ROUTE_PATH: &str = "/forwards/{name}/routes/{path}";
 
 /// 创建 API v1 路由
 pub fn api_routes(config: Arc<RwLock<Config>>) -> Router {
@@ -31,6 +33,12 @@ pub fn api_routes(config: Arc<RwLock<Config>>) -> Router {
         // 转发规则路由
         .route(FORWARD_PATH, get(forward::list_forwards))
         .route(FORWARD_NAME_PATH, get(forward::get_forward))
+        // 路由规则路由
+        .route(ROUTES_PATH, get(routing::list_routes))
+        .route(ROUTES_PATH, post(routing::create_route))
+        .route(ROUTE_PATH, get(routing::get_route))
+        .route(ROUTE_PATH, put(routing::update_route))
+        .route(ROUTE_PATH, delete(routing::delete_route))
         // 上游组路由
         .route(
             UPSTREAM_GROUP_PATH,

@@ -8,10 +8,12 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
+use base64::{engine::general_purpose, Engine as _};
 use serde::Serialize;
 use serde_json;
 use std::collections::HashMap;
 use tracing::{debug, warn};
+
 /// 生成"资源未找到"错误响应
 pub fn not_found_error(resource_type: &str, name: &str) -> Response {
     warn!("API: {} '{}' not found", resource_type, name);
@@ -66,5 +68,18 @@ pub fn log_response_body<T: Serialize>(body: &T) {
         Err(e) => {
             warn!("Response body is not serializable: {}", e);
         }
+    }
+}
+
+/// 将base64字符串解码为路径
+///
+/// 用于解析API路径参数，返回Result表示解码可能失败
+pub fn decode_base64_to_path(encoded: &str) -> Result<String, String> {
+    match general_purpose::URL_SAFE.decode(encoded) {
+        Ok(bytes) => match String::from_utf8(bytes) {
+            Ok(path) => Ok(path),
+            Err(e) => Err(format!("Failed to convert decoded bytes to string: {}", e)),
+        },
+        Err(e) => Err(format!("Failed to decode base64 string: {}", e)),
     }
 }
