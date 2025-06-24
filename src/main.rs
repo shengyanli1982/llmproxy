@@ -116,7 +116,7 @@ struct AppComponents {
 // 创建应用组件
 async fn create_components(debug: bool, config: Config) -> Result<AppComponents, AppError> {
     // 创建配置的共享引用，使用RwLock包装以支持动态更新
-    let config_arc = std::sync::Arc::new(RwLock::new(config));
+    let config_arc = Arc::new(RwLock::new(config));
 
     // 在一个读锁范围内获取所有配置，避免多次获取锁
     let (upstreams, upstream_groups, http_server_config) = {
@@ -134,9 +134,9 @@ async fn create_components(debug: bool, config: Config) -> Result<AppComponents,
     };
 
     // 创建上游管理器
-    let upstream_manager: std::sync::Arc<UpstreamManager> =
+    let upstream_manager: Arc<UpstreamManager> =
         match UpstreamManager::new(upstreams, upstream_groups).await {
-            Ok(manager) => std::sync::Arc::new(manager),
+            Ok(manager) => Arc::new(manager),
             Err(e) => {
                 error!("Failed to initialize upstream manager: {}", e);
                 return Err(e);
@@ -147,7 +147,7 @@ async fn create_components(debug: bool, config: Config) -> Result<AppComponents,
     let mut forward_servers = Vec::with_capacity(http_server_config.forwards.len());
 
     // 预先分配HashMap容量，减少重新分配
-    let mut states_map = HashMap::with_capacity(http_server_config.forwards.len());
+    let mut forward_states_map = HashMap::with_capacity(http_server_config.forwards.len());
 
     for forward_config in &http_server_config.forwards {
         // 使用克隆避免所有权转移
@@ -159,7 +159,7 @@ async fn create_components(debug: bool, config: Config) -> Result<AppComponents,
                 );
 
                 // 获取状态并直接插入HashMap（避免后续再克隆）
-                states_map.insert(forward_config.name.clone(), server.get_state().clone());
+                forward_states_map.insert(forward_config.name.clone(), server.get_state().clone());
                 forward_servers.push(server);
             }
             Err(e) => {
@@ -173,7 +173,7 @@ async fn create_components(debug: bool, config: Config) -> Result<AppComponents,
     }
 
     // 只在所有状态收集完成后创建一次Arc
-    let forward_states = Arc::new(states_map);
+    let forward_states = Arc::new(forward_states_map);
 
     // 创建管理服务
     let admin_addr = format!(

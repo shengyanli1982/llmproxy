@@ -1,5 +1,5 @@
 use crate::{
-    balancer::LoadBalancer,
+    balancer::{create_load_balancer, LoadBalancer},
     breaker::UpstreamError,
     config::{HeaderOpType, UpstreamConfig, UpstreamGroupConfig},
     error::AppError,
@@ -71,8 +71,7 @@ impl UpstreamManager {
             }
 
             // 创建负载均衡器
-            let lb =
-                crate::balancer::create_load_balancer(&group.balance.strategy, managed_upstreams);
+            let lb = create_load_balancer(&group.balance.strategy, managed_upstreams);
 
             group_map.insert(group.name.clone(), lb);
         }
