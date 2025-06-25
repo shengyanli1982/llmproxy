@@ -42,10 +42,9 @@ async fn test_get_upstream_not_found() {
     let mut app = spawn_app().await;
     let response = app.get("/api/v1/upstreams/nonexistent").await;
 
-    // 打印响应体
+    // 获取响应体
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let body_str = String::from_utf8_lossy(&body);
-    println!("Response body: {}", body_str);
 
     // 解析响应体
     let error_response: ErrorResponse = serde_json::from_str(&body_str).unwrap();
@@ -65,10 +64,9 @@ async fn test_create_upstream_success() {
 
     let response = app.post("/api/v1/upstreams", upstream_payload).await;
 
-    // 打印响应体
+    // 获取响应体
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let body_str = String::from_utf8_lossy(&body);
-    println!("Response body: {}", body_str);
 
     // 检查是否成功创建
     if body_str.contains("error") {
@@ -104,10 +102,9 @@ async fn test_create_upstream_conflict() {
 
     let response = app.post("/api/v1/upstreams", upstream_payload).await;
 
-    // 打印响应体
+    // 获取响应体
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let body_str = String::from_utf8_lossy(&body);
-    println!("Response body: {}", body_str);
 
     // 解析响应体
     let error_response: ErrorResponse = serde_json::from_str(&body_str).unwrap();
@@ -148,10 +145,9 @@ async fn test_update_upstream_not_found() {
     let payload = json!({ "name": "nonexistent", "url": "http://127.0.0.1:1" });
     let response = app.put("/api/v1/upstreams/nonexistent", payload).await;
 
-    // 打印响应体
+    // 获取响应体
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let body_str = String::from_utf8_lossy(&body);
-    println!("Response body: {}", body_str);
 
     // 解析响应体
     let error_response: ErrorResponse = serde_json::from_str(&body_str).unwrap();
@@ -185,10 +181,9 @@ async fn test_delete_upstream_in_use_conflict() {
     // "default_upstream" is used by "default_group"
     let response = app.delete("/api/v1/upstreams/default_upstream").await;
 
-    // 打印响应体
+    // 获取响应体
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let body_str = String::from_utf8_lossy(&body);
-    println!("Response body: {}", body_str);
 
     // 解析响应体
     let error_response: ErrorResponse = serde_json::from_str(&body_str).unwrap();

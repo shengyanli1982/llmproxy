@@ -41,10 +41,9 @@ async fn test_get_forward_not_found() {
     let mut app = spawn_app().await;
     let response = app.get("/api/v1/forwards/nonexistent").await;
 
-    // 打印响应体
+    // 获取响应体
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let body_str = String::from_utf8_lossy(&body);
-    println!("Response body: {}", body_str);
 
     // 解析响应体
     let error_response: ErrorResponse = serde_json::from_str(&body_str).unwrap();

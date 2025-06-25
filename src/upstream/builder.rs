@@ -5,6 +5,7 @@ use crate::{
     error::AppError,
 };
 use std::collections::HashMap;
+use std::sync::Arc;
 use tracing::debug;
 
 /// 构建上游配置映射
@@ -14,7 +15,8 @@ pub(super) fn build_upstream_map(upstreams: &[UpstreamConfig]) -> HashMap<String
     for upstream in upstreams {
         debug!(
             "Loaded upstream: {:?}, url: {:?}",
-            upstream.name, upstream.url
+            upstream.name,
+            upstream.url.to_string()
         );
         upstream_map.insert(upstream.name.clone(), upstream.clone());
     }
@@ -43,7 +45,7 @@ pub(super) fn create_managed_upstream(
 
     // 创建托管上游
     let managed_upstream = ManagedUpstream {
-        upstream_ref: upstream_ref.clone(),
+        upstream_ref: Arc::new(upstream_ref.clone()),
         breaker,
     };
 

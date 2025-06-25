@@ -5,9 +5,9 @@ use llmproxy::{
     config::{BalanceStrategy, BreakerConfig, UpstreamRef},
     error::AppError,
 };
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
-
 use wiremock::{
     matchers::{method, path},
     Mock, MockServer, ResponseTemplate,
@@ -183,18 +183,18 @@ async fn test_load_balancer_with_circuit_breaker() {
 
     // 创建托管上游
     let managed_upstream1 = ManagedUpstream {
-        upstream_ref: UpstreamRef {
+        upstream_ref: Arc::new(UpstreamRef {
             name: "upstream1".to_string(),
             weight: 1,
-        },
+        }),
         breaker: Some(breaker1),
     };
 
     let managed_upstream2 = ManagedUpstream {
-        upstream_ref: UpstreamRef {
+        upstream_ref: Arc::new(UpstreamRef {
             name: "upstream2".to_string(),
             weight: 1,
-        },
+        }),
         breaker: Some(breaker2),
     };
 
@@ -248,7 +248,7 @@ async fn test_load_balancer_with_circuit_breaker() {
     }
 
     // 报告失败
-    balancer.report_failure(selected).await;
+    balancer.report_failure(&selected).await;
 
     // 下一次选择应该是upstream2，因为upstream1已熔断
     let selected = balancer.select_upstream().await.unwrap();
@@ -309,12 +309,12 @@ async fn test_all_upstreams_circuit_open() {
     };
 
     let managed_upstream1 = ManagedUpstream {
-        upstream_ref: upstream_ref1,
+        upstream_ref: Arc::new(upstream_ref1),
         breaker: Some(breaker1.clone()),
     };
 
     let managed_upstream2 = ManagedUpstream {
-        upstream_ref: upstream_ref2,
+        upstream_ref: Arc::new(upstream_ref2),
         breaker: Some(breaker2.clone()),
     };
 

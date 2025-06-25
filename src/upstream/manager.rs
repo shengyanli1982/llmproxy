@@ -1,7 +1,7 @@
 use crate::{
-    balancer::LoadBalancer,
+    balancer::{create_load_balancer, LoadBalancer},
     breaker::UpstreamError,
-    config::{HeaderOpType, UpstreamConfig, UpstreamGroupConfig},
+    config::{HeaderOpType, UpstreamConfig, UpstreamGroupConfig, UpstreamRef},
     error::AppError,
     metrics::METRICS,
     r#const::{balance_strategy_labels, breaker_result_labels, error_labels, upstream_labels},
@@ -71,8 +71,7 @@ impl UpstreamManager {
             }
 
             // 创建负载均衡器
-            let lb =
-                crate::balancer::create_load_balancer(&group.balance.strategy, managed_upstreams);
+            let lb = create_load_balancer(&group.balance.strategy, managed_upstreams);
 
             group_map.insert(group.name.clone(), lb);
         }
@@ -151,7 +150,7 @@ impl UpstreamManager {
             .with_label_values(&[group_name, &upstream_config.url])
             .inc();
 
-        Ok((managed_upstream.clone(), upstream_config))
+        Ok((managed_upstream, upstream_config))
     }
 
     /// 执行HTTP请求
@@ -385,5 +384,63 @@ impl UpstreamManager {
         }
 
         Ok(result)
+    }
+
+    /// 更新上游组的负载均衡器
+    ///
+    /// 更新指定上游组的负载均衡器中的上游服务器列表
+    pub async fn update_group_load_balancer(
+        &self,
+        group_name: &str,
+        upstream_refs: &[UpstreamRef],
+    ) -> Result<(), AppError> {
+        // 获取组的负载均衡器
+        let load_balancer = match self.groups.get(group_name) {
+            Some(lb) => lb,
+            None => {
+                error!("Upstream group not found: {:?}", group_name);
+                return Err(AppError::UpstreamGroupNotFound(group_name.to_string()));
+            }
+        };
+
+        // 创建新的ManagedUpstream列表
+        let mut managed_upstreams = Vec::with_capacity(upstream_refs.len());
+
+        // 使用一次性查找获取所有上游配置，避免每次查找
+        // 构建名称到配置的映射
+        let upstream_map: std::collections::HashMap<&str, &UpstreamConfig> = self
+            .upstreams
+            .iter()
+            .map(|(name, config)| (name.as_str(), config))
+            .collect();
+
+        // 为每个上游引用创建托管上游
+        for upstream_ref in upstream_refs {
+            // 获取上游配置
+            let upstream_config = match upstream_map.get(upstream_ref.name.as_str()) {
+                Some(config) => *config,
+                None => {
+                    error!(
+                        "Referenced upstream '{}' not found in upstreams configuration",
+                        upstream_ref.name
+                    );
+                    return Err(AppError::Config(format!(
+                        "Referenced upstream '{}' not found in upstreams configuration",
+                        upstream_ref.name
+                    )));
+                }
+            };
+
+            // 创建托管上游
+            let managed_upstream =
+                super::builder::create_managed_upstream(upstream_ref, upstream_config, group_name)?;
+            managed_upstreams.push(managed_upstream);
+        }
+
+        // 更新负载均衡器的上游列表
+        load_balancer.update_upstreams(managed_upstreams).await;
+        info!("Updated load balancer for upstream group '{}'", group_name);
+
+        Ok(())
     }
 }

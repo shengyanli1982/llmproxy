@@ -5,7 +5,7 @@ use crate::{
     },
     api::v1::models::{ErrorResponse, SuccessResponse, UpstreamGroupDetail},
     api::v1::routes::AppState,
-    config::UpstreamRef,
+    config::{validation::check_duplicate_upstreams, UpstreamRef},
     r#const::api::error_types,
 };
 use axum::{
@@ -15,6 +15,7 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use tracing::{info, warn};
 use utoipa::ToSchema;
 use validator::Validate;
@@ -152,7 +153,24 @@ pub async fn patch_upstream_group(
         warn!("API: Invalid PATCH request for group '{}': {}", name, e);
         let error = ErrorResponse::from_validation_errors(e);
         log_response_body(&error);
-        return Json(error).into_response();
+        return (StatusCode::BAD_REQUEST, Json(error)).into_response();
+    }
+
+    // 检查重复的上游引用
+    if let Err(e) = check_duplicate_upstreams(&payload.upstreams, &name) {
+        warn!(
+            "API: Duplicate upstream references found in request for group '{}': {}",
+            name, e
+        );
+        let error = ErrorResponse::error(
+            StatusCode::BAD_REQUEST,
+            error_types::BAD_REQUEST,
+            e.message
+                .unwrap_or_else(|| "Duplicate upstream references found".into())
+                .to_string(),
+        );
+        log_response_body(&error);
+        return (StatusCode::BAD_REQUEST, Json(error)).into_response();
     }
 
     // 获取写锁
@@ -167,14 +185,14 @@ pub async fn patch_upstream_group(
     match group_index {
         Some(index) => {
             // 验证所有引用的上游服务是否存在
-            let upstream_names: Vec<&str> = config_write
+            let upstream_names: HashSet<&str> = config_write
                 .upstreams
                 .iter()
                 .map(|u| u.name.as_str())
                 .collect();
 
             for upstream_ref in &payload.upstreams {
-                if !upstream_names.contains(&upstream_ref.name.as_str()) {
+                if !upstream_names.contains(upstream_ref.name.as_str()) {
                     warn!(
                         "API: Referenced upstream '{}' not found for group '{}'",
                         upstream_ref.name, name
@@ -185,12 +203,12 @@ pub async fn patch_upstream_group(
                         format!("Upstream '{}' not found", upstream_ref.name),
                     );
                     log_response_body(&error);
-                    return Json(error).into_response();
+                    return (StatusCode::BAD_REQUEST, Json(error)).into_response();
                 }
             }
 
-            // 更新上游组的上游列表
-            config_write.upstream_groups[index].upstreams = payload.upstreams.clone();
+            // 更新上游组的上游列表，直接赋值payload中的上游列表，避免不必要的clone
+            config_write.upstream_groups[index].upstreams = payload.upstreams;
 
             // 创建上游服务名称到配置的映射
             let upstream_map = create_upstream_map(&config_write.upstreams);
@@ -200,6 +218,30 @@ pub async fn patch_upstream_group(
                 &config_write.upstream_groups[index],
                 &upstream_map,
             );
+
+            // 更新运行时的负载均衡器
+            // 注意：在释放config_write锁后执行，以避免可能的死锁
+            let group_name = name.clone();
+
+            // 获取上游引用的克隆，而不是引用
+            let group_upstreams = config_write.upstream_groups[index].upstreams.clone();
+
+            // 释放config_write锁
+            drop(config_write);
+
+            // 遍历所有forward_states，更新负载均衡器
+            for forward_state in app_state.forward_states.values() {
+                if let Err(e) = forward_state
+                    .upstream_manager
+                    .update_group_load_balancer(&group_name, &group_upstreams)
+                    .await
+                {
+                    warn!(
+                        "Failed to update runtime load balancer for group '{}': {}",
+                        group_name, e
+                    );
+                }
+            }
 
             info!("API: Updated upstream group '{}'", name);
 
