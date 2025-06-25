@@ -7,6 +7,7 @@ use llmproxy::{
     balancer::{FailoverBalancer, LoadBalancer, ManagedUpstream},
     config::{BalanceStrategy, UpstreamRef},
 };
+use std::sync::Arc;
 
 #[tokio::test]
 async fn test_failover_balancer_creation() {
@@ -37,17 +38,17 @@ async fn test_load_balancer_factory_failover() {
 async fn test_failover_balancer_with_unavailable_upstream() {
     let mut managed_upstreams = vec![
         ManagedUpstream {
-            upstream_ref: UpstreamRef {
+            upstream_ref: Arc::new(UpstreamRef {
                 name: "unavailable".to_string(),
                 weight: 1,
-            },
+            }),
             breaker: None,
         },
         ManagedUpstream {
-            upstream_ref: UpstreamRef {
+            upstream_ref: Arc::new(UpstreamRef {
                 name: "available".to_string(),
                 weight: 1,
-            },
+            }),
             breaker: None,
         },
     ];

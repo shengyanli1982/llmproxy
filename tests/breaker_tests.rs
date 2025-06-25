@@ -1,10 +1,11 @@
 use circuitbreaker_rs::State;
 use llmproxy::{
-    balancer::{create_load_balancer, ManagedUpstream},
+    balancer::{create_load_balancer, ManagedUpstream, RoundRobinBalancer},
     breaker::{create_upstream_circuit_breaker, UpstreamCircuitBreaker, UpstreamError},
     config::{BalanceStrategy, BreakerConfig, UpstreamRef},
     error::AppError,
 };
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -183,18 +184,18 @@ async fn test_load_balancer_with_circuit_breaker() {
 
     // 创建托管上游
     let managed_upstream1 = ManagedUpstream {
-        upstream_ref: UpstreamRef {
+        upstream_ref: Arc::new(UpstreamRef {
             name: "upstream1".to_string(),
             weight: 1,
-        },
+        }),
         breaker: Some(breaker1),
     };
 
     let managed_upstream2 = ManagedUpstream {
-        upstream_ref: UpstreamRef {
+        upstream_ref: Arc::new(UpstreamRef {
             name: "upstream2".to_string(),
             weight: 1,
-        },
+        }),
         breaker: Some(breaker2),
     };
 
@@ -309,12 +310,12 @@ async fn test_all_upstreams_circuit_open() {
     };
 
     let managed_upstream1 = ManagedUpstream {
-        upstream_ref: upstream_ref1,
+        upstream_ref: Arc::new(upstream_ref1),
         breaker: Some(breaker1.clone()),
     };
 
     let managed_upstream2 = ManagedUpstream {
-        upstream_ref: upstream_ref2,
+        upstream_ref: Arc::new(upstream_ref2),
         breaker: Some(breaker2.clone()),
     };
 

@@ -17,7 +17,7 @@ use tracing::debug;
 #[derive(Clone)]
 pub struct ManagedUpstream {
     /// 上游引用
-    pub upstream_ref: UpstreamRef,
+    pub upstream_ref: Arc<UpstreamRef>,
     /// 熔断器（如果启用）
     pub breaker: Option<Arc<UpstreamCircuitBreaker>>,
 }

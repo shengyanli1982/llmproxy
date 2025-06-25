@@ -3,30 +3,31 @@
 // This module will contain shared helper functions for the balancer tests.
 
 use llmproxy::{balancer::ManagedUpstream, config::UpstreamRef};
+use std::sync::Arc;
 use wiremock::{MockServer, ResponseTemplate};
 
 /// Creates a list of managed upstreams for testing.
 pub fn create_test_managed_upstreams() -> Vec<ManagedUpstream> {
     vec![
         ManagedUpstream {
-            upstream_ref: UpstreamRef {
+            upstream_ref: Arc::new(UpstreamRef {
                 name: "upstream1".to_string(),
                 weight: 1,
-            },
+            }),
             breaker: None,
         },
         ManagedUpstream {
-            upstream_ref: UpstreamRef {
+            upstream_ref: Arc::new(UpstreamRef {
                 name: "upstream2".to_string(),
                 weight: 2,
-            },
+            }),
             breaker: None,
         },
         ManagedUpstream {
-            upstream_ref: UpstreamRef {
+            upstream_ref: Arc::new(UpstreamRef {
                 name: "upstream3".to_string(),
                 weight: 3,
-            },
+            }),
             breaker: None,
         },
     ]
