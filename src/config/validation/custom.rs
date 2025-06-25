@@ -2,9 +2,10 @@
 use validator::ValidationError;
 
 use crate::config::{
-    http_client::HttpClientConfig, upstream::AuthConfig, upstream::AuthType, upstream::HeaderOp,
-    upstream::HeaderOpType, upstream_group::BalanceStrategy, upstream_group::UpstreamGroupConfig,
-    Config, ProxyConfig,
+    http_client::HttpClientConfig, http_server::RoutingRule, upstream::AuthConfig,
+    upstream::AuthType, upstream::HeaderOp, upstream::HeaderOpType,
+    upstream_group::BalanceStrategy, upstream_group::UpstreamGroupConfig, Config, ProxyConfig,
+    UpstreamRef,
 };
 use crate::r#const::http_client_limits;
 use std::collections::HashSet;
@@ -20,6 +21,30 @@ pub fn validate_proxy_config(proxy: &ProxyConfig) -> Result<(), ValidationError>
         err.message = Some("Proxy URL is not a valid URL".into());
         return Err(err);
     }
+    Ok(())
+}
+
+// 检查上游引用列表中是否有重复项
+pub fn check_duplicate_upstreams(
+    upstreams: &[UpstreamRef],
+    group_name: &str,
+) -> Result<(), ValidationError> {
+    let mut upstream_names = HashSet::new();
+
+    for upstream_ref in upstreams {
+        if !upstream_names.insert(&upstream_ref.name) {
+            let mut err = ValidationError::new("duplicate_upstream_in_group");
+            err.message = Some(
+                format!(
+                    "Duplicate upstream '{}' found in group '{}'",
+                    upstream_ref.name, group_name
+                )
+                .into(),
+            );
+            return Err(err);
+        }
+    }
+
     Ok(())
 }
 
@@ -92,6 +117,30 @@ pub fn validate_weighted_round_robin(group: &UpstreamGroupConfig) -> Result<(), 
     Ok(())
 }
 
+// 检查路由规则列表中是否有重复的路径
+pub fn check_duplicate_routing_paths(
+    routing: &[RoutingRule],
+    forward_name: &str,
+) -> Result<(), ValidationError> {
+    let mut path_patterns = HashSet::new();
+
+    for rule in routing {
+        if !path_patterns.insert(&rule.path) {
+            let mut err = ValidationError::new("duplicate_routing_path");
+            err.message = Some(
+                format!(
+                    "Duplicate path pattern '{}' found in forward '{}'",
+                    rule.path, forward_name
+                )
+                .into(),
+            );
+            return Err(err);
+        }
+    }
+
+    Ok(())
+}
+
 pub fn validate_config(config: &Config) -> Result<(), ValidationError> {
     let mut upstream_names = HashSet::new();
     for upstream in &config.upstreams {
@@ -110,6 +159,12 @@ pub fn validate_config(config: &Config) -> Result<(), ValidationError> {
                 Some(format!("Duplicate upstream group name found: {}", group.name).into());
             return Err(err);
         }
+
+        // 检查组中的上游引用是否有重复项
+        if let Err(e) = check_duplicate_upstreams(&group.upstreams, &group.name) {
+            return Err(e);
+        }
+
         for upstream_ref in &group.upstreams {
             if !upstream_names.contains(&upstream_ref.name) {
                 let mut err = ValidationError::new("unknown_upstream_reference");
@@ -148,6 +203,11 @@ pub fn validate_config(config: &Config) -> Result<(), ValidationError> {
 
             // 验证路由规则中的上游组引用
             if let Some(routing) = &forward.routing {
+                // 检查路由规则中是否有重复的路径
+                if let Err(e) = check_duplicate_routing_paths(routing, &forward.name) {
+                    return Err(e);
+                }
+
                 for rule in routing {
                     if !group_names.contains(&rule.target_group) {
                         let mut err = ValidationError::new("unknown_upstream_group_reference");

@@ -5,7 +5,7 @@ use crate::{
     },
     api::v1::models::{ErrorResponse, SuccessResponse, UpstreamGroupDetail},
     api::v1::routes::AppState,
-    config::UpstreamRef,
+    config::{validation::check_duplicate_upstreams, UpstreamRef},
     r#const::api::error_types,
 };
 use axum::{
@@ -15,6 +15,7 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use tracing::{info, warn};
 use utoipa::ToSchema;
 use validator::Validate;
@@ -152,7 +153,24 @@ pub async fn patch_upstream_group(
         warn!("API: Invalid PATCH request for group '{}': {}", name, e);
         let error = ErrorResponse::from_validation_errors(e);
         log_response_body(&error);
-        return Json(error).into_response();
+        return (StatusCode::BAD_REQUEST, Json(error)).into_response();
+    }
+
+    // 检查重复的上游引用
+    if let Err(e) = check_duplicate_upstreams(&payload.upstreams, &name) {
+        warn!(
+            "API: Duplicate upstream references found in request for group '{}': {}",
+            name, e
+        );
+        let error = ErrorResponse::error(
+            StatusCode::BAD_REQUEST,
+            error_types::BAD_REQUEST,
+            e.message
+                .unwrap_or_else(|| "Duplicate upstream references found".into())
+                .to_string(),
+        );
+        log_response_body(&error);
+        return (StatusCode::BAD_REQUEST, Json(error)).into_response();
     }
 
     // 获取写锁
@@ -167,7 +185,7 @@ pub async fn patch_upstream_group(
     match group_index {
         Some(index) => {
             // 验证所有引用的上游服务是否存在
-            let upstream_names: std::collections::HashSet<&str> = config_write
+            let upstream_names: HashSet<&str> = config_write
                 .upstreams
                 .iter()
                 .map(|u| u.name.as_str())
@@ -185,7 +203,7 @@ pub async fn patch_upstream_group(
                         format!("Upstream '{}' not found", upstream_ref.name),
                     );
                     log_response_body(&error);
-                    return Json(error).into_response();
+                    return (StatusCode::BAD_REQUEST, Json(error)).into_response();
                 }
             }
 

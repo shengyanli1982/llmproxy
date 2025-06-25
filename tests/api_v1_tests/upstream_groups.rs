@@ -12,7 +12,6 @@ async fn test_list_upstream_groups_success() {
 
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let body_str = String::from_utf8_lossy(&body);
-    println!("Response body: {}", body_str);
 
     let success_response: SuccessResponse<Value> = serde_json::from_str(&body_str).unwrap();
     let data = success_response.data.as_ref().unwrap();
@@ -30,7 +29,6 @@ async fn test_get_upstream_group_success() {
 
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let body_str = String::from_utf8_lossy(&body);
-    println!("Response body: {}", body_str);
 
     let success_response: SuccessResponse<Value> = serde_json::from_str(&body_str).unwrap();
     let data = success_response.data.as_ref().unwrap();
@@ -43,10 +41,9 @@ async fn test_get_upstream_group_not_found() {
     let mut app = spawn_app().await;
     let response = app.get("/api/v1/upstream-groups/nonexistent").await;
 
-    // 打印响应体
+    // 获取响应体
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let body_str = String::from_utf8_lossy(&body);
-    println!("Response body: {}", body_str);
 
     // 解析响应体
     let error_response: ErrorResponse = serde_json::from_str(&body_str).unwrap();
@@ -80,7 +77,6 @@ async fn test_patch_upstream_group_success() {
 
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let body_str = String::from_utf8_lossy(&body);
-    println!("Response body: {}", body_str);
 
     let success_response: SuccessResponse<Value> = serde_json::from_str(&body_str).unwrap();
 
@@ -112,10 +108,9 @@ async fn test_patch_upstream_group_with_nonexistent_upstream() {
         .patch("/api/v1/upstream-groups/default_group", payload)
         .await;
 
-    // 打印响应体
+    // 获取响应体
     let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
     let body_str = String::from_utf8_lossy(&body);
-    println!("Response body: {}", body_str);
 
     // 解析响应体
     let error_response: ErrorResponse = serde_json::from_str(&body_str).unwrap();
@@ -264,4 +259,46 @@ async fn test_patch_upstream_group_updates_load_balancer() {
     // 验证负载均衡器已更新
     // 注意：这里我们只能通过间接方式验证，因为我们无法直接访问负载均衡器的内部状态
     // 在实际应用中，我们可以通过检查转发请求是否正确路由到新的上游来验证
+}
+
+// 测试尝试更新上游组时存在重复上游引用
+#[tokio::test]
+async fn test_patch_upstream_group_with_duplicate_upstream() {
+    let mut app = spawn_app().await;
+
+    // 先创建两个新的 upstream 供测试使用
+    let upstream1_payload = json!({
+        "name": "test-upstream1",
+        "url": "http://127.0.0.1:1"
+    });
+    app.post("/api/v1/upstreams", upstream1_payload).await;
+
+    let upstream2_payload = json!({
+        "name": "test-upstream2",
+        "url": "http://127.0.0.1:2"
+    });
+    app.post("/api/v1/upstreams", upstream2_payload).await;
+
+    // 尝试更新 group，包含重复的上游引用
+    let patch_payload = json!({
+        "upstreams": [
+            { "name": "test-upstream1", "weight": 1 },
+            { "name": "test-upstream2", "weight": 2 },
+            { "name": "test-upstream1", "weight": 3 } // 重复的上游引用
+        ]
+    });
+
+    let response = app
+        .patch("/api/v1/upstream-groups/default_group", patch_payload)
+        .await;
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    let body = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body_str = String::from_utf8_lossy(&body);
+
+    let error_response: ErrorResponse = serde_json::from_str(&body_str).unwrap();
+    assert_eq!(error_response.code, 400);
+    assert_eq!(error_response.error.r#type, "BadRequest");
+    assert!(error_response.error.message.contains("Duplicate"));
 }
