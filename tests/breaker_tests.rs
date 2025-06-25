@@ -1,6 +1,6 @@
 use circuitbreaker_rs::State;
 use llmproxy::{
-    balancer::{create_load_balancer, ManagedUpstream, RoundRobinBalancer},
+    balancer::{create_load_balancer, ManagedUpstream},
     breaker::{create_upstream_circuit_breaker, UpstreamCircuitBreaker, UpstreamError},
     config::{BalanceStrategy, BreakerConfig, UpstreamRef},
     error::AppError,
@@ -8,11 +8,31 @@ use llmproxy::{
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
-
 use wiremock::{
     matchers::{method, path},
     Mock, MockServer, ResponseTemplate,
 };
+
+// 我们自己定义一个简单的create_test_managed_upstreams函数，而不是导入
+#[allow(dead_code)]
+fn create_test_managed_upstreams() -> Vec<ManagedUpstream> {
+    vec![
+        ManagedUpstream {
+            upstream_ref: Arc::new(UpstreamRef {
+                name: "upstream1".to_string(),
+                weight: 1,
+            }),
+            breaker: None,
+        },
+        ManagedUpstream {
+            upstream_ref: Arc::new(UpstreamRef {
+                name: "upstream2".to_string(),
+                weight: 1,
+            }),
+            breaker: None,
+        },
+    ]
+}
 
 // 辅助函数：创建测试用的熔断器配置
 fn create_test_breaker_config(threshold: f64, cooldown: u64) -> BreakerConfig {
@@ -249,7 +269,7 @@ async fn test_load_balancer_with_circuit_breaker() {
     }
 
     // 报告失败
-    balancer.report_failure(selected).await;
+    balancer.report_failure(&selected).await;
 
     // 下一次选择应该是upstream2，因为upstream1已熔断
     let selected = balancer.select_upstream().await.unwrap();

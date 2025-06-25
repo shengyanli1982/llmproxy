@@ -79,3 +79,35 @@ async fn test_failover_balancer_with_unavailable_upstream() {
     let selected = balancer.select_upstream().await.unwrap();
     assert_eq!(selected.upstream_ref.name, "available");
 }
+
+#[tokio::test]
+async fn test_failover_balancer_update_upstreams() {
+    // 创建初始上游列表
+    let initial_upstreams = create_test_managed_upstreams();
+    let balancer = FailoverBalancer::new(initial_upstreams);
+
+    // 创建新的上游列表，按优先级排序
+    let new_upstreams = vec![
+        ManagedUpstream {
+            upstream_ref: Arc::new(UpstreamRef {
+                name: "primary".to_string(),
+                weight: 1,
+            }),
+            breaker: None,
+        },
+        ManagedUpstream {
+            upstream_ref: Arc::new(UpstreamRef {
+                name: "secondary".to_string(),
+                weight: 1,
+            }),
+            breaker: None,
+        },
+    ];
+
+    // 更新上游列表
+    balancer.update_upstreams(new_upstreams).await;
+
+    // 验证更新后的状态，应该选择第一个上游
+    let updated = balancer.select_upstream().await.unwrap();
+    assert_eq!(updated.upstream_ref.name, "primary");
+}

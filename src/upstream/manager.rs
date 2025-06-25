@@ -1,7 +1,7 @@
 use crate::{
     balancer::{create_load_balancer, LoadBalancer},
     breaker::UpstreamError,
-    config::{HeaderOpType, UpstreamConfig, UpstreamGroupConfig},
+    config::{HeaderOpType, UpstreamConfig, UpstreamGroupConfig, UpstreamRef},
     error::AppError,
     metrics::METRICS,
     r#const::{balance_strategy_labels, breaker_result_labels, error_labels, upstream_labels},
@@ -150,7 +150,7 @@ impl UpstreamManager {
             .with_label_values(&[group_name, &upstream_config.url])
             .inc();
 
-        Ok((managed_upstream.clone(), upstream_config))
+        Ok((managed_upstream, upstream_config))
     }
 
     /// 执行HTTP请求

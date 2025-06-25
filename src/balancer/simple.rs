@@ -28,7 +28,7 @@ impl RoundRobinBalancer {
 
 #[async_trait]
 impl LoadBalancer for RoundRobinBalancer {
-    async fn select_upstream(&self) -> Result<&ManagedUpstream, AppError> {
+    async fn select_upstream(&self) -> Result<ManagedUpstream, AppError> {
         let upstreams = self.upstreams.read().unwrap();
         let len = upstreams.len();
         if len == 0 {
@@ -38,7 +38,7 @@ impl LoadBalancer for RoundRobinBalancer {
         // 如果只有一个上游，直接检查它
         if len == 1 {
             return if is_upstream_healthy(&upstreams[0]) {
-                Ok(&upstreams[0])
+                Ok(upstreams[0].clone())
             } else {
                 Err(AppError::NoHealthyUpstreamAvailable)
             };
@@ -56,7 +56,7 @@ impl LoadBalancer for RoundRobinBalancer {
                     "RoundRobinBalancer selected upstream: {:?}, index: {}",
                     managed_upstream.upstream_ref.name, index
                 );
-                return Ok(managed_upstream);
+                return Ok(managed_upstream.clone());
             }
         }
 
@@ -153,7 +153,7 @@ impl WeightedRoundRobinBalancer {
 
 #[async_trait]
 impl LoadBalancer for WeightedRoundRobinBalancer {
-    async fn select_upstream(&self) -> Result<&ManagedUpstream, AppError> {
+    async fn select_upstream(&self) -> Result<ManagedUpstream, AppError> {
         let upstreams = self.upstreams.read().unwrap();
         let len = upstreams.len();
         if len == 0 {
@@ -163,7 +163,7 @@ impl LoadBalancer for WeightedRoundRobinBalancer {
         // 如果只有一个上游，直接检查它
         if len == 1 {
             return if is_upstream_healthy(&upstreams[0]) {
-                Ok(&upstreams[0])
+                Ok(upstreams[0].clone())
             } else {
                 Err(AppError::NoHealthyUpstreamAvailable)
             };
@@ -181,7 +181,7 @@ impl LoadBalancer for WeightedRoundRobinBalancer {
                     "WeightedRoundRobinBalancer selected upstream: {:?}, weight: {}, index: {}",
                     managed_upstream.upstream_ref.name, managed_upstream.upstream_ref.weight, index
                 );
-                return Ok(managed_upstream);
+                return Ok(managed_upstream.clone());
             }
         }
 
@@ -231,7 +231,7 @@ impl RandomBalancer {
 
 #[async_trait]
 impl LoadBalancer for RandomBalancer {
-    async fn select_upstream(&self) -> Result<&ManagedUpstream, AppError> {
+    async fn select_upstream(&self) -> Result<ManagedUpstream, AppError> {
         let upstreams = self.upstreams.read().unwrap();
         if upstreams.is_empty() {
             return Err(AppError::NoUpstreamAvailable);
@@ -240,7 +240,7 @@ impl LoadBalancer for RandomBalancer {
         // 如果只有一个上游，直接检查它
         if upstreams.len() == 1 {
             return if is_upstream_healthy(&upstreams[0]) {
-                Ok(&upstreams[0])
+                Ok(upstreams[0].clone())
             } else {
                 Err(AppError::NoHealthyUpstreamAvailable)
             };
@@ -256,7 +256,7 @@ impl LoadBalancer for RandomBalancer {
                         "RandomBalancer selected upstream: {:?}",
                         upstream.upstream_ref.name
                     );
-                    return Ok(upstream);
+                    return Ok(upstream.clone());
                 }
             }
         }
@@ -283,7 +283,7 @@ impl LoadBalancer for RandomBalancer {
             upstream.upstream_ref.name
         );
 
-        Ok(*upstream)
+        Ok((*upstream).clone())
     }
 
     async fn report_failure(&self, _upstream: &ManagedUpstream) {
@@ -324,7 +324,7 @@ impl FailoverBalancer {
 
 #[async_trait]
 impl LoadBalancer for FailoverBalancer {
-    async fn select_upstream(&self) -> Result<&ManagedUpstream, AppError> {
+    async fn select_upstream(&self) -> Result<ManagedUpstream, AppError> {
         let upstreams = self.upstreams.read().unwrap();
         if upstreams.is_empty() {
             return Err(AppError::NoUpstreamAvailable);
@@ -337,7 +337,7 @@ impl LoadBalancer for FailoverBalancer {
                     "FailoverBalancer selected upstream: {:?}, index: {}",
                     upstream.upstream_ref.name, index
                 );
-                return Ok(upstream);
+                return Ok(upstream.clone());
             }
         }
 

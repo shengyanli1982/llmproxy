@@ -210,6 +210,7 @@ networks:
         -   **Response Aware** - Especially suitable for LLM services, monitoring node performance in real-time (response latency, concurrent load, success rate) and dynamically directing requests to the currently optimal node, maximizing throughput and user experience.
         -   **Failover** - Try upstream services in the order they are listed. If the current upstream is unavailable, automatically switch to the next one, providing sequential backup capability.
     -   Set weights for each upstream LLM service in the weighted round-robin strategy.
+    -   **Dynamic Load Balancer Updates** - Dynamically update the upstream list for any load balancer at runtime through API calls, allowing for seamless addition, removal, or modification of upstream services without service interruption or restart.
 
 -   🔁 **Flexible Traffic Control & QoS Assurance**
 

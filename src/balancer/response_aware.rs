@@ -118,7 +118,7 @@ impl ResponseAwareBalancer {
 
 #[async_trait]
 impl LoadBalancer for ResponseAwareBalancer {
-    async fn select_upstream(&self) -> Result<&ManagedUpstream, AppError> {
+    async fn select_upstream(&self) -> Result<ManagedUpstream, AppError> {
         let upstreams = self.upstreams.read().unwrap();
         let len = upstreams.len();
         if len == 0 {
@@ -133,7 +133,7 @@ impl LoadBalancer for ResponseAwareBalancer {
                 if !metrics.is_empty() {
                     metrics[0].pending_requests.fetch_add(1, Ordering::SeqCst);
                 }
-                Ok(&upstreams[0])
+                Ok(upstreams[0].clone())
             } else {
                 Err(AppError::NoHealthyUpstreamAvailable)
             };
@@ -198,7 +198,7 @@ impl LoadBalancer for ResponseAwareBalancer {
             upstreams[best_index].upstream_ref.name, best_score
         );
 
-        Ok(&upstreams[best_index])
+        Ok(upstreams[best_index].clone())
     }
 
     async fn report_failure(&self, upstream: &ManagedUpstream) {

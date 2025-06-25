@@ -205,8 +205,8 @@ pub async fn patch_upstream_group(
             // 注意：在释放config_write锁后执行，以避免可能的死锁
             let group_name = name.clone();
 
-            // 获取上游引用的引用，避免clone
-            let group_upstreams = &config_write.upstream_groups[index].upstreams;
+            // 获取上游引用的克隆，而不是引用
+            let group_upstreams = config_write.upstream_groups[index].upstreams.clone();
 
             // 释放config_write锁
             drop(config_write);
@@ -215,7 +215,7 @@ pub async fn patch_upstream_group(
             for forward_state in app_state.forward_states.values() {
                 if let Err(e) = forward_state
                     .upstream_manager
-                    .update_group_load_balancer(&group_name, group_upstreams)
+                    .update_group_load_balancer(&group_name, &group_upstreams)
                     .await
                 {
                     warn!(

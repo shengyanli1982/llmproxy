@@ -22,6 +22,7 @@ use tower::ServiceExt;
 pub struct TestApp {
     pub router: Router,
     pub config: Arc<RwLock<Config>>,
+    pub address: String,
 }
 
 impl TestApp {
@@ -153,9 +154,10 @@ pub async fn spawn_app() -> TestApp {
     let app_router = v1::api_routes(shared_config.clone(), forward_states);
     println!("API routes created");
 
-    // 返回 TestApp 实例
+    // 返回 TestApp 实例，添加一个测试用的地址
     TestApp {
         router: app_router,
         config: shared_config,
+        address: "http://127.0.0.1:8080".to_string(),
     }
 }
