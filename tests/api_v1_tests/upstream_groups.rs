@@ -151,21 +151,21 @@ async fn test_patch_upstream_group_updates_load_balancer() {
     });
 
     client
-        .post(&format!("{}/api/v1/upstreams", test_app.address))
+        .post(format!("{}/api/v1/upstreams", test_app.address))
         .json(&upstream1)
         .send()
         .await
         .expect("Failed to create upstream1");
 
     client
-        .post(&format!("{}/api/v1/upstreams", test_app.address))
+        .post(format!("{}/api/v1/upstreams", test_app.address))
         .json(&upstream2)
         .send()
         .await
         .expect("Failed to create upstream2");
 
     client
-        .post(&format!("{}/api/v1/upstreams", test_app.address))
+        .post(format!("{}/api/v1/upstreams", test_app.address))
         .json(&upstream3)
         .send()
         .await
@@ -190,7 +190,7 @@ async fn test_patch_upstream_group_updates_load_balancer() {
     });
 
     client
-        .post(&format!("{}/api/v1/upstream_groups", test_app.address))
+        .post(format!("{}/api/v1/upstream_groups", test_app.address))
         .json(&group)
         .send()
         .await
@@ -198,7 +198,7 @@ async fn test_patch_upstream_group_updates_load_balancer() {
 
     // 获取初始组配置
     let initial_response = client
-        .get(&format!(
+        .get(format!(
             "{}/api/v1/upstream_groups/test_group",
             test_app.address
         ))
@@ -227,7 +227,7 @@ async fn test_patch_upstream_group_updates_load_balancer() {
     });
 
     client
-        .patch(&format!(
+        .patch(format!(
             "{}/api/v1/upstream_groups/test_group",
             test_app.address
         ))
@@ -238,7 +238,7 @@ async fn test_patch_upstream_group_updates_load_balancer() {
 
     // 获取更新后的组配置
     let updated_response = client
-        .get(&format!(
+        .get(format!(
             "{}/api/v1/upstream_groups/test_group",
             test_app.address
         ))

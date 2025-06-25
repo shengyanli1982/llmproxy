@@ -344,7 +344,7 @@ async fn test_response_aware_balancer_update_upstreams() {
         if fast_upstream.upstream_ref.name == "fast_upstream" {
             let start = std::time::Instant::now();
             let response = client
-                .get(&format!("{}/test", mock_server_fast.uri()))
+                .get(format!("{}/test", mock_server_fast.uri()))
                 .send()
                 .await
                 .unwrap();
@@ -360,7 +360,7 @@ async fn test_response_aware_balancer_update_upstreams() {
         if slow_upstream.upstream_ref.name == "slow_upstream" {
             let start = std::time::Instant::now();
             let response = client
-                .get(&format!("{}/test", mock_server_slow.uri()))
+                .get(format!("{}/test", mock_server_slow.uri()))
                 .send()
                 .await
                 .unwrap();
@@ -440,7 +440,7 @@ async fn test_response_aware_balancer_update_upstreams() {
         if fastest_upstream.upstream_ref.name == "fastest_upstream" {
             let start = std::time::Instant::now();
             let response = client
-                .get(&format!("{}/test", mock_server_fastest.uri()))
+                .get(format!("{}/test", mock_server_fastest.uri()))
                 .send()
                 .await
                 .unwrap();
@@ -456,7 +456,7 @@ async fn test_response_aware_balancer_update_upstreams() {
         if slow_upstream.upstream_ref.name == "slow_upstream" {
             let start = std::time::Instant::now();
             let response = client
-                .get(&format!("{}/test", mock_server_slow.uri()))
+                .get(format!("{}/test", mock_server_slow.uri()))
                 .send()
                 .await
                 .unwrap();
