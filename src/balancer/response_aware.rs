@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use std::any::Any;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, RwLock};
 use tracing::debug;
 
 // 响应时间感知负载均衡器的固定参数
@@ -15,13 +16,13 @@ const INCLUDE_SUCCESS_RATE: bool = true; // 在得分计算中包含成功率
 // 响应时间感知负载均衡器
 pub struct ResponseAwareBalancer {
     // 服务器列表
-    upstreams: Vec<ManagedUpstream>,
+    upstreams: Arc<RwLock<Vec<ManagedUpstream>>>,
     // 当前索引（原子操作）
     current: AtomicUsize,
     // 节点指标
-    metrics: Vec<UpstreamMetrics>,
+    metrics: Arc<RwLock<Vec<UpstreamMetrics>>>,
     // 名称到索引的映射
-    name_to_index: HashMap<String, usize>,
+    name_to_index: Arc<RwLock<HashMap<String, usize>>>,
 }
 
 struct UpstreamMetrics {
@@ -51,79 +52,88 @@ impl ResponseAwareBalancer {
             .collect();
 
         Self {
-            upstreams,
+            upstreams: Arc::new(RwLock::new(upstreams)),
             current: AtomicUsize::new(0),
-            metrics,
-            name_to_index,
+            metrics: Arc::new(RwLock::new(metrics)),
+            name_to_index: Arc::new(RwLock::new(name_to_index)),
         }
     }
 
     // 查找上游索引
     fn find_upstream_index(&self, upstream: &ManagedUpstream) -> Option<usize> {
-        self.name_to_index.get(&upstream.upstream_ref.name).copied()
+        let name_to_index = self.name_to_index.read().unwrap();
+        name_to_index.get(&upstream.upstream_ref.name).copied()
     }
 
     // 更新响应时间和减少待处理请求
     pub fn update_metrics(&self, upstream: &ManagedUpstream, response_time_ms: usize) {
         if let Some(index) = self.find_upstream_index(upstream) {
-            // 更新响应时间
-            let old_time = self.metrics[index].response_time.load(Ordering::Relaxed);
-            let new_time = ((1.0 - SMOOTH_FACTOR as f64) * old_time as f64
-                + SMOOTH_FACTOR as f64 * response_time_ms as f64)
-                as usize;
+            let metrics = self.metrics.read().unwrap();
+            if index < metrics.len() {
+                // 更新响应时间
+                let old_time = metrics[index].response_time.load(Ordering::Relaxed);
+                let new_time = ((1.0 - SMOOTH_FACTOR as f64) * old_time as f64
+                    + SMOOTH_FACTOR as f64 * response_time_ms as f64)
+                    as usize;
 
-            self.metrics[index]
-                .response_time
-                .store(new_time, Ordering::Relaxed);
+                metrics[index]
+                    .response_time
+                    .store(new_time, Ordering::Relaxed);
 
-            // 减少待处理请求计数
-            self.metrics[index]
-                .pending_requests
-                .fetch_sub(1, Ordering::SeqCst);
+                // 减少待处理请求计数
+                metrics[index]
+                    .pending_requests
+                    .fetch_sub(1, Ordering::SeqCst);
 
-            // 更新成功率 (成功)
-            if INCLUDE_SUCCESS_RATE {
-                self.update_success_rate(index, true);
+                // 更新成功率 (成功)
+                if INCLUDE_SUCCESS_RATE {
+                    self.update_success_rate(index, true);
+                }
+
+                debug!(
+                    "Updated metrics for {:?}: response_time={}ms, pending={}",
+                    upstream.upstream_ref.name,
+                    new_time,
+                    metrics[index].pending_requests.load(Ordering::Relaxed)
+                );
             }
-
-            debug!(
-                "Updated metrics for {:?}: response_time={}ms, pending={}",
-                upstream.upstream_ref.name,
-                new_time,
-                self.metrics[index].pending_requests.load(Ordering::Relaxed)
-            );
         }
     }
 
     // 更新成功率
     fn update_success_rate(&self, index: usize, success: bool) {
-        let old_rate = self.metrics[index].success_rate.load(Ordering::Relaxed);
-        let success_value = if success { 1000 } else { 0 };
-        let new_rate = ((1.0 - SMOOTH_FACTOR as f64) * old_rate as f64
-            + SMOOTH_FACTOR as f64 * success_value as f64) as usize;
+        let metrics = self.metrics.read().unwrap();
+        if index < metrics.len() {
+            let old_rate = metrics[index].success_rate.load(Ordering::Relaxed);
+            let success_value = if success { 1000 } else { 0 };
+            let new_rate = ((1.0 - SMOOTH_FACTOR as f64) * old_rate as f64
+                + SMOOTH_FACTOR as f64 * success_value as f64) as usize;
 
-        self.metrics[index]
-            .success_rate
-            .store(new_rate, Ordering::Relaxed);
+            metrics[index]
+                .success_rate
+                .store(new_rate, Ordering::Relaxed);
+        }
     }
 }
 
 #[async_trait]
 impl LoadBalancer for ResponseAwareBalancer {
     async fn select_upstream(&self) -> Result<&ManagedUpstream, AppError> {
-        let len = self.upstreams.len();
+        let upstreams = self.upstreams.read().unwrap();
+        let len = upstreams.len();
         if len == 0 {
             return Err(AppError::NoUpstreamAvailable);
         }
 
         // 如果只有一个上游，直接检查它
         if len == 1 {
-            return if is_upstream_healthy(&self.upstreams[0]) {
+            return if is_upstream_healthy(&upstreams[0]) {
                 // 增加待处理请求计数
-                self.metrics[0]
-                    .pending_requests
-                    .fetch_add(1, Ordering::SeqCst);
-                Ok(&self.upstreams[0])
+                let metrics = self.metrics.read().unwrap();
+                if !metrics.is_empty() {
+                    metrics[0].pending_requests.fetch_add(1, Ordering::SeqCst);
+                }
+                Ok(&upstreams[0])
             } else {
                 Err(AppError::NoHealthyUpstreamAvailable)
             };
@@ -137,31 +147,36 @@ impl LoadBalancer for ResponseAwareBalancer {
         // 从当前索引开始，确保公平性
         let start_index = self.current.fetch_add(1, Ordering::SeqCst) % len;
 
+        let metrics = self.metrics.read().unwrap();
+
         // 遍历所有上游，找到健康的最佳节点
         for i in 0..len {
             let index = (start_index + i) % len;
-            let managed_upstream = &self.upstreams[index];
+            let managed_upstream = &upstreams[index];
 
             if is_upstream_healthy(managed_upstream) {
                 found_healthy = true;
-                let resp_time = self.metrics[index].response_time.load(Ordering::Relaxed) as f64;
-                let pending = self.metrics[index].pending_requests.load(Ordering::Relaxed) as f64;
 
-                // 计算得分
-                let mut score = resp_time * (pending + 1.0);
+                if index < metrics.len() {
+                    let resp_time = metrics[index].response_time.load(Ordering::Relaxed) as f64;
+                    let pending = metrics[index].pending_requests.load(Ordering::Relaxed) as f64;
 
-                // 考虑成功率
-                if INCLUDE_SUCCESS_RATE {
-                    let success_rate =
-                        self.metrics[index].success_rate.load(Ordering::Relaxed) as f64 / 1000.0;
-                    if success_rate > 0.0 {
-                        score *= 1.0 / success_rate;
+                    // 计算得分
+                    let mut score = resp_time * (pending + 1.0);
+
+                    // 考虑成功率
+                    if INCLUDE_SUCCESS_RATE {
+                        let success_rate =
+                            metrics[index].success_rate.load(Ordering::Relaxed) as f64 / 1000.0;
+                        if success_rate > 0.0 {
+                            score *= 1.0 / success_rate;
+                        }
                     }
-                }
 
-                if score < best_score {
-                    best_score = score;
-                    best_index = index;
+                    if score < best_score {
+                        best_score = score;
+                        best_index = index;
+                    }
                 }
             }
         }
@@ -172,16 +187,18 @@ impl LoadBalancer for ResponseAwareBalancer {
         }
 
         // 增加选中节点的待处理请求计数
-        self.metrics[best_index]
-            .pending_requests
-            .fetch_add(1, Ordering::SeqCst);
+        if best_index < metrics.len() {
+            metrics[best_index]
+                .pending_requests
+                .fetch_add(1, Ordering::SeqCst);
+        }
 
         debug!(
             "ResponseAwareBalancer selected upstream: {:?}, score: {:.2}",
-            self.upstreams[best_index].upstream_ref.name, best_score
+            upstreams[best_index].upstream_ref.name, best_score
         );
 
-        Ok(&self.upstreams[best_index])
+        Ok(&upstreams[best_index])
     }
 
     async fn report_failure(&self, upstream: &ManagedUpstream) {
@@ -192,9 +209,12 @@ impl LoadBalancer for ResponseAwareBalancer {
                 self.update_success_rate(index, false);
 
                 // 减少待处理请求计数
-                self.metrics[index]
-                    .pending_requests
-                    .fetch_sub(1, Ordering::SeqCst);
+                let metrics = self.metrics.read().unwrap();
+                if index < metrics.len() {
+                    metrics[index]
+                        .pending_requests
+                        .fetch_sub(1, Ordering::SeqCst);
+                }
             }
         }
     }
@@ -205,5 +225,41 @@ impl LoadBalancer for ResponseAwareBalancer {
 
     fn as_str(&self) -> &'static str {
         balance_strategy_labels::RESPONSE_AWARE
+    }
+
+    async fn update_upstreams(&self, upstreams: Vec<ManagedUpstream>) {
+        // 提前计算capacity以减少内存再分配
+        let upstreams_len = upstreams.len();
+
+        // 创建新的指标和映射，使用with_capacity预分配内存
+        let mut new_metrics = Vec::with_capacity(upstreams_len);
+        for _ in 0..upstreams_len {
+            new_metrics.push(UpstreamMetrics {
+                response_time: AtomicUsize::new(INITIAL_RESPONSE_TIME),
+                pending_requests: AtomicUsize::new(0),
+                success_rate: AtomicUsize::new(1000), // 初始 100% 成功率
+            });
+        }
+
+        // 预分配HashMap容量，避免rehash
+        let mut new_name_to_index = HashMap::with_capacity(upstreams_len);
+
+        // 填充新的名称到索引映射
+        for (i, u) in upstreams.iter().enumerate() {
+            new_name_to_index.insert(u.upstream_ref.name.clone(), i);
+        }
+
+        // 更新所有状态
+        {
+            let mut write_guard_upstreams = self.upstreams.write().unwrap();
+            let mut write_guard_metrics = self.metrics.write().unwrap();
+            let mut write_guard_mapping = self.name_to_index.write().unwrap();
+
+            *write_guard_upstreams = upstreams;
+            *write_guard_metrics = new_metrics;
+            *write_guard_mapping = new_name_to_index;
+        }
+
+        debug!("ResponseAwareBalancer upstreams and metrics updated successfully");
     }
 }

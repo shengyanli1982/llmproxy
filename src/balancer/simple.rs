@@ -5,12 +5,13 @@ use async_trait::async_trait;
 use rand::{seq::SliceRandom, thread_rng};
 use std::any::Any;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, RwLock};
 use tracing::debug;
 
 // 轮询负载均衡器
 pub struct RoundRobinBalancer {
     // 服务器列表
-    upstreams: Vec<ManagedUpstream>,
+    upstreams: Arc<RwLock<Vec<ManagedUpstream>>>,
     // 当前索引（原子操作）
     current: AtomicUsize,
 }
@@ -19,7 +20,7 @@ impl RoundRobinBalancer {
     // 创建新的轮询负载均衡器
     pub fn new(upstreams: Vec<ManagedUpstream>) -> Self {
         Self {
-            upstreams,
+            upstreams: Arc::new(RwLock::new(upstreams)),
             current: AtomicUsize::new(0),
         }
     }
@@ -28,15 +29,16 @@ impl RoundRobinBalancer {
 #[async_trait]
 impl LoadBalancer for RoundRobinBalancer {
     async fn select_upstream(&self) -> Result<&ManagedUpstream, AppError> {
-        let len = self.upstreams.len();
+        let upstreams = self.upstreams.read().unwrap();
+        let len = upstreams.len();
         if len == 0 {
             return Err(AppError::NoUpstreamAvailable);
         }
 
         // 如果只有一个上游，直接检查它
         if len == 1 {
-            return if is_upstream_healthy(&self.upstreams[0]) {
-                Ok(&self.upstreams[0])
+            return if is_upstream_healthy(&upstreams[0]) {
+                Ok(&upstreams[0])
             } else {
                 Err(AppError::NoHealthyUpstreamAvailable)
             };
@@ -47,7 +49,7 @@ impl LoadBalancer for RoundRobinBalancer {
 
         for i in 0..len {
             let index = (start_index + i) % len;
-            let managed_upstream = &self.upstreams[index];
+            let managed_upstream = &upstreams[index];
 
             if is_upstream_healthy(managed_upstream) {
                 debug!(
@@ -74,12 +76,20 @@ impl LoadBalancer for RoundRobinBalancer {
     fn as_str(&self) -> &'static str {
         balance_strategy_labels::ROUND_ROBIN
     }
+
+    async fn update_upstreams(&self, upstreams: Vec<ManagedUpstream>) {
+        // 替换upstreams向量
+        let mut write_guard = self.upstreams.write().unwrap();
+        *write_guard = upstreams;
+        // 写锁在这里被自动释放，确保不会阻塞读取
+        debug!("RoundRobinBalancer upstreams updated successfully");
+    }
 }
 
 // 加权轮询负载均衡器
 pub struct WeightedRoundRobinBalancer {
     // 服务器列表，按权重复制
-    upstreams: Vec<ManagedUpstream>,
+    upstreams: Arc<RwLock<Vec<ManagedUpstream>>>,
     // 当前索引（原子操作）
     current: AtomicUsize,
 }
@@ -108,24 +118,52 @@ impl WeightedRoundRobinBalancer {
         }
 
         Self {
-            upstreams: weighted_upstreams,
+            upstreams: Arc::new(RwLock::new(weighted_upstreams)),
             current: AtomicUsize::new(0),
         }
+    }
+
+    // 根据上游列表创建权重副本
+    fn create_weighted_copies(upstreams: Vec<ManagedUpstream>) -> Vec<ManagedUpstream> {
+        // 预先计算所需的容量，避免重新分配
+        // 这里使用fold避免中间Vec分配
+        let total_capacity = upstreams
+            .iter()
+            .fold(0, |acc, u| acc + u.upstream_ref.weight as usize);
+
+        // 根据权重复制服务器
+        let mut weighted_upstreams = Vec::with_capacity(total_capacity);
+
+        for upstream in upstreams {
+            // 对于每个服务器，按其权重添加多个副本
+            let weight = upstream.upstream_ref.weight;
+
+            // 第一个副本是原始的，不需要克隆
+            weighted_upstreams.push(upstream.clone());
+
+            // 从第二个开始添加剩余的副本
+            for _ in 1..weight {
+                weighted_upstreams.push(upstream.clone());
+            }
+        }
+
+        weighted_upstreams
     }
 }
 
 #[async_trait]
 impl LoadBalancer for WeightedRoundRobinBalancer {
     async fn select_upstream(&self) -> Result<&ManagedUpstream, AppError> {
-        let len = self.upstreams.len();
+        let upstreams = self.upstreams.read().unwrap();
+        let len = upstreams.len();
         if len == 0 {
             return Err(AppError::NoUpstreamAvailable);
         }
 
         // 如果只有一个上游，直接检查它
         if len == 1 {
-            return if is_upstream_healthy(&self.upstreams[0]) {
-                Ok(&self.upstreams[0])
+            return if is_upstream_healthy(&upstreams[0]) {
+                Ok(&upstreams[0])
             } else {
                 Err(AppError::NoHealthyUpstreamAvailable)
             };
@@ -136,7 +174,7 @@ impl LoadBalancer for WeightedRoundRobinBalancer {
 
         for i in 0..len {
             let index = (start_index + i) % len;
-            let managed_upstream = &self.upstreams[index];
+            let managed_upstream = &upstreams[index];
 
             if is_upstream_healthy(managed_upstream) {
                 debug!(
@@ -163,32 +201,46 @@ impl LoadBalancer for WeightedRoundRobinBalancer {
     fn as_str(&self) -> &'static str {
         balance_strategy_labels::WEIGHTED_ROUND_ROBIN
     }
+
+    async fn update_upstreams(&self, upstreams: Vec<ManagedUpstream>) {
+        // 创建加权副本
+        let weighted_upstreams = Self::create_weighted_copies(upstreams);
+
+        // 替换upstreams向量
+        let mut write_guard = self.upstreams.write().unwrap();
+        *write_guard = weighted_upstreams;
+        // 写锁在这里被自动释放，确保不会阻塞读取
+        debug!("WeightedRoundRobinBalancer upstreams updated successfully");
+    }
 }
 
 // 随机负载均衡器
 pub struct RandomBalancer {
     // 服务器列表
-    upstreams: Vec<ManagedUpstream>,
+    upstreams: Arc<RwLock<Vec<ManagedUpstream>>>,
 }
 
 impl RandomBalancer {
     // 创建新的随机负载均衡器
     pub fn new(upstreams: Vec<ManagedUpstream>) -> Self {
-        Self { upstreams }
+        Self {
+            upstreams: Arc::new(RwLock::new(upstreams)),
+        }
     }
 }
 
 #[async_trait]
 impl LoadBalancer for RandomBalancer {
     async fn select_upstream(&self) -> Result<&ManagedUpstream, AppError> {
-        if self.upstreams.is_empty() {
+        let upstreams = self.upstreams.read().unwrap();
+        if upstreams.is_empty() {
             return Err(AppError::NoUpstreamAvailable);
         }
 
         // 如果只有一个上游，直接检查它
-        if self.upstreams.len() == 1 {
-            return if is_upstream_healthy(&self.upstreams[0]) {
-                Ok(&self.upstreams[0])
+        if upstreams.len() == 1 {
+            return if is_upstream_healthy(&upstreams[0]) {
+                Ok(&upstreams[0])
             } else {
                 Err(AppError::NoHealthyUpstreamAvailable)
             };
@@ -198,7 +250,7 @@ impl LoadBalancer for RandomBalancer {
         let mut rng = thread_rng();
         for _ in 0..3 {
             // 尝试最多3次随机选择
-            if let Some(upstream) = self.upstreams.choose(&mut rng) {
+            if let Some(upstream) = upstreams.choose(&mut rng) {
                 if is_upstream_healthy(upstream) {
                     debug!(
                         "RandomBalancer selected upstream: {:?}",
@@ -210,8 +262,7 @@ impl LoadBalancer for RandomBalancer {
         }
 
         // 如果随机选择失败，创建健康上游列表
-        let healthy_upstreams: Vec<&ManagedUpstream> = self
-            .upstreams
+        let healthy_upstreams: Vec<&ManagedUpstream> = upstreams
             .iter()
             .filter(|upstream| is_upstream_healthy(upstream))
             .collect();
@@ -246,30 +297,41 @@ impl LoadBalancer for RandomBalancer {
     fn as_str(&self) -> &'static str {
         crate::r#const::balance_strategy_labels::RANDOM
     }
+
+    async fn update_upstreams(&self, upstreams: Vec<ManagedUpstream>) {
+        // 替换upstreams向量
+        let mut write_guard = self.upstreams.write().unwrap();
+        *write_guard = upstreams;
+        // 写锁在这里被自动释放，确保不会阻塞读取
+        debug!("RandomBalancer upstreams updated successfully");
+    }
 }
 
 // 故障转移负载均衡器
 pub struct FailoverBalancer {
     // 服务器列表（按优先级顺序排列）
-    upstreams: Vec<ManagedUpstream>,
+    upstreams: Arc<RwLock<Vec<ManagedUpstream>>>,
 }
 
 impl FailoverBalancer {
     // 创建新的故障转移负载均衡器
     pub fn new(upstreams: Vec<ManagedUpstream>) -> Self {
-        Self { upstreams }
+        Self {
+            upstreams: Arc::new(RwLock::new(upstreams)),
+        }
     }
 }
 
 #[async_trait]
 impl LoadBalancer for FailoverBalancer {
     async fn select_upstream(&self) -> Result<&ManagedUpstream, AppError> {
-        if self.upstreams.is_empty() {
+        let upstreams = self.upstreams.read().unwrap();
+        if upstreams.is_empty() {
             return Err(AppError::NoUpstreamAvailable);
         }
 
         // 按顺序尝试每个上游，找到第一个健康的
-        for (index, upstream) in self.upstreams.iter().enumerate() {
+        for (index, upstream) in upstreams.iter().enumerate() {
             if is_upstream_healthy(upstream) {
                 debug!(
                     "FailoverBalancer selected upstream: {:?}, index: {}",
@@ -294,5 +356,13 @@ impl LoadBalancer for FailoverBalancer {
 
     fn as_str(&self) -> &'static str {
         balance_strategy_labels::FAILOVER
+    }
+
+    async fn update_upstreams(&self, upstreams: Vec<ManagedUpstream>) {
+        // 替换upstreams向量
+        let mut write_guard = self.upstreams.write().unwrap();
+        *write_guard = upstreams;
+        // 写锁在这里被自动释放，确保不会阻塞读取
+        debug!("FailoverBalancer upstreams updated successfully");
     }
 }

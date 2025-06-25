@@ -28,6 +28,9 @@ pub trait LoadBalancer: Send + Sync {
     // 选择一个上游服务器
     async fn select_upstream(&self) -> Result<&ManagedUpstream, AppError>;
 
+    // 更新上游服务器列表
+    async fn update_upstreams(&self, upstreams: Vec<ManagedUpstream>);
+
     // 报告服务器失败
     async fn report_failure(&self, upstream: &ManagedUpstream);
 
