@@ -984,10 +984,15 @@ The API offers a structured set of endpoints to retrieve and modify all key conf
 -   **Forwards**:
     -   `GET /api/v1/forwards`: Retrieves a list of all configured forward services.
     -   `GET /api/v1/forwards/{name}`: Fetches the details of a specific forward service.
+-   **Routes**:
+    -   `GET /api/v1/forwards/{name}/routes`: Retrieves a list of all routing rules for a specific forward service.
+    -   `POST /api/v1/forwards/{name}/routes`: Creates a new routing rule in a specific forward.
+    -   `GET /api/v1/forwards/{name}/routes/{path}`: Fetches the details of a specific routing rule (path must be Base64 encoded).
+    -   `PUT /api/v1/forwards/{name}/routes/{path}`: Updates an existing routing rule (path must be Base64 encoded).
+    -   `DELETE /api/v1/forwards/{name}/routes/{path}`: Deletes a routing rule (path must be Base64 encoded).
 -   **Upstream Groups**:
     -   `GET /api/v1/upstream-groups`: Lists all configured upstream groups.
     -   `GET /api/v1/upstream-groups/{name}`: Fetches the details of a specific group.
-    -   `PATCH /api/v1/upstream-groups/{name}`: Updates the upstreams list of a specific group. This operation atomically replaces the entire upstreams list with the new one provided.
 -   **Upstreams**:
     -   `GET /api/v1/upstreams`: Lists all configured upstream services.
     -   `GET /api/v1/upstreams/{name}`: Fetches the details of a specific upstream.
@@ -999,10 +1004,10 @@ The API offers a structured set of endpoints to retrieve and modify all key conf
 
 The dynamic configuration API enables hot-reloading of LLMProxy's configuration without service restart:
 
+-   **Routing Rule Management**: Dynamically create, retrieve, update, and delete path-based routing rules for any forward service, allowing for instant changes to traffic flow logic.
 -   **Upstream Service Management**: Create, update, or delete upstream services on-the-fly.
 -   **Upstream Group Management**: Reconfigure upstream groups by modifying their upstreams list.
 -   **Dependency Protection**: Built-in safeguards prevent breaking changes, such as deleting an upstream that's currently in use.
--   **Configuration Consistency**: All modifications maintain the integrity of LLMProxy's configuration.
 
 **Interactive OpenAPI UI**
 

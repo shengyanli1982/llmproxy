@@ -980,6 +980,12 @@ API 提供了一组结构化的端点，用于获取和修改所有关键配置�
 -   **转发服务 (Forwards)**：
     -   `GET /api/v1/forwards`: 获取所有已配置的转发服务列表。
     -   `GET /api/v1/forwards/{name}`: 根据名称获取特定转发服务的详细信息。
+-   **路由 (Routes)**:
+    -   `GET /api/v1/forwards/{name}/routes`: 获取特定转发服务的所有路由规则列表。
+    -   `POST /api/v1/forwards/{name}/routes`: 在特定转发中创建新的路由规则。
+    -   `GET /api/v1/forwards/{name}/routes/{path}`: 获取特定路由规则的详细信息（路径需进行 Base64 编码）。
+    -   `PUT /api/v1/forwards/{name}/routes/{path}`: 更新已存在的路由规则（路径需进行 Base64 编码）。
+    -   `DELETE /api/v1/forwards/{name}/routes/{path}`: 删除路由规则（路径需进行 Base64 编码）。
 -   **上游组 (Upstream Groups)**：
     -   `GET /api/v1/upstream-groups`: 列出所有已配置的上游组。
     -   `GET /api/v1/upstream-groups/{name}`: 获取特定上游组的详细信息。
@@ -995,6 +1001,7 @@ API 提供了一组结构化的端点，用于获取和修改所有关键配置�
 
 动态配置 API 实现了 LLMProxy 配置的热重载，无需重启服务：
 
+-   **路由规则管理**: 可为任意转发服务动态地创建、查询、更新和删除基于路径的路由规则，从而实现对流量分发逻辑的即时调整。
 -   **上游服务管理**：随时创建、更新或删除上游服务。
 -   **上游组管理**：通过修改其上游服务列表来重新配置上游组。
 -   **依赖保护**：内置安全机制防止破坏性变更，例如删除当前正在使用的上游服务。
